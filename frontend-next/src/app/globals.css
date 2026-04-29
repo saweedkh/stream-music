@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+a {
+  @apply transition;
+}
+
+* {
+  scrollbar-color: #334155 #020617;
+}
