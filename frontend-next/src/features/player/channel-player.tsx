@@ -28,6 +28,7 @@ export type ChannelPlaybackEventPayload = {
   started_at_server_time?: number | null;
   position?: number | null;
   track_file?: string | null;
+  queue_version?: number;
 };
 
 type Props = {
@@ -103,6 +104,9 @@ export function ChannelPlayer({
   const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
   const lastAppliedEventSeqRef = useRef(0);
   const isDraggingSeekRef = useRef(false);
+  const isPlayingRef = useRef(initialIsPlaying);
+  const socketConnectedRef = useRef(socketState === "connected");
+  const sendSocketMessageRef = useRef(sendSocketMessage);
 
   const [offsetMs, setOffsetMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
@@ -114,6 +118,7 @@ export function ChannelPlayer({
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.75);
+  const [queueVersion, setQueueVersion] = useState(0);
 
   const trackLabel = activeTrackPath ? decodeURIComponent(activeTrackPath.split("/").pop() ?? "Unknown track") : "No active track";
   const title = useMemo(() => trackLabel.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim(), [trackLabel]);
@@ -128,6 +133,7 @@ export function ChannelPlayer({
       setSyncStartedAt(data.playback.started_at_server_time);
       setSyncPausedAt(data.playback.paused_at_position);
       setActiveTrackPath(data.playback.track?.file ?? undefined);
+      if (typeof data.playback.queue_version === "number") setQueueVersion(data.playback.queue_version);
       setLastSyncAt(Date.now());
     } catch (error) {
       if (error instanceof ChannelClosedError) {
@@ -144,10 +150,21 @@ export function ChannelPlayer({
     if ("started_at_server_time" in payload) setSyncStartedAt(payload.started_at_server_time ?? null);
     if ("position" in payload && typeof payload.position === "number") setSyncPausedAt(Math.max(0, payload.position));
     if ("track_file" in payload) setActiveTrackPath(payload.track_file ?? undefined);
+    if (typeof payload.queue_version === "number") setQueueVersion(payload.queue_version);
     setLastSyncAt(Date.now());
   }
 
   function handleIncomingPlaybackPayload(payload: ChannelPlaybackEventPayload) {
+    const action = String(payload.action ?? "").toLowerCase();
+    if (action === "initial_sync") {
+      applySocketPayload(payload);
+      const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
+      if (seq !== null) {
+        lastAppliedEventSeqRef.current = Math.max(lastAppliedEventSeqRef.current, seq);
+      }
+      return;
+    }
+
     const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
     if (seq !== null) {
       if (seq <= lastAppliedEventSeqRef.current) return;
@@ -187,6 +204,18 @@ export function ChannelPlayer({
   }, []);
 
   useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    socketConnectedRef.current = socketState === "connected";
+  }, [socketState]);
+
+  useEffect(() => {
+    sendSocketMessageRef.current = sendSocketMessage;
+  }, [sendSocketMessage]);
+
+  useEffect(() => {
     setActiveTrackPath(trackPath);
     setSyncStartedAt(startedAt);
     setSyncPausedAt(pausedAt);
@@ -194,12 +223,14 @@ export function ChannelPlayer({
   }, [trackPath, startedAt, pausedAt, initialIsPlaying]);
 
   useEffect(() => {
-    void refreshChannelPlaybackState({ silent: true });
+    lastAppliedEventSeqRef.current = 0;
+    setQueueVersion(0);
   }, [channelId]);
 
   useEffect(() => {
-    if (socketState === "connected") void refreshChannelPlaybackState({ silent: true });
-  }, [socketState, channelId]);
+    if (socketState !== "closed") return;
+    void refreshChannelPlaybackState({ silent: true });
+  }, [channelId, socketState]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -249,6 +280,14 @@ export function ChannelPlayer({
       onload: () => setDuration(howl.duration() || 0),
       onplayerror: () => setNeedsUserInteraction(true),
       onloaderror: () => showToast("Cannot load audio source", "error"),
+      onend: () => {
+        if (!isPlayingRef.current || !socketConnectedRef.current) return;
+        const send = sendSocketMessageRef.current;
+        const ok = send?.({ action: "auto_next" });
+        if (!ok) {
+          pendingSocketCommandRef.current = { action: "auto_next" };
+        }
+      },
     });
 
     howlRef.current?.unload();
@@ -260,7 +299,7 @@ export function ChannelPlayer({
         howlRef.current = null;
       }
     };
-  }, [activeTrackPath]);
+  }, [activeTrackPath, queueVersion]);
 
   useEffect(() => {
     const howl = howlRef.current;
@@ -285,7 +324,7 @@ export function ChannelPlayer({
           isPlaying,
         });
         const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-        if (Math.abs(current - expected) > 0.25 && !isDraggingSeekRef.current) {
+        if (Math.abs(current - expected) > 0.85 && !isDraggingSeekRef.current) {
           howl.seek(Math.max(0, expected));
         }
       }

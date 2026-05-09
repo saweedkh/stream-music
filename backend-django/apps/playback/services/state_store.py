@@ -31,6 +31,10 @@ class PlaybackStateStore:
     def _event_seq_key(channel_id: int) -> str:
         return f"channel:{channel_id}:event_seq"
 
+    @staticmethod
+    def _auto_next_lock_key(channel_id: int) -> str:
+        return f"channel:{channel_id}:auto_next_lock"
+
     def save_playback_snapshot(self, channel_id: int, payload: dict[str, Any]) -> None:
         if self._client is None:
             return
@@ -89,10 +93,24 @@ class PlaybackStateStore:
 
             return int(time() * 1000)
 
+    def try_auto_next_lock(self, channel_id: int, ttl_sec: int = 5) -> bool:
+        """One winner across listeners when many clients fire end-of-track at once."""
+        if self._client is None:
+            return True
+        try:
+            return bool(self._client.set(self._auto_next_lock_key(channel_id), "1", nx=True, ex=ttl_sec))
+        except Exception:
+            return True
+
     def clear_channel(self, channel_id: int) -> None:
         if self._client is None:
             return
-        for key in (self._playback_key(channel_id), self._queue_key(channel_id), self._event_seq_key(channel_id)):
+        for key in (
+            self._playback_key(channel_id),
+            self._queue_key(channel_id),
+            self._event_seq_key(channel_id),
+            self._auto_next_lock_key(channel_id),
+        ):
             try:
                 self._client.delete(key)
             except Exception:
