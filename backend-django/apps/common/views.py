@@ -19,6 +19,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership, InviteToken
+
+
+def _channel_closed_response():
+    return Response({"detail": "channel_closed"}, status=status.HTTP_410_GONE)
 from apps.common.serializers import (
     ChannelSerializer,
     ChannelJoinRequestSerializer,
@@ -113,7 +117,11 @@ class ChannelViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return self.queryset.filter(memberships__user=user, memberships__is_active=True).distinct()
+        return (
+            self.queryset.filter(memberships__user=user)
+            .filter(Q(is_active=True) | Q(owner=user))
+            .distinct()
+        )
 
     def perform_create(self, serializer):
         channel = serializer.save(owner=self.request.user)
@@ -269,6 +277,8 @@ class ChannelStateView(APIView):
 
     def get(self, request, channel_id: int):
         channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active and channel.owner_id != request.user.id:
+            return _channel_closed_response()
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
         playback_data = PlaybackSessionSerializer(playback_session).data
         snapshot = playback_state_store.get_playback_snapshot(channel.id)
@@ -287,7 +297,7 @@ class ChannelStateView(APIView):
                 playback_data["track"] = merged_track
         return Response(
             {
-                "channel": ChannelSerializer(channel).data,
+                "channel": ChannelSerializer(channel, context={"request": request}).data,
                 "playback": playback_data,
             }
         )
@@ -320,6 +330,8 @@ class ChannelControlView(APIView):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
 
         channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
         action = request.data.get("action")
         if action not in {"play", "pause", "seek", "next", "prev"}:
@@ -377,6 +389,8 @@ class ChannelPlayPlaylistView(APIView):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
 
         channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         playlist = get_object_or_404(Playlist, id=playlist_id)
         if playlist.owner_id != request.user.id and playlist.channel_id != channel.id:
             return Response({"detail": "playlist_not_allowed"}, status=status.HTTP_403_FORBIDDEN)
@@ -447,6 +461,8 @@ class ChannelShufflePlayView(APIView):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
 
         channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         try:
             limit = int(request.data.get("limit") or 50)
         except (TypeError, ValueError):
@@ -506,6 +522,9 @@ class ChannelQueueView(APIView):
     def get(self, request, channel_id: int):
         if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         queue_snapshot = playback_state_store.get_queue_snapshot(channel_id)
         if queue_snapshot is not None:
             return Response({"results": queue_snapshot})
@@ -521,6 +540,9 @@ class ChannelQueueItemManageView(APIView):
     def patch(self, request, channel_id: int, item_id: int):
         if not can_control_channel(request.user, channel_id):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         item = get_object_or_404(ChannelQueueItem, id=item_id, channel_id=channel_id)
         new_position = max(0, int(request.data.get("position", 0)))
         rows = list(ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id"))
@@ -543,6 +565,9 @@ class ChannelQueueItemManageView(APIView):
     def delete(self, request, channel_id: int, item_id: int):
         if not can_control_channel(request.user, channel_id):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         item = get_object_or_404(ChannelQueueItem, id=item_id, channel_id=channel_id)
         item.delete()
         rows = list(ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id"))
@@ -564,6 +589,9 @@ class ChannelQueueJumpView(APIView):
     def post(self, request, channel_id: int, item_id: int):
         if not can_control_channel(request.user, channel_id):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
         item = get_object_or_404(ChannelQueueItem, id=item_id, channel_id=channel_id)
         session, _ = PlaybackSession.objects.get_or_create(channel_id=channel_id)
         session.track = item.track
@@ -659,7 +687,29 @@ def perform_channel_join(user, channel: Channel, token_value) -> Response:
     """
     membership = ChannelMembership.objects.filter(channel=channel, user=user).first()
     if membership and membership.is_active:
+        if not channel.is_active and channel.owner_id != user.id:
+            return _channel_closed_response()
         return Response(MembershipSerializer(membership).data, status=status.HTTP_200_OK)
+
+    # Left the room but membership row remains — allow listing + one-click rejoin.
+    if membership and not membership.is_active:
+        if not channel.is_active and channel.owner_id != user.id:
+            return _channel_closed_response()
+        active_members = ChannelMembership.objects.filter(channel=channel, is_active=True).count()
+        if active_members >= channel.member_limit:
+            return Response({"detail": "channel_full"}, status=status.HTTP_403_FORBIDDEN)
+        err, invite = _validate_private_invite(channel, token_value, user=user)
+        if err:
+            if channel.privacy != Channel.Privacy.PRIVATE or channel.owner_id == user.id:
+                return err
+        elif invite:
+            _consume_invite(invite)
+        membership.is_active = True
+        membership.save(update_fields=["is_active"])
+        return Response(MembershipSerializer(membership).data, status=status.HTTP_200_OK)
+
+    if not channel.is_active:
+        return _channel_closed_response()
 
     err, invite = _validate_private_invite(channel, token_value, user=user)
     if err:
@@ -735,6 +785,8 @@ class ChannelJoinRequestApproveView(APIView):
             return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
 
         channel = join_req.channel
+        if not channel.is_active:
+            return _channel_closed_response()
         active_members = ChannelMembership.objects.filter(channel=channel, is_active=True).count()
         if active_members >= channel.member_limit:
             return Response({"detail": "channel_full"}, status=status.HTTP_403_FORBIDDEN)
@@ -930,7 +982,7 @@ class ChannelSettingsView(APIView):
         channel.save(
             update_fields=["name", "description", "privacy", "member_limit", "join_requires_approval", "updated_at"]
         )
-        return Response(ChannelSerializer(channel).data)
+        return Response(ChannelSerializer(channel, context={"request": request}).data)
 
 
 class ChannelLeaveView(APIView):
@@ -945,6 +997,35 @@ class ChannelLeaveView(APIView):
             return Response({"detail": "owner_cannot_leave"}, status=status.HTTP_400_BAD_REQUEST)
         membership.is_active = False
         membership.save(update_fields=["is_active"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChannelCloseView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        if channel.owner_id != request.user.id:
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        if not channel.is_active:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        channel.is_active = False
+        channel.save(update_fields=["is_active", "updated_at"])
+        playback_state_store.clear_channel(channel.id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChannelReopenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        if channel.owner_id != request.user.id:
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        if channel.is_active:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        channel.is_active = True
+        channel.save(update_fields=["is_active", "updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -40,6 +40,19 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         self.channel_id = self.scope["url_route"]["kwargs"]["channel_id"]
+
+        @sync_to_async
+        def channel_is_open() -> bool:
+            try:
+                ch = Channel.objects.only("is_active").get(id=int(self.channel_id))
+            except (Channel.DoesNotExist, ValueError, TypeError):
+                return False
+            return bool(ch.is_active)
+
+        if not await channel_is_open():
+            await self.close(code=4404)
+            return
+
         self.group_name = f"channel_{self.channel_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()

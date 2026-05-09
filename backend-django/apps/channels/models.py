@@ -21,6 +21,7 @@ class Channel(models.Model):
     is_playing = models.BooleanField(default=False)
     started_at = models.FloatField(null=True, blank=True)
     paused_at = models.FloatField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

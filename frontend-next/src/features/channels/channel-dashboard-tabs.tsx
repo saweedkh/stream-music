@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, HeartPulse, LogOut, Radio, Settings2, Sparkles } from "lucide-react";
+import { Activity, DoorClosed, HeartPulse, LogOut, Radio, Settings2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
+import { ChannelListenerView, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
-import { getChannelMembers, getMe, joinChannel, leaveChannel, type QueueItemSummary } from "@/lib/api";
+import {
+  closeChannel,
+  getChannelMembers,
+  getMe,
+  joinChannel,
+  leaveChannel,
+  reopenChannel,
+  type QueueItemSummary,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TAB_IDS = ["player", "queue", "admin", "health"] as const;
@@ -39,6 +48,13 @@ function readTabFromWindowSearch(): TabId | null {
   return tabFromSearchValue(new URLSearchParams(window.location.search).get("tab"));
 }
 
+function deriveNowPlayingLabel(trackPath?: string, payload?: { track_file?: string | null } | null): string | null {
+  const raw = payload?.track_file ?? trackPath;
+  if (!raw?.trim()) return null;
+  const base = decodeURIComponent(raw.split("/").pop() ?? "").replace(/\.[^/.]+$/i, "").trim();
+  return base || null;
+}
+
 type Props = {
   channelId: string;
   /** Django user id of channel owner — leave is hidden for owners (must transfer/delete elsewhere). */
@@ -53,6 +69,8 @@ type Props = {
   initialMemberLimit?: number;
   publicSlug?: string;
   initialJoinRequiresApproval?: boolean;
+  /** When false, sync/listening is off until the owner reopens the room. */
+  channelIsActive?: boolean;
 };
 
 export function ChannelDashboardTabs(props: Props) {
@@ -69,6 +87,7 @@ export function ChannelDashboardTabs(props: Props) {
     initialMemberLimit,
     publicSlug,
     initialJoinRequiresApproval,
+    channelIsActive = true,
   } = props;
   const { showToast } = useToast();
   const router = useRouter();
@@ -77,10 +96,13 @@ export function ChannelDashboardTabs(props: Props) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "player");
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
-  const [canManageChannel, setCanManageChannel] = useState(true);
+  const [canManageChannel, setCanManageChannel] = useState(false);
+  const [membershipLoaded, setMembershipLoaded] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
+  const [closeChannelDialogOpen, setCloseChannelDialogOpen] = useState(false);
+  const [closeChannelBusy, setCloseChannelBusy] = useState(false);
   const [latestPlaybackPayload, setLatestPlaybackPayload] = useState<{
     action?: string;
     event_seq?: number;
@@ -140,7 +162,7 @@ export function ChannelDashboardTabs(props: Props) {
   const { socketState, sendMessage } = useReconnectingChannelSocket({
     channelId,
     onMessage: handleSocketMessage,
-    enabled: !leaveBusy,
+    enabled: channelIsActive && !leaveBusy,
   });
 
   const isChannelOwner =
@@ -164,21 +186,23 @@ export function ChannelDashboardTabs(props: Props) {
   }, []);
 
   useEffect(() => {
-    joinChannel(channelId)
-      .then((out) => {
+    let cancelled = false;
+    setMembershipLoaded(false);
+
+    void (async () => {
+      try {
+        const out = await joinChannel(channelId);
+        if (cancelled) return;
         if (out.status === "pending") {
           showToast("Your join request is pending moderator approval.", "info");
         }
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : "Cannot join this channel";
-        showToast(message, "error");
-      });
-  }, [channelId, showToast]);
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Cannot join this channel";
+          showToast(message, "error");
+        }
+      }
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
       try {
         const me = await getMe();
         if (cancelled) return;
@@ -202,12 +226,30 @@ export function ChannelDashboardTabs(props: Props) {
           setCurrentUserId(null);
           setCanManageChannel(false);
         }
+      } finally {
+        if (!cancelled) setMembershipLoaded(true);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [channelId]);
+  }, [channelId, showToast]);
+
+  function applyChannelClosedNavigation() {
+    upsertGlobalPlayerState({
+      channelId: null,
+      socketState: "closed",
+      trackPath: undefined,
+      startedAt: undefined,
+      pausedAt: undefined,
+      initialIsPlaying: false,
+      canControl: false,
+      sendSocketMessage: undefined,
+      latestSocketPayload: null,
+    });
+    router.replace("/dashboard");
+  }
 
   async function confirmLeaveChannel() {
     setLeaveBusy(true);
@@ -256,12 +298,13 @@ export function ChannelDashboardTabs(props: Props) {
       startedAt,
       pausedAt,
       initialIsPlaying: isPlaying,
-      canControl: canManageChannel,
+      canControl: canManageChannel && channelIsActive,
       sendSocketMessage: stableSendSocketMessage,
       latestSocketPayload: latestPlaybackPayload,
     });
   }, [
     canManageChannel,
+    channelIsActive,
     channelId,
     isPlaying,
     latestPlaybackPayload,
@@ -283,8 +326,120 @@ export function ChannelDashboardTabs(props: Props) {
     };
   }, [upsertGlobalPlayerState]);
 
+  const nowPlayingLabel = deriveNowPlayingLabel(trackPath, latestPlaybackPayload);
+
+  const closeChannelDialog = (
+    <Dialog open={closeChannelDialogOpen} onOpenChange={(open) => !closeChannelBusy && setCloseChannelDialogOpen(open)}>
+      <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Close this channel?</DialogTitle>
+          <DialogDescription>Everyone loses access until you reopen the room.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="secondary" disabled={closeChannelBusy} onClick={() => setCloseChannelDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={closeChannelBusy}
+            onClick={() => {
+              void (async () => {
+                setCloseChannelBusy(true);
+                try {
+                  await closeChannel(channelId);
+                  showToast("Channel closed.", "success");
+                  setCloseChannelDialogOpen(false);
+                  applyChannelClosedNavigation();
+                } catch (error) {
+                  showToast(error instanceof Error ? error.message : "Close failed.", "error");
+                } finally {
+                  setCloseChannelBusy(false);
+                }
+              })();
+            }}
+          >
+            {closeChannelBusy ? "Closing…" : "Close"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const leaveDialog = (
+    <Dialog open={leaveDialogOpen} onOpenChange={(open) => !leaveBusy && setLeaveDialogOpen(open)}>
+      <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Leave this channel?</DialogTitle>
+          <DialogDescription>You can join again later from the dashboard if you still have access.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="secondary" disabled={leaveBusy} onClick={() => setLeaveDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" disabled={leaveBusy} onClick={() => void confirmLeaveChannel()}>
+            {leaveBusy ? "Leaving…" : "Leave channel"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (!membershipLoaded) {
+    return (
+      <>
+        <ChannelRoomLoading />
+        {leaveDialog}
+      </>
+    );
+  }
+
+  if (!canManageChannel) {
+    return (
+      <>
+        <ChannelListenerView
+          channelId={channelId}
+          channelName={channelName}
+          channelPrivacy={channelPrivacy}
+          description={initialDescription}
+          memberLimit={initialMemberLimit}
+          joinRequiresApproval={initialJoinRequiresApproval}
+          isLive={isChannelOnline}
+          socketState={socketState}
+          nowPlayingLabel={nowPlayingLabel}
+          showLeave={!isChannelOwner && currentUserId !== null}
+          onLeaveClick={() => setLeaveDialogOpen(true)}
+        />
+        {leaveDialog}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-28">
+      {!channelIsActive && isChannelOwner ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-amber-100/90">This channel is closed — playback and sync stay off until you reopen.</p>
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              void (async () => {
+                try {
+                  await reopenChannel(channelId);
+                  showToast("Channel reopened.", "success");
+                  router.refresh();
+                } catch (e) {
+                  showToast(e instanceof Error ? e.message : "Could not reopen.", "error");
+                }
+              })();
+            }}
+          >
+            Reopen channel
+          </Button>
+        </div>
+      ) : null}
       <section
         className={cn(
           "overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5 shadow-lg shadow-black/20 backdrop-blur-xl",
@@ -293,11 +448,22 @@ export function ChannelDashboardTabs(props: Props) {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Channel</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Control room</p>
             <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
-            <p className="max-w-xl text-sm text-zinc-400">Listen in the docked player, manage the queue, or open controls if you’re a moderator.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isChannelOwner && channelIsActive ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setCloseChannelDialogOpen(true)}
+              >
+                <DoorClosed className="h-4 w-4" aria-hidden />
+                Close channel
+              </Button>
+            ) : null}
             {!isChannelOwner && currentUserId != null ? (
               <Button
                 type="button"
@@ -317,7 +483,11 @@ export function ChannelDashboardTabs(props: Props) {
             <Badge variant="outline" className="capitalize">
               {channelPrivacy}
             </Badge>
-            <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+            {!channelIsActive ? (
+              <Badge variant="warning">Closed</Badge>
+            ) : (
+              <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+            )}
           </div>
         </div>
       </section>
@@ -347,7 +517,7 @@ export function ChannelDashboardTabs(props: Props) {
         </div>
 
         <TabsContent value="player" className="mt-5 focus-visible:outline-none space-y-6">
-          <ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel} sendSocketMessage={sendMessage} />
+          <ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel && channelIsActive} sendSocketMessage={sendMessage} />
           <Card className="border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
             <CardHeader className="border-b border-zinc-800/80 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -356,18 +526,15 @@ export function ChannelDashboardTabs(props: Props) {
                 </span>
                 Player
               </CardTitle>
-              <CardDescription>The mini player stays fixed at the bottom while you browse this channel.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6 text-sm text-zinc-400">
-              <p className="leading-relaxed">
-                Use the bar to play/pause, scrub, or open the full panel. Audio keeps running when you switch tabs.
-              </p>
+              <p className="leading-relaxed">Mini player is pinned at the bottom of the screen.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="queue" className="mt-5">
-          <ChannelQueuePanel channelId={channelId} />
+          <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />
         </TabsContent>
 
         {canManageChannel ? (
@@ -381,6 +548,7 @@ export function ChannelDashboardTabs(props: Props) {
               publicSlug={publicSlug}
               initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
               sendSocketMessage={sendMessage}
+              channelIsActive={channelIsActive}
             />
           </TabsContent>
         ) : null}
@@ -392,9 +560,8 @@ export function ChannelDashboardTabs(props: Props) {
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-950/40">
                   <HeartPulse className="h-5 w-5 text-emerald-400" aria-hidden />
                 </span>
-                Sync &amp; health
+                Sync
               </CardTitle>
-              <CardDescription>Baseline from the latest server snapshot for this channel.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 pt-6 text-sm text-zinc-400">
               <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
@@ -409,30 +576,13 @@ export function ChannelDashboardTabs(props: Props) {
                   <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{pausedAtText}</span>
                 </p>
               </div>
-              <p className="text-xs text-zinc-500">REST and WebSocket events share the same playback state on the server.</p>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <Dialog open={leaveDialogOpen} onOpenChange={(open) => !leaveBusy && setLeaveDialogOpen(open)}>
-        <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leave this channel?</DialogTitle>
-            <DialogDescription>
-              Playback will stop and you will need to join again to listen. Moderators and owners stay via Control tab — owners cannot leave from here.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="secondary" disabled={leaveBusy} onClick={() => setLeaveDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" disabled={leaveBusy} onClick={() => void confirmLeaveChannel()}>
-              {leaveBusy ? "Leaving…" : "Leave channel"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {closeChannelDialog}
+      {leaveDialog}
     </div>
   );
 }

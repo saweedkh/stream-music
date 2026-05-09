@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast-provider";
-import { getApiBase, getChannelState, getServerTime } from "@/lib/api";
+import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { expectedTimeSeconds } from "./sync-client";
 
@@ -130,6 +130,10 @@ export function ChannelPlayer({
       setActiveTrackPath(data.playback.track?.file ?? undefined);
       setLastSyncAt(Date.now());
     } catch (error) {
+      if (error instanceof ChannelClosedError) {
+        if (!options?.silent) showToast("This channel is closed.", "info");
+        return;
+      }
       const message = error instanceof Error ? error.message : "Cannot refresh channel state";
       if (!options?.silent) showToast(message, "error");
     }

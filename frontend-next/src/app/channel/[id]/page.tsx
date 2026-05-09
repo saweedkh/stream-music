@@ -1,6 +1,9 @@
+import Link from "next/link";
+import { headers } from "next/headers";
 import { AuthGuard } from "@/features/auth/auth-guard";
 import { ChannelDashboardTabs } from "@/features/channels/channel-dashboard-tabs";
-import { getChannelState } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { ChannelClosedError, getChannelState } from "@/lib/api";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -8,11 +11,33 @@ type Props = {
 
 export default async function ChannelPage({ params }: Props) {
   const { id } = await params;
-  const data = await getChannelState(id).catch(() => null);
+  const cookieHeader = (await headers()).get("cookie");
+
+  let data: Awaited<ReturnType<typeof getChannelState>>;
+  try {
+    data = await getChannelState(id, { cookieHeader });
+  } catch (e) {
+    if (e instanceof ChannelClosedError) {
+      return (
+        <AuthGuard>
+          <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+            <h1 className="text-xl font-semibold text-white">This channel is closed</h1>
+            <p className="text-sm text-zinc-400">The owner ended the room. You cannot listen or sync here anymore.</p>
+            <Button asChild variant="secondary">
+              <Link href="/dashboard">Back to dashboard</Link>
+            </Button>
+          </div>
+        </AuthGuard>
+      );
+    }
+    throw e;
+  }
+
   const startedAt = data?.playback?.started_at_server_time;
   const pausedAt = data?.playback?.paused_at_position;
   const trackPath = data?.playback?.track?.file ?? undefined;
   const isPlaying = data?.playback?.is_playing ?? false;
+  const channelIsActive = data.channel.is_active !== false;
 
   return (
     <AuthGuard>
@@ -21,6 +46,7 @@ export default async function ChannelPage({ params }: Props) {
         channelOwnerId={data?.channel?.owner}
         channelName={data?.channel?.name ?? `Channel #${id}`}
         channelPrivacy={data?.channel?.privacy ?? "unknown"}
+        channelIsActive={channelIsActive}
         isPlaying={isPlaying}
         trackPath={trackPath}
         startedAt={startedAt ?? undefined}

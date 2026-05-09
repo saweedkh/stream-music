@@ -64,12 +64,17 @@ export function useReconnectingChannelSocket({ channelId, onMessage, enabled = t
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (heartbeatTimerRef.current) {
           clearInterval(heartbeatTimerRef.current);
           heartbeatTimerRef.current = null;
         }
         if (cancelled) {
+          setSocketState("closed");
+          return;
+        }
+        // Server rejects inactive/missing channels (see Django Channels consumer).
+        if (event.code === 4404) {
           setSocketState("closed");
           return;
         }

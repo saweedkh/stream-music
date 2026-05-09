@@ -48,6 +48,8 @@ export type ChannelStateResponse = {
     member_limit?: number;
     public_slug?: string;
     join_requires_approval?: boolean;
+    is_active?: boolean;
+    membership_is_active?: boolean | null;
   };
   playback: PlaybackState;
 };
@@ -56,10 +58,22 @@ export type ChannelSummary = {
   name: string;
   description: string;
   privacy: "public" | "private" | "unlisted";
+  owner?: number;
   member_limit?: number;
   is_playing?: boolean;
   join_requires_approval?: boolean;
+  is_active?: boolean;
+  /** False after leaving the room; user can reopen / reconnect via join. */
+  membership_is_active?: boolean | null;
 };
+
+/** Thrown when GET /channels/:id/state returns 410 (room closed for non-owners). */
+export class ChannelClosedError extends Error {
+  constructor() {
+    super("channel_closed");
+    this.name = "ChannelClosedError";
+  }
+}
 
 /** Shorter QR: `/join?channel=<id>` — no long URL on screen; works for public/unlisted (and server join rules). */
 export function buildJoinUrlWithChannelId(channelId: string | number): string {
@@ -207,8 +221,25 @@ async function withAuthFormData(init: RequestInit = {}): Promise<RequestInit> {
   };
 }
 
-export async function getChannelState(channelId: string) {
-  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/state`, { cache: "no-store" });
+export type GetChannelStateOptions = {
+  /**
+   * Required for server-side (RSC) calls: the browser never attaches cookies to fetches
+   * from Next.js to INTERNAL_API_BASE_URL, so forward the incoming `Cookie` header.
+   */
+  cookieHeader?: string | null;
+};
+
+export async function getChannelState(channelId: string, options?: GetChannelStateOptions): Promise<ChannelStateResponse> {
+  const isBrowser = typeof window !== "undefined";
+  const fetchInit: RequestInit = { cache: "no-store" };
+  if (isBrowser) {
+    fetchInit.credentials = "include";
+  } else if (options?.cookieHeader) {
+    fetchInit.headers = { ...(fetchInit.headers as Record<string, string>), Cookie: options.cookieHeader };
+  }
+
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/state`, fetchInit);
+  if (res.status === 410) throw new ChannelClosedError();
   if (!res.ok) throw new Error("Cannot load channel state");
   return (await res.json()) as ChannelStateResponse;
 }
@@ -382,6 +413,16 @@ export async function removeChannelMember(channelId: string, memberId: number) {
 export async function leaveChannel(channelId: string) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/leave`, await withAuthHeaders({ method: "POST" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot leave channel"));
+}
+
+export async function closeChannel(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/close`, await withAuthHeaders({ method: "POST" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot close channel"));
+}
+
+export async function reopenChannel(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/reopen`, await withAuthHeaders({ method: "POST" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot reopen channel"));
 }
 
 export async function rotatePrivateInvite(channelId: string) {

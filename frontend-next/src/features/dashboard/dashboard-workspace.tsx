@@ -16,6 +16,7 @@ import {
   addTrackSharePermission,
   createChannel,
   createPlaylist,
+  getMe,
   listChannels,
   listPlaylistItems,
   listPlaylists,
@@ -65,6 +66,7 @@ export function DashboardWorkspace() {
   const [shareChannelId, setShareChannelId] = useState<string>("");
   const [draggingPlaylistItemId, setDraggingPlaylistItemId] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"channels" | "tracks" | "playlists" | "sharing">(
     tabFromUrl === "channels" || tabFromUrl === "tracks" || tabFromUrl === "playlists" || tabFromUrl === "sharing" ? tabFromUrl : "channels",
   );
@@ -94,6 +96,8 @@ export function DashboardWorkspace() {
 
   async function refreshAll() {
     try {
+      const me = await getMe();
+      setCurrentUserId(me?.id ?? null);
       const [c, t, p, u] = await Promise.all([listChannels(), listTracks(), listPlaylists(), listUsers()]);
       const pi = await listPlaylistItems();
       setChannels(c);
@@ -345,6 +349,8 @@ export function DashboardWorkspace() {
               onChannelPrivacyChange={setChannelPrivacy}
               onMemberLimitChange={setMemberLimit}
               onCreateChannel={handleCreateChannel}
+              currentUserId={currentUserId}
+              onChannelsRefresh={() => void refreshAll()}
             />
           </TabsContent>
 

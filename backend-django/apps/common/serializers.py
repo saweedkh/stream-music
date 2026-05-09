@@ -23,6 +23,8 @@ class TrackSharePermissionSerializer(serializers.ModelSerializer):
 
 
 class ChannelSerializer(serializers.ModelSerializer):
+    membership_is_active = serializers.SerializerMethodField()
+
     class Meta:
         model = Channel
         fields = [
@@ -37,8 +39,17 @@ class ChannelSerializer(serializers.ModelSerializer):
             "is_playing",
             "started_at",
             "paused_at",
+            "is_active",
+            "membership_is_active",
         ]
-        read_only_fields = ["owner", "public_slug", "is_playing", "started_at", "paused_at"]
+        read_only_fields = ["owner", "public_slug", "is_playing", "started_at", "paused_at", "is_active", "membership_is_active"]
+
+    def get_membership_is_active(self, obj):
+        request = self.context.get("request")
+        if not request or not getattr(request.user, "is_authenticated", False):
+            return None
+        row = ChannelMembership.objects.filter(channel=obj, user=request.user).first()
+        return row.is_active if row else None
 
 
 class MembershipSerializer(serializers.ModelSerializer):

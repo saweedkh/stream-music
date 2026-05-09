@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,6 +40,7 @@ type Props = {
   publicSlug?: string;
   initialJoinRequiresApproval?: boolean;
   sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
+  channelIsActive?: boolean;
 };
 
 export function ChannelAdminPanel({
@@ -51,6 +52,7 @@ export function ChannelAdminPanel({
   publicSlug,
   initialJoinRequiresApproval = false,
   sendSocketMessage,
+  channelIsActive = true,
 }: Props) {
   const { showToast } = useToast();
   const [seekSeconds, setSeekSeconds] = useState("10");
@@ -85,6 +87,7 @@ export function ChannelAdminPanel({
   }, [loadJoinRequests]);
 
   async function control(action: string, payload?: Record<string, unknown>) {
+    if (!channelIsActive) return;
     setBusyAction(action);
     setFeedback(`Applying ${action}...`);
     try {
@@ -150,12 +153,10 @@ export function ChannelAdminPanel({
   }
 
   async function loadMembers() {
-    setFeedback("Loading members...");
     try {
       const data = await getChannelMembers(channelId);
       setMembers(data.results);
-      setFeedback("Members loaded.");
-      showToast("Members loaded.", "success");
+      setFeedback(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Cannot load members.";
       setFeedback(message);
@@ -198,7 +199,6 @@ export function ChannelAdminPanel({
           </span>
           <div className="space-y-1">
             <CardTitle className="text-lg">Admin</CardTitle>
-            <CardDescription>Playback controls, channel settings, invites, and members.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -215,16 +215,20 @@ export function ChannelAdminPanel({
             )}
           </div>
           <div className="grid gap-2 md:grid-cols-2">
-            <Button onClick={() => control("play")} disabled={busyAction !== null} className="transition-transform duration-200 active:scale-[0.98]">
+            <Button
+              onClick={() => control("play")}
+              disabled={busyAction !== null || !channelIsActive}
+              className="transition-transform duration-200 active:scale-[0.98]"
+            >
               Play
             </Button>
-            <Button variant="secondary" onClick={() => control("pause")} disabled={busyAction !== null}>
+            <Button variant="secondary" onClick={() => control("pause")} disabled={busyAction !== null || !channelIsActive}>
               Pause
             </Button>
-            <Button variant="secondary" onClick={() => control("prev")} disabled={busyAction !== null}>
+            <Button variant="secondary" onClick={() => control("prev")} disabled={busyAction !== null || !channelIsActive}>
               Previous
             </Button>
-            <Button variant="secondary" onClick={() => control("next")} disabled={busyAction !== null}>
+            <Button variant="secondary" onClick={() => control("next")} disabled={busyAction !== null || !channelIsActive}>
               Next
             </Button>
           </div>
@@ -241,7 +245,11 @@ export function ChannelAdminPanel({
                 onChange={(e) => setSeekSeconds(e.target.value)}
               />
             </div>
-            <Button variant="secondary" onClick={() => control("seek", { position: Number(seekSeconds) || 0 })} disabled={busyAction !== null}>
+            <Button
+              variant="secondary"
+              onClick={() => control("seek", { position: Number(seekSeconds) || 0 })}
+              disabled={busyAction !== null || !channelIsActive}
+            >
               Seek
             </Button>
           </div>
@@ -313,9 +321,6 @@ export function ChannelAdminPanel({
               />
               <label htmlFor={`channel-${channelId}-join-approval`} className="text-sm leading-snug text-zinc-300">
                 <span className="font-medium text-zinc-100">Require approval to join</span>
-                <span className="mt-0.5 block text-xs text-zinc-500">
-                  When on, users with a valid link still need moderator approval. When off, they join immediately.
-                </span>
               </label>
             </div>
             <Button variant="secondary" className="w-full" onClick={saveSettings}>
@@ -348,28 +353,18 @@ export function ChannelAdminPanel({
         </div>
 
         <section className="space-y-4 rounded-lg border border-zinc-800/80 bg-zinc-950/35 p-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Join QR codes</p>
-            <p className="mt-1 text-xs text-zinc-500">
-              Scan while logged in. Left: compact join by channel id. Right: private channels — scan encodes the invite (single link, no extra fields).
-            </p>
-          </div>
+          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Join QR codes</p>
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="flex flex-col items-center gap-2 text-center">
               <p className="text-sm font-medium text-zinc-200">Channel #{channelId}</p>
-              <p className="text-[11px] text-zinc-500">Uses id only — best for public / unlisted.</p>
               <div className="rounded-lg bg-white p-3 shadow-inner">
                 <QRCode value={buildJoinUrlWithChannelId(channelId)} size={160} />
               </div>
-              <p className="text-xs font-mono text-zinc-400">?channel={channelId}</p>
             </div>
             <div className="flex flex-col items-center gap-2 text-center">
               <p className="text-sm font-medium text-zinc-200">Private invite</p>
               {inviteToken ? (
                 <>
-                  <p className="text-[11px] text-zinc-500">
-                    Shorter URL than before — easier for phone cameras. Scan while logged in on the same site URL you opened here.
-                  </p>
                   <div className="rounded-lg bg-white p-3 shadow-inner">
                     <QRCode value={buildPrivateInviteJoinUrl(inviteToken)} size={192} />
                   </div>

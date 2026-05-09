@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
-import type { ChannelSummary } from "@/lib/api";
+import { reopenChannel, type ChannelSummary } from "@/lib/api";
+import { useToast } from "@/components/ui/toast-provider";
 
 type Props = {
   channels: ChannelSummary[];
@@ -23,6 +24,8 @@ type Props = {
   onChannelPrivacyChange: (value: ChannelSummary["privacy"]) => void;
   onMemberLimitChange: (value: string) => void;
   onCreateChannel: () => void;
+  currentUserId: number | null;
+  onChannelsRefresh: () => void | Promise<void>;
 };
 
 export function ChannelManagementSection(props: Props) {
@@ -36,6 +39,8 @@ export function ChannelManagementSection(props: Props) {
     onChannelPrivacyChange,
     onMemberLimitChange,
     onCreateChannel,
+    currentUserId,
+    onChannelsRefresh,
   } = props;
 
   return (
@@ -43,13 +48,17 @@ export function ChannelManagementSection(props: Props) {
       <Card className="lg:col-span-3">
         <CardHeader>
           <CardTitle>Your channels</CardTitle>
-          <CardDescription>Open a channel room or review its live status.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <ScrollArea className="h-[min(420px,55vh)] px-5 pb-5 pr-3">
             <div className="grid gap-3 sm:grid-cols-2">
               {channels.map((channel) => (
-                <ChannelCard key={channel.id} channel={channel} />
+                <ChannelCard
+                  key={channel.id}
+                  channel={channel}
+                  currentUserId={currentUserId}
+                  onChannelsRefresh={onChannelsRefresh}
+                />
               ))}
             </div>
             {channels.length === 0 ? <p className="py-6 text-center text-sm text-zinc-500">No channels yet — create one on the right.</p> : null}
@@ -60,7 +69,6 @@ export function ChannelManagementSection(props: Props) {
       <Card className="border-emerald-500/15 lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-base">New channel</CardTitle>
-          <CardDescription>Set a name, visibility, and capacity.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -111,7 +119,18 @@ export function ChannelManagementSection(props: Props) {
   );
 }
 
-function ChannelCard({ channel }: { channel: ChannelSummary }) {
+function ChannelCard({
+  channel,
+  currentUserId,
+  onChannelsRefresh,
+}: {
+  channel: ChannelSummary;
+  currentUserId: number | null;
+  onChannelsRefresh: () => void | Promise<void>;
+}) {
+  const { showToast } = useToast();
+  const isOwner = channel.owner != null && currentUserId != null && Number(channel.owner) === Number(currentUserId);
+  const isActive = channel.is_active !== false;
   const [isOnline, setIsOnline] = useState(channel.is_playing ?? false);
   const handleMessage = useCallback((payload: unknown) => {
     const data = (payload ?? {}) as { type?: string; action?: string };
@@ -119,7 +138,11 @@ function ChannelCard({ channel }: { channel: ChannelSummary }) {
     if (action === "play") setIsOnline(true);
     if (action === "pause") setIsOnline(false);
   }, []);
-  const { socketState } = useReconnectingChannelSocket({ channelId: channel.id, onMessage: handleMessage });
+  const { socketState } = useReconnectingChannelSocket({
+    channelId: channel.id,
+    onMessage: handleMessage,
+    enabled: isActive,
+  });
 
   useEffect(() => {
     setIsOnline(channel.is_playing ?? false);
@@ -131,13 +154,21 @@ function ChannelCard({ channel }: { channel: ChannelSummary }) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <CardTitle className="line-clamp-2 text-base">{channel.name}</CardTitle>
           <div className="flex flex-wrap gap-1.5">
+            {!isActive ? <Badge variant="warning">Closed</Badge> : null}
             <Badge variant={isOnline ? "success" : "secondary"}>{isOnline ? "Live" : "Idle"}</Badge>
-            <Badge variant={socketState === "connected" ? "success" : "warning"} className="text-[10px]">
-              {socketState}
-            </Badge>
+            {isActive ? (
+              <Badge variant={socketState === "connected" ? "success" : "warning"} className="text-[10px]">
+                {socketState}
+              </Badge>
+            ) : null}
             <Badge variant="outline" className="capitalize">
               {channel.privacy}
             </Badge>
+            {channel.membership_is_active === false ? (
+              <Badge variant="outline" className="border-zinc-600 text-zinc-400">
+                Left — tap Open to reconnect
+              </Badge>
+            ) : null}
             {channel.join_requires_approval ? (
               <Badge variant="warning" className="text-[10px]" title="New members need moderator approval">
                 Approval required
@@ -145,12 +176,39 @@ function ChannelCard({ channel }: { channel: ChannelSummary }) {
             ) : null}
           </div>
         </div>
-        <p className="text-xs text-zinc-500">Members cap: {channel.member_limit ?? "—"}</p>
+        <p className="text-xs text-zinc-500">Cap: {channel.member_limit ?? "—"}</p>
       </CardHeader>
-      <CardContent className="pt-0">
-        <Button variant="secondary" className="w-full" asChild>
-          <Link href={`/channel/${channel.id}`}>Open room</Link>
-        </Button>
+      <CardContent className="space-y-2 pt-0">
+        {!isActive && !isOwner ? (
+          <Button variant="secondary" className="w-full" disabled type="button">
+            Closed
+          </Button>
+        ) : (
+          <Button variant="secondary" className="w-full" asChild>
+            <Link href={`/channel/${channel.id}`}>
+              {!isActive && isOwner ? "Manage" : channel.membership_is_active === false ? "Reconnect" : "Open room"}
+            </Link>
+          </Button>
+        )}
+        {!isActive && isOwner ? (
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => {
+              void (async () => {
+                try {
+                  await reopenChannel(String(channel.id));
+                  showToast("Channel reopened.", "success");
+                  await onChannelsRefresh();
+                } catch (e) {
+                  showToast(e instanceof Error ? e.message : "Reopen failed.", "error");
+                }
+              })();
+            }}
+          >
+            Reopen
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );

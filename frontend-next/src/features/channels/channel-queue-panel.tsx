@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/toast-provider";
@@ -18,13 +18,19 @@ import {
   type TrackSummary,
 } from "@/lib/api";
 
-export function ChannelQueuePanel({ channelId }: { channelId: string }) {
+export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: string; readOnly?: boolean }) {
   const { showToast } = useToast();
   const [queue, setQueue] = useState<QueueItemSummary[]>([]);
   const [trackMap, setTrackMap] = useState<Record<number, TrackSummary>>({});
   const [status, setStatus] = useState<string | null>(null);
 
   async function refresh() {
+    if (readOnly) {
+      setQueue([]);
+      setTrackMap({});
+      setStatus(null);
+      return;
+    }
     try {
       const [queueData, tracks] = await Promise.all([listChannelQueue(channelId), listTracks()]);
       setQueue(queueData.results);
@@ -37,17 +43,16 @@ export function ChannelQueuePanel({ channelId }: { channelId: string }) {
   }
 
   useEffect(() => {
-    refresh();
-  }, [channelId]);
+    void refresh();
+  }, [channelId, readOnly]);
 
   return (
     <Card className="overflow-hidden border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-zinc-800/80 pb-4">
         <div className="space-y-1">
           <CardTitle className="text-lg">Queue</CardTitle>
-          <CardDescription>Reorder, jump to playback, or remove items.</CardDescription>
         </div>
-        <Button variant="secondary" size="sm" className="gap-1.5" onClick={refresh}>
+        <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => void refresh()} disabled={readOnly}>
           <RefreshCw className="size-3.5" />
           Refresh
         </Button>
@@ -55,7 +60,11 @@ export function ChannelQueuePanel({ channelId }: { channelId: string }) {
       <CardContent className="p-0">
         <ScrollArea className="h-[min(420px,50vh)]">
           <div className="space-y-2 p-5 pr-3">
-            {queue.map((item) => (
+            {readOnly ? (
+              <p className="py-6 text-center text-sm text-zinc-500">Reopen the channel to load or edit the queue.</p>
+            ) : null}
+            {!readOnly &&
+              queue.map((item) => (
               <div
                 key={item.id}
                 className="group flex flex-col gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 transition-colors duration-200 hover:border-zinc-700/90 hover:bg-zinc-900/35 sm:flex-row sm:items-center sm:gap-3"
@@ -142,9 +151,9 @@ export function ChannelQueuePanel({ channelId }: { channelId: string }) {
                   </Button>
                 </div>
               </div>
-            ))}
-            {queue.length === 0 ? (
-              <p className="py-8 text-center text-sm text-zinc-500">Queue is empty — add tracks from the playlist tab.</p>
+              ))}
+            {!readOnly && queue.length === 0 ? (
+              <p className="py-8 text-center text-sm text-zinc-500">Queue is empty — add tracks from the Listen tab.</p>
             ) : null}
           </div>
         </ScrollArea>
