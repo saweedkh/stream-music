@@ -28,7 +28,9 @@ services:
     volumes:
       - ./backend-django:/app
       - ./media:/media
-    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     ports:
       - "8000:8000"
     depends_on:
