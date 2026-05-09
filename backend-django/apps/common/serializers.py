@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
-from apps.channels.models import Channel, ChannelMembership, InviteToken
+from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership, InviteToken
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
@@ -32,6 +32,7 @@ class ChannelSerializer(serializers.ModelSerializer):
             "owner",
             "privacy",
             "member_limit",
+            "join_requires_approval",
             "public_slug",
             "is_playing",
             "started_at",
@@ -95,3 +96,12 @@ class InviteTokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = InviteToken
         fields = ["id", "token", "max_uses", "used_count", "expires_at", "is_active", "created_at"]
+
+
+class ChannelJoinRequestSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = ChannelJoinRequest
+        fields = ["id", "channel", "user", "username", "status", "created_at", "resolved_at", "resolved_by"]
+        read_only_fields = ["channel", "user", "status", "created_at", "resolved_at", "resolved_by"]

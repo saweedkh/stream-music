@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Alert } from "@/components/ui/alert";
+import { LayoutGrid, ListMusic, Music, Share2 } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
+import { JoinChannelDialog } from "@/features/dashboard/join-channel-dialog";
 import { PlaylistBuilderSection } from "@/features/dashboard/playlist-builder-section";
 import { TrackLibrarySection } from "@/features/dashboard/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/track-sharing-section";
@@ -22,7 +24,7 @@ import {
   listUsers,
   removeTrackSharePermission,
   reorderPlaylistItem,
-  uploadTrack,
+  uploadTrackChunked,
   type ChannelSummary,
   type PlaylistItemSummary,
   type PlaylistSummary,
@@ -33,7 +35,6 @@ import { createChannelSchema, createPlaylistSchema, uploadTrackSchema } from "@/
 
 export function DashboardWorkspace() {
   const { showToast } = useToast();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
@@ -43,7 +44,7 @@ export function DashboardWorkspace() {
   const [playlistItems, setPlaylistItems] = useState<PlaylistItemSummary[]>([]);
   const [users, setUsers] = useState<Array<{ id: number; username: string }>>([]);
   const [trackShares, setTrackShares] = useState<TrackSharePermission[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
+  const [, setStatus] = useState<string | null>(null);
 
   const [channelName, setChannelName] = useState("");
   const [channelPrivacy, setChannelPrivacy] = useState<ChannelSummary["privacy"]>("public");
@@ -85,7 +86,10 @@ export function DashboardWorkspace() {
     setTrackFile(file);
     if (!file) return;
     setTrackTitle((current) => (current.trim() ? current : deriveTitleFromFile(file)));
-    setFieldErrors((prev) => ({ ...prev, trackFile: undefined, trackTitle: undefined }));
+    setFieldErrors((prev) => {
+      const { trackFile: _trackFile, trackTitle: _trackTitle, ...rest } = prev;
+      return rest;
+    });
   }
 
   async function refreshAll() {
@@ -118,8 +122,9 @@ export function DashboardWorkspace() {
     const params = new URLSearchParams(searchParams.toString());
     if (params.get("tab") === activeTab) return;
     params.set("tab", activeTab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [activeTab, pathname, router, searchParams]);
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, "", qs.length ? `${pathname}?${qs}` : pathname);
+  }, [activeTab, pathname, searchParams]);
 
   async function handleCreateChannel() {
     const result = createChannelSchema.safeParse({ channelName, memberLimit });
@@ -138,6 +143,7 @@ export function DashboardWorkspace() {
     try {
       await createChannel({ name: channelName, privacy: channelPrivacy, member_limit: Number(memberLimit) || 50 });
       setStatus("Channel created.");
+      showToast("Channel created.", "success");
       setChannelName("");
       await refreshAll();
     } catch {
@@ -166,14 +172,9 @@ export function DashboardWorkspace() {
       setIsUploading(true);
       setUploadProgress(0);
       setTrackTitle(normalizedTitle);
-      await uploadTrack(
-        { title: normalizedTitle, visibility: trackVisibility, file: trackFile },
-        {
-          onProgress: setUploadProgress,
-          timeoutMs: 1000 * 60 * 20,
-        },
-      );
+      await uploadTrackChunked({ title: normalizedTitle, visibility: trackVisibility, file: trackFile }, { onProgress: setUploadProgress });
       setStatus("Track uploaded.");
+      showToast("Track uploaded.", "success");
       setTrackTitle("");
       setTrackFile(null);
       setUploadProgress(100);
@@ -197,12 +198,14 @@ export function DashboardWorkspace() {
     try {
       await createPlaylist({ name: playlistName, channel: playlistChannel !== "none" ? Number(playlistChannel) : null });
       setStatus("Playlist created.");
+      showToast("Playlist created.", "success");
       setPlaylistName("");
       setPlaylistChannel("none");
       await refreshAll();
-    } catch {
-      setStatus("Create playlist failed.");
-      showToast("Create playlist failed.", "error");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Create playlist failed.";
+      setStatus(message);
+      showToast(message, "error");
     }
   }
 
@@ -217,6 +220,7 @@ export function DashboardWorkspace() {
       const position = playlistItems.filter((item) => item.playlist === playlistId).length;
       await addPlaylistItem({ playlist: playlistId, track: trackId, position });
       setStatus("Track added to playlist.");
+      showToast("Track added to playlist.", "success");
       setItemPlaylistId("");
       setItemTrackId("");
       await refreshAll();
@@ -230,6 +234,7 @@ export function DashboardWorkspace() {
     try {
       await reorderPlaylistItem(draggingId, dropIndex);
       setStatus("Playlist reordered.");
+      showToast("Playlist reordered.", "success");
       await refreshAll();
     } catch {
       setStatus("Cannot reorder playlist.");
@@ -267,6 +272,7 @@ export function DashboardWorkspace() {
       setShareUserId("");
       setShareChannelId("");
       setStatus("Track share permission added.");
+      showToast("Track share permission added.", "success");
     } catch {
       setStatus("Cannot add share permission.");
       showToast("Cannot add share permission.", "error");
@@ -279,6 +285,8 @@ export function DashboardWorkspace() {
       await removeTrackSharePermission(Number(shareTrackId), shareId);
       const rows = await listTrackSharePermissions(Number(shareTrackId));
       setTrackShares(rows.results);
+      setStatus("Share permission removed.");
+      showToast("Share permission removed.", "success");
     } catch {
       setStatus("Cannot remove share permission.");
       showToast("Cannot remove share permission.", "error");
@@ -286,26 +294,47 @@ export function DashboardWorkspace() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Your Dashboard</h1>
-          <p className="text-sm text-slate-300">Create channels, upload tracks, and manage playlists.</p>
+    <div className="space-y-6 pb-24">
+      <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5 shadow-lg shadow-black/25 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Workspace</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Dashboard</h1>
+            <p className="max-w-lg text-sm text-zinc-400 sm:text-base">Channels, media library, playlists, and sharing in one place.</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <JoinChannelDialog />
+            <Button variant="secondary" size="sm" onClick={refreshAll}>
+              Refresh
+            </Button>
+          </div>
         </div>
-        <Button variant="secondary" onClick={refreshAll}>
-          Refresh
-        </Button>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
-          <Button variant={activeTab === "channels" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("channels")}>Channels</Button>
-          <Button variant={activeTab === "tracks" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("tracks")}>Tracks</Button>
-          <Button variant={activeTab === "playlists" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("playlists")}>Playlists</Button>
-          <Button variant={activeTab === "sharing" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("sharing")}>Sharing</Button>
-        </aside>
-        <div className="space-y-4">
-          {activeTab === "channels" ? (
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full animate-in fade-in duration-500">
+        <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
+          <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-center">
+            <TabsTrigger value="channels" className="gap-1.5">
+              <LayoutGrid className="h-4 w-4 opacity-80" aria-hidden />
+              Channels
+            </TabsTrigger>
+            <TabsTrigger value="tracks" className="gap-1.5">
+              <Music className="h-4 w-4 opacity-80" aria-hidden />
+              Tracks
+            </TabsTrigger>
+            <TabsTrigger value="playlists" className="gap-1.5">
+              <ListMusic className="h-4 w-4 opacity-80" aria-hidden />
+              Playlists
+            </TabsTrigger>
+            <TabsTrigger value="sharing" className="gap-1.5">
+              <Share2 className="h-4 w-4 opacity-80" aria-hidden />
+              Sharing
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <div className="mt-6">
+          <TabsContent value="channels" className="m-0 focus-visible:outline-none">
             <ChannelManagementSection
               channels={channels}
               channelName={channelName}
@@ -317,9 +346,9 @@ export function DashboardWorkspace() {
               onMemberLimitChange={setMemberLimit}
               onCreateChannel={handleCreateChannel}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeTab === "tracks" ? (
+          <TabsContent value="tracks" className="m-0 focus-visible:outline-none">
             <TrackLibrarySection
               tracks={tracks}
               trackTitle={trackTitle}
@@ -334,9 +363,9 @@ export function DashboardWorkspace() {
               onTrackFileDrop={handleTrackFileSelect}
               onUploadTrack={handleUploadTrack}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeTab === "playlists" ? (
+          <TabsContent value="playlists" className="m-0 focus-visible:outline-none">
             <PlaylistBuilderSection
               channels={channels}
               playlists={playlists}
@@ -357,9 +386,9 @@ export function DashboardWorkspace() {
               setDraggingPlaylistItemId={setDraggingPlaylistItemId}
               draggingPlaylistItemId={draggingPlaylistItemId}
             />
-          ) : null}
+          </TabsContent>
 
-          {activeTab === "sharing" ? (
+          <TabsContent value="sharing" className="m-0 focus-visible:outline-none">
             <TrackSharingSection
               tracks={tracks}
               users={users}
@@ -374,11 +403,9 @@ export function DashboardWorkspace() {
               onAddShare={handleAddShare}
               onRemoveShare={handleRemoveShare}
             />
-          ) : null}
+          </TabsContent>
         </div>
-      </div>
-
-      {status ? <Alert>{status}</Alert> : null}
+      </Tabs>
     </div>
   );
 }

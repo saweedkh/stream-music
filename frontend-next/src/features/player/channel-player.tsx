@@ -1,56 +1,182 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Howl } from "howler";
+import { ChevronUp, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
-import { API_BASE, getServerTime } from "@/lib/api";
-import { applyDriftCorrection } from "./sync-client";
+import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { useToast } from "@/components/ui/toast-provider";
+import { getApiBase, getChannelState, getServerTime } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { expectedTimeSeconds } from "./sync-client";
+
+export type ChannelPlaybackEventPayload = {
+  action?: string;
+  event_seq?: number;
+  is_playing?: boolean;
+  started_at_server_time?: number | null;
+  position?: number | null;
+  track_file?: string | null;
+};
 
 type Props = {
   channelId: string;
+  socketState: "connecting" | "connected" | "reconnecting" | "closed";
   trackPath?: string;
   startedAt?: number | null;
   pausedAt?: number | null;
   initialIsPlaying?: boolean;
+  canControl?: boolean;
+  sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
+  latestSocketPayload?: ChannelPlaybackEventPayload | null;
+  drawerOpen: boolean;
+  onDrawerOpenChange: (open: boolean) => void;
 };
 
-export function ChannelPlayer({ channelId, trackPath, startedAt, pausedAt, initialIsPlaying = false }: Props) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+function formatTime(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function ArtworkRing({ letter, size = "md" }: { letter: string; size?: "xs" | "sm" | "md" | "lg" }) {
+  if (size === "lg") {
+    return (
+      <div className="h-44 w-44 shrink-0 overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-[2px] shadow-[0_20px_50px_-25px_rgba(16,185,129,0.75)]">
+        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-black/65 text-4xl font-bold text-emerald-100">
+          {letter}
+        </div>
+      </div>
+    );
+  }
+  if (size === "md") {
+    return (
+      <div className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-[2px] shadow-[0_16px_40px_-20px_rgba(16,185,129,0.6)]">
+        <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-black/65 text-xl font-bold text-emerald-100">{letter}</div>
+      </div>
+    );
+  }
+  if (size === "sm") {
+    return (
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-px shadow-[0_10px_24px_-12px_rgba(16,185,129,0.5)]">
+        <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-black/65 text-sm font-bold text-emerald-100">{letter}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-emerald-400/90 via-teal-500 to-cyan-500 p-px shadow-[0_6px_16px_-8px_rgba(16,185,129,0.45)]">
+      <div className="flex h-full w-full items-center justify-center rounded-[7px] bg-black/60 text-xs font-bold text-emerald-100">{letter}</div>
+    </div>
+  );
+}
+
+export function ChannelPlayer({
+  channelId,
+  socketState,
+  trackPath,
+  startedAt,
+  pausedAt,
+  initialIsPlaying = false,
+  canControl = false,
+  sendSocketMessage,
+  latestSocketPayload = null,
+  drawerOpen,
+  onDrawerOpenChange,
+}: Props) {
+  const { showToast } = useToast();
+
+  const howlRef = useRef<Howl | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const controlRequestInFlightRef = useRef(false);
+  const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
+  const lastAppliedEventSeqRef = useRef(0);
+  const isDraggingSeekRef = useRef(false);
+
   const [offsetMs, setOffsetMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
   const [syncStartedAt, setSyncStartedAt] = useState<number | null | undefined>(startedAt);
   const [syncPausedAt, setSyncPausedAt] = useState<number | null | undefined>(pausedAt);
   const [activeTrackPath, setActiveTrackPath] = useState<string | undefined>(trackPath);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
-  const handleSocketMessage = useCallback((payload: unknown) => {
-    const data = (payload ?? {}) as Record<string, unknown>;
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (data.type === "PLAY" || data.action === "play") {
-      setIsPlaying(true);
-      if (typeof data.track_file === "string" && data.track_file.length > 0) {
-        setActiveTrackPath(data.track_file);
-      }
-      if (typeof data.started_at_server_time === "number") {
-        setSyncStartedAt(data.started_at_server_time);
-      }
-      audio.play().catch(() => undefined);
-    } else if (data.type === "PAUSE" || data.action === "pause") {
-      setIsPlaying(false);
-      if (typeof data.position === "number") {
-        setSyncPausedAt(data.position);
-        audio.currentTime = data.position;
-      }
-      audio.pause();
-    } else if ((data.type === "SEEK" || data.action === "seek") && typeof data.position === "number") {
-      setSyncPausedAt(data.position);
-      audio.currentTime = data.position;
+  const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.75);
+
+  const trackLabel = activeTrackPath ? decodeURIComponent(activeTrackPath.split("/").pop() ?? "Unknown track") : "No active track";
+  const title = useMemo(() => trackLabel.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim(), [trackLabel]);
+  const artworkLetter = title && title !== "No active track" ? title.charAt(0).toUpperCase() : "♪";
+  const seekMax = Math.max(duration, 0.1);
+  const seekValue = Math.min(position, seekMax);
+
+  async function refreshChannelPlaybackState(options?: { silent?: boolean }) {
+    try {
+      const data = await getChannelState(channelId);
+      setIsPlaying(data.playback.is_playing);
+      setSyncStartedAt(data.playback.started_at_server_time);
+      setSyncPausedAt(data.playback.paused_at_position);
+      setActiveTrackPath(data.playback.track?.file ?? undefined);
+      setLastSyncAt(Date.now());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cannot refresh channel state";
+      if (!options?.silent) showToast(message, "error");
     }
+  }
+
+  function applySocketPayload(payload: ChannelPlaybackEventPayload) {
+    if (typeof payload.is_playing === "boolean") setIsPlaying(payload.is_playing);
+    if ("started_at_server_time" in payload) setSyncStartedAt(payload.started_at_server_time ?? null);
+    if ("position" in payload && typeof payload.position === "number") setSyncPausedAt(Math.max(0, payload.position));
+    if ("track_file" in payload) setActiveTrackPath(payload.track_file ?? undefined);
     setLastSyncAt(Date.now());
-  }, []);
-  const { socketState } = useReconnectingChannelSocket({ channelId, onMessage: handleSocketMessage });
+  }
+
+  function handleIncomingPlaybackPayload(payload: ChannelPlaybackEventPayload) {
+    const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
+    if (seq !== null) {
+      if (seq <= lastAppliedEventSeqRef.current) return;
+      lastAppliedEventSeqRef.current = seq;
+    }
+    applySocketPayload(payload);
+  }
+
+  async function applyControl(action: "play" | "pause" | "seek" | "next" | "prev", payload?: Record<string, unknown>) {
+    if (!canControl || !sendSocketMessage) return;
+    if (controlRequestInFlightRef.current) return;
+    controlRequestInFlightRef.current = true;
+    try {
+      const sent = sendSocketMessage({ action, ...payload });
+      if (!sent) {
+        pendingSocketCommandRef.current = { action, ...payload };
+        showToast("Socket reconnecting... command queued.", "error");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Cannot ${action} playback`;
+      showToast(message, "error");
+    } finally {
+      controlRequestInFlightRef.current = false;
+    }
+  }
+
+  function commitSeek(next: number) {
+    isDraggingSeekRef.current = false;
+    const clamped = Math.max(0, next);
+    const howl = howlRef.current;
+    if (howl) howl.seek(clamped);
+    if (canControl) void applyControl("seek", { position: clamped });
+  }
 
   useEffect(() => {
     getServerTime().then(({ offset }) => setOffsetMs(offset)).catch(() => setOffsetMs(0));
@@ -58,37 +184,435 @@ export function ChannelPlayer({ channelId, trackPath, startedAt, pausedAt, initi
 
   useEffect(() => {
     setActiveTrackPath(trackPath);
-  }, [trackPath]);
+    setSyncStartedAt(startedAt);
+    setSyncPausedAt(pausedAt);
+    setIsPlaying(initialIsPlaying);
+  }, [trackPath, startedAt, pausedAt, initialIsPlaying]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleTimeUpdate = () => {
-      applyDriftCorrection(audio, { startedAt: syncStartedAt, pausedAt: syncPausedAt, offsetMs, isPlaying });
+    void refreshChannelPlaybackState({ silent: true });
+  }, [channelId]);
+
+  useEffect(() => {
+    if (socketState === "connected") void refreshChannelPlaybackState({ silent: true });
+  }, [socketState, channelId]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ channelId?: string; payload?: ChannelPlaybackEventPayload }>;
+      if (customEvent.detail?.channelId && customEvent.detail.channelId !== channelId) return;
+      const payload = customEvent.detail?.payload;
+      if (payload) {
+        handleIncomingPlaybackPayload(payload);
+        return;
+      }
+      void refreshChannelPlaybackState({ silent: true });
     };
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("play", handleTimeUpdate);
+    window.addEventListener("channel-playback-updated", handler as EventListener);
+    return () => window.removeEventListener("channel-playback-updated", handler as EventListener);
+  }, [channelId]);
+
+  useEffect(() => {
+    if (latestSocketPayload) handleIncomingPlaybackPayload(latestSocketPayload);
+  }, [latestSocketPayload]);
+
+  useEffect(() => {
+    if (socketState !== "connected") return;
+    const command = pendingSocketCommandRef.current;
+    if (!command || !sendSocketMessage) return;
+    const sent = sendSocketMessage(command);
+    if (sent) {
+      pendingSocketCommandRef.current = null;
+      showToast("Queued command sent.", "success");
+    }
+  }, [socketState, sendSocketMessage, showToast]);
+
+  useEffect(() => {
+    const src = activeTrackPath ? `${getApiBase()}${activeTrackPath}` : null;
+
+    if (!src) {
+      howlRef.current?.unload();
+      howlRef.current = null;
+      setPosition(0);
+      setDuration(0);
+      return;
+    }
+
+    const howl = new Howl({
+      src: [src],
+      html5: true,
+      volume,
+      onload: () => setDuration(howl.duration() || 0),
+      onplayerror: () => setNeedsUserInteraction(true),
+      onloaderror: () => showToast("Cannot load audio source", "error"),
+    });
+
+    howlRef.current?.unload();
+    howlRef.current = howl;
+
     return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("play", handleTimeUpdate);
+      howl.unload();
+      if (howlRef.current === howl) {
+        howlRef.current = null;
+      }
     };
-  }, [syncStartedAt, syncPausedAt, offsetMs, isPlaying]);
+  }, [activeTrackPath]);
+
+  useEffect(() => {
+    const howl = howlRef.current;
+    if (!howl) return;
+    howl.volume(volume);
+  }, [volume]);
+
+  useEffect(() => {
+    const tick = () => {
+      const howl = howlRef.current;
+      if (!howl) return;
+      if (!isDraggingSeekRef.current) {
+        const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
+        setPosition(current);
+      }
+
+      if (isPlaying) {
+        const expected = expectedTimeSeconds({
+          startedAt: syncStartedAt,
+          pausedAt: syncPausedAt,
+          offsetMs,
+          isPlaying,
+        });
+        const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
+        if (Math.abs(current - expected) > 0.25 && !isDraggingSeekRef.current) {
+          howl.seek(Math.max(0, expected));
+        }
+      }
+
+      rafRef.current = window.requestAnimationFrame(tick);
+    };
+
+    rafRef.current = window.requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs]);
+
+  useEffect(() => {
+    const howl = howlRef.current;
+    if (!howl) return;
+
+    if (isPlaying) {
+      const expected = expectedTimeSeconds({
+        startedAt: syncStartedAt,
+        pausedAt: syncPausedAt,
+        offsetMs,
+        isPlaying,
+      });
+      howl.seek(Math.max(0, expected));
+      howl.play();
+      return;
+    }
+
+    howl.pause();
+    if (typeof syncPausedAt === "number") {
+      howl.seek(Math.max(0, syncPausedAt));
+      setPosition(Math.max(0, syncPausedAt));
+    }
+  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs]);
+
+  type DockSize = "narrow" | "touch";
+
+  const playbackControls = (compact: boolean, dock?: DockSize) => {
+    const touch = dock === "touch";
+    return (
+      <div className={cn("flex items-center justify-center", compact ? (touch ? "gap-1" : "gap-0.5") : "gap-3")}>
+        <Button
+          type="button"
+          variant="secondary"
+          className={cn(
+            compact
+              ? touch
+                ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
+                : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
+              : "h-12 w-12 rounded-full p-0",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            void applyControl("prev");
+          }}
+          disabled={!canControl}
+        >
+          <SkipBack className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
+        </Button>
+        <Button
+          type="button"
+          className={cn(
+            compact
+              ? touch
+                ? "h-10 w-10 rounded-full border border-emerald-400/40 bg-gradient-to-br from-emerald-500/95 to-teal-600/95 p-0 shadow-[0_8px_20px_-8px_rgba(16,185,129,0.7)] hover:from-emerald-400 hover:to-teal-500 active:scale-95"
+                : "h-8 w-8 rounded-full border border-emerald-400/35 bg-gradient-to-br from-emerald-500/90 to-teal-600/90 p-0 shadow-[0_6px_16px_-6px_rgba(16,185,129,0.65)] hover:from-emerald-400 hover:to-teal-500"
+              : "h-16 w-16 rounded-full border border-emerald-300/50 p-0 shadow-[0_20px_40px_-18px_rgba(16,185,129,0.85)]",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            const howl = howlRef.current;
+            if (!howl) return;
+            if (isPlaying) {
+              void applyControl("pause", { position: howl.seek() as number });
+            } else {
+              const at = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
+              void applyControl("play", { position: at });
+            }
+          }}
+          disabled={!canControl}
+        >
+          {isPlaying ? (
+            <Pause className={compact ? (touch ? "h-[18px] w-[18px]" : "h-4 w-4") : "h-7 w-7"} />
+          ) : (
+            <Play className={compact ? (touch ? "h-[18px] w-[18px] fill-current" : "h-4 w-4 fill-current") : "h-7 w-7 fill-current"} />
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          className={cn(
+            compact
+              ? touch
+                ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
+                : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
+              : "h-12 w-12 rounded-full p-0",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            void applyControl("next");
+          }}
+          disabled={!canControl}
+        >
+          <SkipForward className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
+        </Button>
+      </div>
+    );
+  };
+
+  const seekSlider = (className?: string) => (
+    <div className={className}>
+      <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-zinc-500">
+        <span>{formatTime(seekValue)}</span>
+        <span>{formatTime(duration)}</span>
+      </div>
+      <Slider
+        value={[seekValue]}
+        min={0}
+        max={seekMax}
+        step={0.1}
+        disabled={!activeTrackPath}
+        onPointerDown={() => {
+          isDraggingSeekRef.current = true;
+        }}
+        onValueChange={(v) => setPosition(v[0] ?? 0)}
+        onValueCommit={(v) => commitSeek(v[0] ?? 0)}
+        className="w-full"
+      />
+    </div>
+  );
+
+  const volumeRow = (
+    <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center gap-2 sm:block sm:min-w-0">
+        <Volume2 className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+        <span className="text-xs text-zinc-500 sm:sr-only">Volume</span>
+      </div>
+      <Slider
+        value={[volume]}
+        min={0}
+        max={1}
+        step={0.01}
+        onValueChange={(v) => setVolume(v[0] ?? 0)}
+        className="w-full flex-1"
+      />
+      <span className="shrink-0 text-right text-xs tabular-nums text-zinc-500">{Math.round(volume * 100)}%</span>
+    </div>
+  );
+
+  const miniSeekRow = (
+    <div className="flex min-h-[40px] min-w-0 touch-manipulation items-center gap-1.5 sm:min-h-0 sm:gap-2">
+      <span className="w-8 shrink-0 tabular-nums text-[10px] leading-none text-zinc-500 sm:w-9 sm:text-[11px]">{formatTime(seekValue)}</span>
+      <Slider
+        compact
+        value={[seekValue]}
+        min={0}
+        max={seekMax}
+        step={0.1}
+        disabled={!activeTrackPath}
+        onPointerDown={() => {
+          isDraggingSeekRef.current = true;
+        }}
+        onValueChange={(v) => setPosition(v[0] ?? 0)}
+        onValueCommit={(v) => commitSeek(v[0] ?? 0)}
+        className="min-w-0 flex-1 py-1 sm:py-0.5"
+      />
+      <span className="w-8 shrink-0 text-right tabular-nums text-[10px] leading-none text-zinc-500 sm:w-9 sm:text-[11px]">{formatTime(duration)}</span>
+    </div>
+  );
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>Synchronized Player</CardTitle>
-        <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!activeTrackPath ? <Alert tone="error">No active track in this channel yet.</Alert> : null}
-        <audio ref={audioRef} src={activeTrackPath ? `${API_BASE}${activeTrackPath}` : undefined} controls className="w-full" />
-        <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-          <span>Clock offset: {Math.round(offsetMs)}ms</span>
-          <span>Playback: {isPlaying ? "playing" : "paused"}</span>
-          <span>Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : "waiting..."}</span>
+    <>
+      <Drawer open={drawerOpen} onOpenChange={onDrawerOpenChange} shouldScaleBackground={false}>
+        <DrawerContent className="border-zinc-800/90 px-3 pb-6 pt-0 sm:px-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
+            <DrawerHeader className="shrink-0 space-y-1 px-0.5">
+              <div className="flex items-center justify-center gap-2 sm:justify-start">
+                <Radio className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden />
+                <DrawerTitle className="text-base sm:text-lg">Live channel player</DrawerTitle>
+              </div>
+              <DrawerDescription className="text-xs sm:text-sm">
+                <span className="block sm:inline">Synced playback · Channel #{channelId}</span>{" "}
+                <span className="text-zinc-500">· socket {socketState}</span>
+              </DrawerDescription>
+            </DrawerHeader>
+
+            {!activeTrackPath ? (
+              <Alert tone="error" className="mb-3 sm:mb-4">
+                No active track in this channel.
+              </Alert>
+            ) : null}
+
+            <div className="mt-2 grid shrink-0 grid-cols-1 gap-5 md:grid-cols-[minmax(0,200px)_1fr] md:items-start md:gap-6">
+              <div className="flex flex-col items-center gap-2 sm:gap-3 md:items-start">
+                <div className="md:hidden">
+                  <ArtworkRing letter={artworkLetter} size="md" />
+                </div>
+                <div className="hidden md:block">
+                  <ArtworkRing letter={artworkLetter} size="lg" />
+                </div>
+                <div className="w-full text-center md:w-auto md:text-left">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400/90 sm:text-[11px] sm:tracking-[0.25em]">Now playing</p>
+                  <p className="mt-0.5 line-clamp-2 text-lg font-semibold text-white sm:text-xl">{title || "No active track"}</p>
+                </div>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+                <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3 shadow-inner sm:p-4">
+                  {seekSlider()}
+                  {playbackControls(false)}
+                  <Separator className="my-5 bg-zinc-800" />
+                  <div className="space-y-2">
+                    <Label className="text-zinc-400">Volume</Label>
+                    {volumeRow}
+                  </div>
+                </div>
+
+                {needsUserInteraction && isPlaying ? (
+                  <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm">Browser blocked autoplay. Tap to continue.</span>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const howl = howlRef.current;
+                        if (!howl) return;
+                        howl.play();
+                        setNeedsUserInteraction(false);
+                      }}
+                    >
+                      Enable audio
+                    </Button>
+                  </Alert>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <Badge variant={isPlaying ? "success" : "warning"}>{isPlaying ? "Playing" : "Paused"}</Badge>
+                  <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+                  <Badge className="text-[10px] sm:text-xs">Δ {Math.round(offsetMs)}ms</Badge>
+                  <Badge className="hidden max-w-full truncate sm:inline-flex sm:max-w-none">
+                    {lastSyncAt ? `Sync ${new Date(lastSyncAt).toLocaleTimeString()}` : "Sync …"}
+                  </Badge>
+                  {canControl ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-9 w-full px-3 text-xs sm:h-8 sm:w-auto"
+                      onClick={() => void refreshChannelPlaybackState()}
+                    >
+                      Refresh sync
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <div
+        className={cn(
+          "fixed inset-x-2 z-40 mx-auto w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl border border-zinc-800/90",
+          "bg-gradient-to-r from-zinc-950/90 via-zinc-900/75 to-zinc-950/90",
+          "shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]",
+          "backdrop-blur-2xl backdrop-saturate-150",
+          "transition-[box-shadow,transform] duration-300",
+          "bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:inset-x-4 sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:max-w-4xl",
+          drawerOpen && "ring-1 ring-emerald-500/35 ring-offset-0 shadow-[0_12px_40px_-10px_rgba(16,185,129,0.2)]",
+        )}
+      >
+        {/* Narrow screens: two rows — more room for touch + wide seek */}
+        <div className="flex flex-col gap-2.5 p-2.5 sm:hidden">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="touch-manipulation shrink-0 rounded-lg p-0.5 outline-none transition duration-200 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-emerald-500/45"
+              onClick={() => onDrawerOpenChange(true)}
+              aria-label="Open full player"
+            >
+              <ArtworkRing letter={artworkLetter} size="xs" />
+            </button>
+            <p
+              className="min-w-0 flex-1 truncate text-left text-[11px] font-semibold leading-tight text-white/95"
+              title={title || undefined}
+            >
+              {title || "No track"}
+            </p>
+            <div className="flex shrink-0 items-center border-l border-zinc-800/80 pl-2">{playbackControls(true, "touch")}</div>
+            <button
+              type="button"
+              className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-900/60 text-emerald-400/95 shadow-sm transition duration-200 hover:bg-zinc-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 active:scale-95"
+              onClick={() => onDrawerOpenChange(true)}
+              aria-label="Expand player"
+            >
+              <ChevronUp className="h-[18px] w-[18px] opacity-90" />
+            </button>
+          </div>
+          {miniSeekRow}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* sm and up: single compact row */}
+        <div className="hidden h-[50px] items-center gap-2 px-2.5 py-1 sm:flex md:gap-2.5 md:px-3">
+          <button
+            type="button"
+            className="touch-manipulation shrink-0 rounded-lg outline-none transition duration-200 active:scale-[0.98] hover:opacity-95 focus-visible:ring-2 focus-visible:ring-emerald-500/45"
+            onClick={() => onDrawerOpenChange(true)}
+            aria-label="Open full player"
+          >
+            <ArtworkRing letter={artworkLetter} size="xs" />
+          </button>
+          <p
+            className="min-w-0 max-w-[min(22vw,200px)] shrink truncate text-left text-[11px] font-medium leading-tight text-white/95 md:max-w-[min(28vw,260px)] lg:max-w-[min(32vw,300px)]"
+            title={title || undefined}
+          >
+            {title || "No track"}
+          </p>
+          <div className="min-w-0 flex-1">{miniSeekRow}</div>
+          <div className="flex shrink-0 items-center border-l border-zinc-800/80 pl-2 md:pl-2.5">{playbackControls(true)}</div>
+          <button
+            type="button"
+            className="flex h-8 w-8 shrink-0 touch-manipulation items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-900/60 text-emerald-400/90 shadow-sm transition duration-200 hover:bg-zinc-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/45 md:h-9 md:w-9"
+            onClick={() => onDrawerOpenChange(true)}
+            aria-label="Expand player"
+          >
+            <ChevronUp className="h-4 w-4 opacity-90" />
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

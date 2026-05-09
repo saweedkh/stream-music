@@ -91,6 +91,14 @@ MEDIA_URL = "/audio/"
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Stream large uploads to disk instead of buffering entirely in memory (multipart handlers).
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(2 * 1024 * 1024)))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(50 * 1024 * 1024)))
+
+CHUNK_UPLOAD_ROOT = os.getenv("CHUNK_UPLOAD_ROOT", os.path.join(MEDIA_ROOT, "chunk_uploads"))
+CHUNK_UPLOAD_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_MAX_BYTES", str(500 * 1024 * 1024)))
+CHUNK_UPLOAD_CHUNK_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_CHUNK_MAX_BYTES", str(8 * 1024 * 1024)))
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -98,9 +106,17 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8080",
 ]
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
+# Comma-separated, e.g. "http://192.168.1.10:8080" when testing from a phone on LAN.
+_extra_origins = [o.strip() for o in os.getenv("CORS_EXTRA_ORIGINS", "").split(",") if o.strip()]
+if _extra_origins:
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys([*CORS_ALLOWED_ORIGINS, *_extra_origins]))
+    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *_extra_origins]))
+
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^http://172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$",
+    ]

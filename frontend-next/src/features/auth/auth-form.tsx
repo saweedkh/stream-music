@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,13 @@ import { authLoginSchema, authRegisterSchema } from "@/lib/validation";
 
 type Mode = "login" | "register";
 
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
+
 export function AuthForm({ mode }: { mode: Mode }) {
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -51,7 +58,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       } else {
         await loginUser(username, password);
       }
-      window.location.href = "/dashboard";
+      window.location.href = safeNextPath(searchParams.get("next"));
     } catch (error) {
       const message =
         error instanceof Error
@@ -67,8 +74,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <Card className="mx-auto max-w-md">
-      <CardHeader>
+    <Card className="mx-auto max-w-md border-emerald-900/40">
+      <CardHeader className="bg-gradient-to-r from-emerald-950/30 to-transparent">
         <CardTitle>{mode === "register" ? "Create account" : "Login"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -121,11 +128,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <p className="text-center text-xs text-slate-400">
           {mode === "register" ? (
             <>
-              Already have an account? <Link href="/login" className="text-indigo-300 hover:text-indigo-200">Login</Link>
+              Already have an account? <Link href="/login" className="text-emerald-300 hover:text-emerald-200">Login</Link>
             </>
           ) : (
             <>
-              Need an account? <Link href="/register" className="text-indigo-300 hover:text-indigo-200">Register</Link>
+              Need an account? <Link href="/register" className="text-emerald-300 hover:text-emerald-200">Register</Link>
             </>
           )}
         </p>

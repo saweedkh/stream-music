@@ -6,28 +6,31 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { joinChannel } from "@/lib/api";
+import { joinChannelFromLink } from "@/lib/api";
 
 export function HomeActions() {
-  const [channelId, setChannelId] = useState("");
-  const [token, setToken] = useState("");
+  const [joinInput, setJoinInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
   async function handleJoin() {
-    if (!channelId) return;
+    if (!joinInput.trim()) return;
     setStatus("Joining channel...");
     try {
-      await joinChannel(channelId, token || undefined);
+      const out = await joinChannelFromLink(joinInput.trim());
+      if (out.status === "pending") {
+        setStatus("Join request sent — wait for a moderator to approve.");
+        return;
+      }
       setStatus("Joined. Opening channel page...");
-      window.location.href = `/channel/${channelId}`;
+      window.location.href = `/channel/${out.channel}`;
     } catch {
-      setStatus("Join failed. Make sure you are logged in and token is valid for private channels.");
+      setStatus("Join failed. Check your link or id, and that you are logged in.");
     }
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
+      <Card className="border-emerald-900/30">
         <CardHeader>
           <CardTitle>Start from dashboard</CardTitle>
         </CardHeader>
@@ -43,8 +46,11 @@ export function HomeActions() {
           <CardTitle>Quick join</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input placeholder="Channel id (example: 1)" value={channelId} onChange={(e) => setChannelId(e.target.value)} />
-          <Input placeholder="Invite token (private channels only)" value={token} onChange={(e) => setToken(e.target.value)} />
+          <Input
+            placeholder="Channel id, link, or /join/private/…"
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
+          />
           <Button className="w-full" onClick={handleJoin}>
             Join Channel
           </Button>

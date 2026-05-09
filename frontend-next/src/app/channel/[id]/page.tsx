@@ -27,6 +27,7 @@ export default async function ChannelPage({ params }: Props) {
         initialDescription={data?.channel?.description}
         initialMemberLimit={data?.channel?.member_limit ?? 50}
         publicSlug={data?.channel?.public_slug}
+        initialJoinRequiresApproval={Boolean(data?.channel?.join_requires_approval)}
       />
     </AuthGuard>
   );

@@ -1,15 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Activity, HeartPulse, Radio, Settings2, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/toast-provider";
 import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
-import { ChannelPlayer } from "@/features/player/channel-player";
+import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
+import { getChannelMembers, getMe, joinChannel, type QueueItemSummary } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+const TAB_IDS = ["player", "queue", "admin", "health"] as const;
+
+type TabId = (typeof TAB_IDS)[number];
+
+function tabFromSearchValue(value: string | null): TabId | null {
+  const raw = value ?? "";
+  if (raw === "playlist") return "player";
+  return TAB_IDS.includes(raw as TabId) ? (raw as TabId) : null;
+}
+
+function readTabFromWindowSearch(): TabId | null {
+  if (typeof window === "undefined") return null;
+  return tabFromSearchValue(new URLSearchParams(window.location.search).get("tab"));
+}
 
 type Props = {
   channelId: string;
@@ -22,6 +41,7 @@ type Props = {
   initialDescription?: string;
   initialMemberLimit?: number;
   publicSlug?: string;
+  initialJoinRequiresApproval?: boolean;
 };
 
 export function ChannelDashboardTabs(props: Props) {
@@ -36,73 +56,243 @@ export function ChannelDashboardTabs(props: Props) {
     initialDescription,
     initialMemberLimit,
     publicSlug,
+    initialJoinRequiresApproval,
   } = props;
-  const router = useRouter();
+  const { showToast } = useToast();
+  const { upsertState: upsertGlobalPlayerState } = useGlobalChannelPlayer();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tabFromUrl = searchParams.get("tab");
-  const activeTabFromUrl = useMemo(
-    () => (tabFromUrl === "player" || tabFromUrl === "playlist" || tabFromUrl === "queue" || tabFromUrl === "admin" || tabFromUrl === "health" ? tabFromUrl : null),
-    [tabFromUrl],
-  );
-  const [activeTab, setActiveTab] = useState<"player" | "playlist" | "queue" | "admin" | "health">(activeTabFromUrl ?? "player");
+  const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "player");
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
+  const [canManageChannel, setCanManageChannel] = useState(true);
+  const [latestPlaybackPayload, setLatestPlaybackPayload] = useState<{
+    action?: string;
+    event_seq?: number;
+    is_playing?: boolean;
+    started_at_server_time?: number | null;
+    position?: number | null;
+    track_file?: string | null;
+    playlist_id?: number;
+    queue?: QueueItemSummary[];
+  } | null>(null);
+  const latestSendMessageRef = useRef<((payload: Record<string, unknown>) => boolean) | undefined>(undefined);
   const startedAtText = startedAt == null ? "No active playback session yet" : `${startedAt}`;
   const pausedAtText = pausedAt == null ? (isChannelOnline ? "Not paused" : "No paused position available") : `${pausedAt}s`;
-  const handleSocketMessage = useCallback((payload: unknown) => {
-    const data = (payload ?? {}) as { type?: string; action?: string };
-    const action = (data.action ?? data.type ?? "").toLowerCase();
-    if (action === "play") setIsChannelOnline(true);
-    if (action === "pause") setIsChannelOnline(false);
+
+  const stableSendSocketMessage = useCallback((payload: Record<string, unknown>) => {
+    return latestSendMessageRef.current?.(payload) ?? false;
   }, []);
-  const { socketState } = useReconnectingChannelSocket({ channelId, onMessage: handleSocketMessage });
+
+  const handleSocketMessage = useCallback(
+    (payload: unknown) => {
+      const data = (payload ?? {}) as {
+        type?: string;
+        action?: string;
+        event_seq?: number;
+        is_playing?: boolean;
+        started_at_server_time?: number | null;
+        position?: number | null;
+        track_file?: string | null;
+        message?: string;
+        queue?: QueueItemSummary[];
+      };
+      const type = (data.type ?? "").toLowerCase();
+      if (type === "error") {
+        const map: Record<string, string> = {
+          queue_empty: "Queue is empty. Select a playlist/track first.",
+          playlist_empty: "Selected playlist is empty.",
+          playlist_not_allowed: "This playlist is not allowed for this channel.",
+          no_tracks: "No tracks available to shuffle.",
+          permission_denied: "You do not have permission for this action.",
+        };
+        const key = String(data.message ?? "invalid_state");
+        showToast(map[key] ?? `Playback error: ${key}`, "error");
+        return;
+      }
+      const action = (data.action ?? data.type ?? "").toLowerCase();
+      if (typeof data.is_playing === "boolean") setIsChannelOnline(data.is_playing);
+      if (action === "play") setIsChannelOnline(true);
+      if (action === "pause") setIsChannelOnline(false);
+      if (["initial_sync", "play", "pause", "seek", "next", "prev", "add_to_queue", "enqueue_next"].includes(action)) {
+        setLatestPlaybackPayload(data);
+        window.dispatchEvent(new CustomEvent("channel-playback-updated", { detail: { channelId, payload: data } }));
+      }
+    },
+    [channelId, showToast],
+  );
+
+  const { socketState, sendMessage } = useReconnectingChannelSocket({ channelId, onMessage: handleSocketMessage });
+
+  useEffect(() => {
+    latestSendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   useEffect(() => {
     setIsChannelOnline(isPlaying);
   }, [isPlaying]);
 
   useEffect(() => {
-    if (activeTabFromUrl) setActiveTab(activeTabFromUrl);
-  }, [activeTabFromUrl]);
+    const syncFromHistory = () => {
+      const next = readTabFromWindowSearch() ?? "player";
+      setActiveTab(next);
+    };
+    window.addEventListener("popstate", syncFromHistory);
+    return () => window.removeEventListener("popstate", syncFromHistory);
+  }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
+    joinChannel(channelId)
+      .then((out) => {
+        if (out.status === "pending") {
+          showToast("Your join request is pending moderator approval.", "info");
+        }
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Cannot join this channel";
+        showToast(message, "error");
+      });
+  }, [channelId, showToast]);
+
+  useEffect(() => {
+    Promise.all([getMe(), getChannelMembers(channelId)])
+      .then(([me, members]) => {
+        if (!me) {
+          setCanManageChannel(false);
+          return;
+        }
+        const myMembership = members.results.find((member) => member.user_id === me.id);
+        const canManage = myMembership?.role === "owner" || myMembership?.role === "moderator";
+        setCanManageChannel(Boolean(canManage));
+      })
+      .catch(() => {});
+  }, [channelId]);
+
+  useEffect(() => {
+    if (!canManageChannel && activeTab === "admin") {
+      setActiveTab("player");
+    }
+  }, [activeTab, canManageChannel]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
     if (params.get("tab") === activeTab) return;
     params.set("tab", activeTab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [activeTab, pathname, router, searchParams]);
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, "", qs.length ? `${pathname}?${qs}` : pathname);
+  }, [activeTab, pathname]);
+
+  useEffect(() => {
+    upsertGlobalPlayerState({
+      channelId,
+      socketState,
+      trackPath,
+      startedAt,
+      pausedAt,
+      initialIsPlaying: isPlaying,
+      canControl: canManageChannel,
+      sendSocketMessage: stableSendSocketMessage,
+      latestSocketPayload: latestPlaybackPayload,
+    });
+  }, [
+    canManageChannel,
+    channelId,
+    isPlaying,
+    latestPlaybackPayload,
+    pausedAt,
+    socketState,
+    stableSendSocketMessage,
+    startedAt,
+    trackPath,
+    upsertGlobalPlayerState,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      upsertGlobalPlayerState({
+        socketState: "closed",
+        canControl: false,
+        sendSocketMessage: undefined,
+      });
+    };
+  }, [upsertGlobalPlayerState]);
 
   return (
-    <div className="space-y-5">
-      <section className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">{channelName}</h1>
-          <p className="text-sm text-slate-300">Real-time playback, control, and diagnostics.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={isChannelOnline ? "success" : "warning"}>{isChannelOnline ? "Online" : "Offline"}</Badge>
-          <Badge variant={isChannelOnline ? "success" : "warning"}>{isChannelOnline ? "Playing" : "Paused"}</Badge>
-          <Badge>{channelPrivacy}</Badge>
-          <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+    <div className="space-y-6 pb-28">
+      <section
+        className={cn(
+          "overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5 shadow-lg shadow-black/20 backdrop-blur-xl",
+          "animate-in fade-in slide-in-from-bottom-2 duration-500",
+        )}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Channel</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
+            <p className="max-w-xl text-sm text-zinc-400">Listen in the docked player, manage the queue, or open controls if you’re a moderator.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={isChannelOnline ? "success" : "secondary"}>{isChannelOnline ? "Live" : "Idle"}</Badge>
+            <Badge variant={isChannelOnline ? "success" : "outline"} className="capitalize">
+              {isChannelOnline ? "Playing" : "Paused"}
+            </Badge>
+            <Badge variant="outline" className="capitalize">
+              {channelPrivacy}
+            </Badge>
+            <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
-          <Button variant={activeTab === "player" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("player")}>Player</Button>
-          <Button variant={activeTab === "playlist" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("playlist")}>Playlist</Button>
-          <Button variant={activeTab === "queue" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("queue")}>Queue</Button>
-          <Button variant={activeTab === "admin" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("admin")}>Admin</Button>
-          <Button variant={activeTab === "health" ? "default" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("health")}>Health</Button>
-        </aside>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="w-full animate-in fade-in duration-500">
+        <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
+          <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-center">
+            <TabsTrigger value="player" className="gap-1.5">
+              <Radio className="h-4 w-4 opacity-80" aria-hidden />
+              Listen
+            </TabsTrigger>
+            <TabsTrigger value="queue" className="gap-1.5">
+              <Sparkles className="h-4 w-4 opacity-80" aria-hidden />
+              Queue
+            </TabsTrigger>
+            {canManageChannel ? (
+              <TabsTrigger value="admin" className="gap-1.5">
+                <Settings2 className="h-4 w-4 opacity-80" aria-hidden />
+                Control
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger value="health" className="gap-1.5">
+              <HeartPulse className="h-4 w-4 opacity-80" aria-hidden />
+              Health
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <div className="space-y-4">
-          {activeTab === "player" ? (
-            <ChannelPlayer channelId={channelId} trackPath={trackPath} startedAt={startedAt} pausedAt={pausedAt} initialIsPlaying={isPlaying} />
-          ) : null}
-          {activeTab === "playlist" ? <ChannelPlaylistPanel channelId={channelId} /> : null}
-          {activeTab === "queue" ? <ChannelQueuePanel channelId={channelId} /> : null}
-          {activeTab === "admin" ? (
+        <TabsContent value="player" className="mt-5 focus-visible:outline-none space-y-6">
+          <ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel} sendSocketMessage={sendMessage} />
+          <Card className="border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
+            <CardHeader className="border-b border-zinc-800/80 pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-950/40">
+                  <Activity className="h-5 w-5 text-emerald-400" aria-hidden />
+                </span>
+                Player
+              </CardTitle>
+              <CardDescription>The mini player stays fixed at the bottom while you browse this channel.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 text-sm text-zinc-400">
+              <p className="leading-relaxed">
+                Use the bar to play/pause, scrub, or open the full panel. Audio keeps running when you switch tabs.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="queue" className="mt-5">
+          <ChannelQueuePanel channelId={channelId} />
+        </TabsContent>
+
+        {canManageChannel ? (
+          <TabsContent value="admin" className="mt-5">
             <ChannelAdminPanel
               channelId={channelId}
               initialName={channelName}
@@ -110,22 +300,41 @@ export function ChannelDashboardTabs(props: Props) {
               initialPrivacy={(channelPrivacy as "public" | "private" | "unlisted") ?? "public"}
               initialMemberLimit={initialMemberLimit ?? 50}
               publicSlug={publicSlug}
+              initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
+              sendSocketMessage={sendMessage}
             />
-          ) : null}
-          {activeTab === "health" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Channel Health</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-slate-300">
-                <p>Sync baseline started at: {startedAtText}</p>
-                <p>Paused position: {pausedAtText}</p>
-                <p>Control and sync state are unified between REST and WebSocket events.</p>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      </div>
+          </TabsContent>
+        ) : null}
+
+        <TabsContent value="health" className="mt-5">
+          <Card className="border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
+            <CardHeader className="border-b border-zinc-800/80 pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-950/40">
+                  <HeartPulse className="h-5 w-5 text-emerald-400" aria-hidden />
+                </span>
+                Sync &amp; health
+              </CardTitle>
+              <CardDescription>Baseline from the latest server snapshot for this channel.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-6 text-sm text-zinc-400">
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">Session started</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{startedAtText}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">Paused position</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{pausedAtText}</span>
+                </p>
+              </div>
+              <p className="text-xs text-zinc-500">REST and WebSocket events share the same playback state on the server.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

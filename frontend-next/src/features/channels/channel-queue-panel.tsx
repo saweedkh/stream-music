@@ -1,9 +1,12 @@
 "use client";
 
+import { ChevronDown, ChevronUp, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   jumpToChannelQueueItem,
@@ -26,9 +29,10 @@ export function ChannelQueuePanel({ channelId }: { channelId: string }) {
       const [queueData, tracks] = await Promise.all([listChannelQueue(channelId), listTracks()]);
       setQueue(queueData.results);
       setTrackMap(Object.fromEntries(tracks.map((t) => [t.id, t])));
-    } catch {
-      setStatus("Cannot load queue.");
-      showToast("Cannot load queue.", "error");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cannot load queue.";
+      setStatus(message);
+      showToast(message, "error");
     }
   }
 
@@ -37,78 +41,121 @@ export function ChannelQueuePanel({ channelId }: { channelId: string }) {
   }, [channelId]);
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>Channel Queue</CardTitle>
-        <Button variant="secondary" onClick={refresh}>
+    <Card className="overflow-hidden border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-zinc-800/80 pb-4">
+        <div className="space-y-1">
+          <CardTitle className="text-lg">Queue</CardTitle>
+          <CardDescription>Reorder, jump to playback, or remove items.</CardDescription>
+        </div>
+        <Button variant="secondary" size="sm" className="gap-1.5" onClick={refresh}>
+          <RefreshCw className="size-3.5" />
           Refresh
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {queue.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900/60 p-2 text-sm">
-            <div className="min-w-8 rounded bg-slate-800 px-2 py-1 text-center text-xs text-slate-300">#{item.position}</div>
-            <div className="flex-1 font-medium">{trackMap[item.track]?.title ?? `Track ${item.track}`}</div>
-            <Button
-              variant="ghost"
-              className="px-2 py-1"
-              onClick={async () => {
-                try {
-                  await reorderChannelQueueItem(channelId, item.id, Math.max(0, item.position - 1));
-                  refresh();
-                } catch {
-                  showToast("Cannot move queue item up.", "error");
-                }
-              }}
-            >
-              Up
-            </Button>
-            <Button
-              variant="ghost"
-              className="px-2 py-1"
-              onClick={async () => {
-                try {
-                  await reorderChannelQueueItem(channelId, item.id, item.position + 1);
-                  refresh();
-                } catch {
-                  showToast("Cannot move queue item down.", "error");
-                }
-              }}
-            >
-              Down
-            </Button>
-            <Button
-              variant="secondary"
-              className="px-2 py-1"
-              onClick={async () => {
-                try {
-                  await jumpToChannelQueueItem(channelId, item.id);
-                  setStatus("Jumped to selected queue item.");
-                } catch {
-                  showToast("Cannot jump to selected queue item.", "error");
-                }
-              }}
-            >
-              Play
-            </Button>
-            <Button
-              variant="danger"
-              className="px-2 py-1"
-              onClick={async () => {
-                try {
-                  await removeChannelQueueItem(channelId, item.id);
-                  refresh();
-                } catch {
-                  showToast("Cannot remove queue item.", "error");
-                }
-              }}
-            >
-              Remove
-            </Button>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[min(420px,50vh)]">
+          <div className="space-y-2 p-5 pr-3">
+            {queue.map((item) => (
+              <div
+                key={item.id}
+                className="group flex flex-col gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 transition-colors duration-200 hover:border-zinc-700/90 hover:bg-zinc-900/35 sm:flex-row sm:items-center sm:gap-3"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="inline-flex min-w-9 justify-center rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-400">
+                    #{item.position}
+                  </span>
+                  <span className="truncate text-sm font-medium text-zinc-100">
+                    {trackMap[item.track]?.title ?? `Track ${item.track}`}
+                  </span>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Move up"
+                    onClick={async () => {
+                      try {
+                        await reorderChannelQueueItem(channelId, item.id, Math.max(0, item.position - 1));
+                        refresh();
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot move queue item up.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    <ChevronUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Move down"
+                    onClick={async () => {
+                      try {
+                        await reorderChannelQueueItem(channelId, item.id, item.position + 1);
+                        refresh();
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot move queue item down.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    <ChevronDown className="size-4" />
+                  </Button>
+                  <Separator orientation="vertical" className="hidden h-6 sm:block" />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="gap-1"
+                    onClick={async () => {
+                      try {
+                        await jumpToChannelQueueItem(channelId, item.id);
+                        setStatus("Jumped to selected queue item.");
+                        showToast("Jumped to selected queue item.", "success");
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot jump to selected queue item.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    <Play className="size-3.5" />
+                    Play
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-1"
+                    onClick={async () => {
+                      try {
+                        await removeChannelQueueItem(channelId, item.id);
+                        showToast("Queue item removed.", "success");
+                        await refresh();
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot remove queue item.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {queue.length === 0 ? (
+              <p className="py-8 text-center text-sm text-zinc-500">Queue is empty — add tracks from the playlist tab.</p>
+            ) : null}
           </div>
-        ))}
-        {queue.length === 0 ? <p className="text-sm text-slate-400">Queue is empty.</p> : null}
-        {status ? <Alert>{status}</Alert> : null}
+        </ScrollArea>
+        {status ? (
+          <>
+            <Separator />
+            <div className="px-5 pb-5 pt-3">
+              <Alert>{status}</Alert>
+            </div>
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );

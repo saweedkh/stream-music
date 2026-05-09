@@ -1,23 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { Radio } from "lucide-react";
+import QRCode from "react-qr-code";
+import { useCallback, useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/toast-provider";
 import {
-  controlChannel,
+  approveJoinRequest,
+  buildJoinLandingUrl,
+  buildJoinUrlWithChannelId,
   createInvite,
   getChannelMembers,
+  listChannelJoinRequests,
+  rejectJoinRequest,
   removeChannelMember,
   rotatePrivateInvite,
   rotatePublicLink,
   updateChannelMemberRole,
   updateChannelSettings,
   type ChannelMember,
+  type JoinRequestRow,
 } from "@/lib/api";
 import { channelSettingsSchema } from "@/lib/validation";
 
@@ -28,15 +38,9 @@ type Props = {
   initialPrivacy?: "public" | "private" | "unlisted";
   initialMemberLimit?: number;
   publicSlug?: string;
+  initialJoinRequiresApproval?: boolean;
+  sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
 };
-
-const actions = [
-  { action: "play", label: "Play" },
-  { action: "pause", label: "Pause" },
-  { action: "seek", label: "Seek +15s", payload: { position: 15 } },
-  { action: "prev", label: "Prev" },
-  { action: "next", label: "Next" }
-];
 
 export function ChannelAdminPanel({
   channelId,
@@ -45,9 +49,11 @@ export function ChannelAdminPanel({
   initialPrivacy = "public",
   initialMemberLimit = 50,
   publicSlug,
+  initialJoinRequiresApproval = false,
+  sendSocketMessage,
 }: Props) {
   const { showToast } = useToast();
-  const [seekSeconds, setSeekSeconds] = useState("15");
+  const [seekSeconds, setSeekSeconds] = useState("10");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -57,17 +63,39 @@ export function ChannelAdminPanel({
   const [memberLimit, setMemberLimit] = useState(String(initialMemberLimit));
   const [publicUrl, setPublicUrl] = useState(publicSlug ? `/join/public/${publicSlug}` : "");
   const [members, setMembers] = useState<ChannelMember[]>([]);
+  const [joinRequiresApproval, setJoinRequiresApproval] = useState(Boolean(initialJoinRequiresApproval));
+  const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const loadJoinRequests = useCallback(async () => {
+    try {
+      const data = await listChannelJoinRequests(channelId);
+      setJoinRequests(data.results);
+    } catch {
+      setJoinRequests([]);
+    }
+  }, [channelId]);
+
+  useEffect(() => {
+    void loadMembers();
+  }, [channelId]);
+
+  useEffect(() => {
+    void loadJoinRequests();
+  }, [loadJoinRequests]);
 
   async function control(action: string, payload?: Record<string, unknown>) {
     setBusyAction(action);
     setFeedback(`Applying ${action}...`);
     try {
-      await controlChannel(channelId, action as "play" | "pause" | "seek" | "next" | "prev", payload);
+      const sent = sendSocketMessage?.({ action, ...payload });
+      if (!sent) throw new Error("Socket is not connected");
       setFeedback(`Action "${action}" applied.`);
-    } catch {
-      setFeedback(`Action "${action}" failed. Check auth/session permissions.`);
-      showToast(`Action "${action}" failed.`, "error");
+      showToast(`Action "${action}" applied.`, "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Action "${action}" failed.`;
+      setFeedback(message);
+      showToast(message, "error");
     } finally {
       setBusyAction(null);
     }
@@ -79,9 +107,11 @@ export function ChannelAdminPanel({
       const data = await createInvite(channelId);
       setInviteToken(data.token);
       setFeedback("Invite token generated.");
-    } catch {
-      setFeedback("Invite generation failed. Only controllers can generate invites.");
-      showToast("Invite generation failed.", "error");
+      showToast("Invite token generated.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invite generation failed.";
+      setFeedback(message);
+      showToast(message, "error");
     }
   }
 
@@ -108,11 +138,14 @@ export function ChannelAdminPanel({
         description,
         privacy,
         member_limit: Number(memberLimit) || 1,
+        join_requires_approval: joinRequiresApproval,
       });
       setFeedback("Channel settings updated.");
-    } catch {
-      setFeedback("Failed to update channel settings.");
-      showToast("Failed to update channel settings.", "error");
+      showToast("Channel settings updated.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update channel settings.";
+      setFeedback(message);
+      showToast(message, "error");
     }
   }
 
@@ -122,9 +155,11 @@ export function ChannelAdminPanel({
       const data = await getChannelMembers(channelId);
       setMembers(data.results);
       setFeedback("Members loaded.");
-    } catch {
-      setFeedback("Cannot load members.");
-      showToast("Cannot load members.", "error");
+      showToast("Members loaded.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cannot load members.";
+      setFeedback(message);
+      showToast(message, "error");
     }
   }
 
@@ -133,9 +168,11 @@ export function ChannelAdminPanel({
       const data = await rotatePrivateInvite(channelId);
       setInviteToken(data.token);
       setFeedback("Private invite rotated.");
-    } catch {
-      setFeedback("Private invite rotation failed.");
-      showToast("Private invite rotation failed.", "error");
+      showToast("Private invite rotated.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Private invite rotation failed.";
+      setFeedback(message);
+      showToast(message, "error");
     }
   }
 
@@ -144,101 +181,343 @@ export function ChannelAdminPanel({
       const data = await rotatePublicLink(channelId);
       setPublicUrl(data.public_url);
       setFeedback("Public link rotated.");
-    } catch {
-      setFeedback("Public link rotation failed.");
-      showToast("Public link rotation failed.", "error");
+      showToast("Public link rotated.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Public link rotation failed.";
+      setFeedback(message);
+      showToast(message, "error");
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Channel Controls</CardTitle>
+    <Card className="overflow-hidden border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
+      <CardHeader className="border-b border-zinc-800/80 pb-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-950/40 text-emerald-400">
+            <Radio className="size-4" />
+          </span>
+          <div className="space-y-1">
+            <CardTitle className="text-lg">Admin</CardTitle>
+            <CardDescription>Playback controls, channel settings, invites, and members.</CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {actions.map((item) => (
-            <Button
-              key={item.action}
-              variant="secondary"
-              onClick={() => control(item.action, item.action === "seek" ? { position: Number(seekSeconds) || 0 } : item.payload)}
-              disabled={busyAction !== null}
-            >
-              {item.label}
+      <CardContent className="space-y-6 pt-6">
+        <section className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-zinc-200">Playback</p>
+            {busyAction ? (
+              <Badge variant="warning" className="animate-pulse">
+                {busyAction}
+              </Badge>
+            ) : (
+              <Badge variant="success">Ready</Badge>
+            )}
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <Button onClick={() => control("play")} disabled={busyAction !== null} className="transition-transform duration-200 active:scale-[0.98]">
+              Play
             </Button>
-          ))}
-        </div>
-        <div className="space-y-2">
-          <Label>Seek position (seconds)</Label>
-          <Input value={seekSeconds} onChange={(e) => setSeekSeconds(e.target.value)} />
-        </div>
-        <Button onClick={generateInvite}>Generate invite token</Button>
-        <div className="grid gap-2 rounded-md border border-slate-800 p-3">
-          <p className="text-xs text-slate-400">Channel settings</p>
-          <Input
-            value={name}
-            aria-invalid={Boolean(fieldErrors.name)}
-            valid={Boolean(name.trim())}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Channel name"
-          />
-          {fieldErrors.name ? <p className="text-xs text-rose-400">{fieldErrors.name}</p> : null}
-          <Input value={description} valid={Boolean(description.trim())} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
-          <Select value={privacy} valid={Boolean(privacy)} onChange={(e) => setPrivacy(e.target.value as "public" | "private" | "unlisted")}>
-            <option value="public">public</option>
-            <option value="private">private</option>
-            <option value="unlisted">unlisted</option>
-          </Select>
-          <Input
-            value={memberLimit}
-            aria-invalid={Boolean(fieldErrors.memberLimit)}
-            valid={Boolean(memberLimit.trim() && Number(memberLimit) > 0)}
-            onChange={(e) => setMemberLimit(e.target.value)}
-            placeholder="Member limit"
-          />
-          {fieldErrors.memberLimit ? <p className="text-xs text-rose-400">{fieldErrors.memberLimit}</p> : null}
-          <Button variant="secondary" onClick={saveSettings}>
-            Save settings
-          </Button>
-        </div>
-        <div className="grid gap-2 rounded-md border border-slate-800 p-3">
-          <p className="text-xs text-slate-400">Invite links</p>
-          <Button variant="secondary" onClick={rotatePrivate}>
-            Rotate private invite
-          </Button>
-          <Button variant="secondary" onClick={rotatePublic}>
-            Rotate public link
-          </Button>
-          {publicUrl ? <Alert>Public URL: {publicUrl}</Alert> : null}
-        </div>
-        <div className="grid gap-2 rounded-md border border-slate-800 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400">Members management</p>
-            <Button variant="secondary" onClick={loadMembers}>
-              Refresh members
+            <Button variant="secondary" onClick={() => control("pause")} disabled={busyAction !== null}>
+              Pause
+            </Button>
+            <Button variant="secondary" onClick={() => control("prev")} disabled={busyAction !== null}>
+              Previous
+            </Button>
+            <Button variant="secondary" onClick={() => control("next")} disabled={busyAction !== null}>
+              Next
             </Button>
           </div>
-          {members.map((member) => (
-            <div key={member.id} className="flex items-center gap-2 text-xs">
-              <span className="min-w-24">{member.username}</span>
+          <div className="mt-4 flex flex-wrap items-end gap-2">
+            <div className="min-w-40 flex-1 space-y-2">
+              <Label htmlFor={`channel-${channelId}-seek-seconds`}>Seek (seconds)</Label>
               <Input
-                value={member.role}
-                onChange={(e) =>
-                  setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: e.target.value as ChannelMember["role"] } : m)))
-                }
-                className="h-8"
+                id={`channel-${channelId}-seek-seconds`}
+                name="seek_seconds"
+                type="number"
+                inputMode="numeric"
+                value={seekSeconds}
+                valid={seekSeconds.trim() !== "" && !Number.isNaN(Number(seekSeconds))}
+                onChange={(e) => setSeekSeconds(e.target.value)}
               />
-              <Button variant="secondary" className="px-2 py-1" onClick={() => updateChannelMemberRole(channelId, member.id, member.role)}>
-                Save role
-              </Button>
-              <Button variant="danger" className="px-2 py-1" onClick={() => removeChannelMember(channelId, member.id).then(loadMembers)}>
-                Remove
-              </Button>
             </div>
-          ))}
+            <Button variant="secondary" onClick={() => control("seek", { position: Number(seekSeconds) || 0 })} disabled={busyAction !== null}>
+              Seek
+            </Button>
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="space-y-3 rounded-lg border border-zinc-800/80 bg-zinc-950/35 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Channel</p>
+            <div className="space-y-2">
+              <Label htmlFor={`channel-${channelId}-settings-name`}>Name</Label>
+              <Input
+                id={`channel-${channelId}-settings-name`}
+                name="channel_name"
+                value={name}
+                aria-invalid={Boolean(fieldErrors.name)}
+                valid={Boolean(name.trim())}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Channel name"
+              />
+              {fieldErrors.name ? <p className="text-xs text-red-400">{fieldErrors.name}</p> : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`channel-${channelId}-settings-description`}>Description</Label>
+              <Input
+                id={`channel-${channelId}-settings-description`}
+                name="channel_description"
+                value={description}
+                valid={Boolean(description.trim())}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`channel-${channelId}-settings-privacy`}>Privacy</Label>
+              <Select
+                id={`channel-${channelId}-settings-privacy`}
+                name="channel_privacy"
+                value={privacy}
+                valid={Boolean(privacy)}
+                onChange={(e) => setPrivacy(e.target.value as "public" | "private" | "unlisted")}
+              >
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted</option>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`channel-${channelId}-settings-member-limit`}>Member limit</Label>
+              <Input
+                id={`channel-${channelId}-settings-member-limit`}
+                name="channel_member_limit"
+                type="number"
+                inputMode="numeric"
+                value={memberLimit}
+                aria-invalid={Boolean(fieldErrors.memberLimit)}
+                valid={Boolean(memberLimit.trim() && Number(memberLimit) > 0)}
+                onChange={(e) => setMemberLimit(e.target.value)}
+                placeholder="Member limit"
+              />
+              {fieldErrors.memberLimit ? <p className="text-xs text-red-400">{fieldErrors.memberLimit}</p> : null}
+            </div>
+            <div className="flex gap-3 rounded-lg border border-zinc-800/60 bg-zinc-950/50 p-3">
+              <input
+                type="checkbox"
+                id={`channel-${channelId}-join-approval`}
+                checked={joinRequiresApproval}
+                onChange={(e) => setJoinRequiresApproval(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-900"
+              />
+              <label htmlFor={`channel-${channelId}-join-approval`} className="text-sm leading-snug text-zinc-300">
+                <span className="font-medium text-zinc-100">Require approval to join</span>
+                <span className="mt-0.5 block text-xs text-zinc-500">
+                  When on, users with a valid link still need moderator approval. When off, they join immediately.
+                </span>
+              </label>
+            </div>
+            <Button variant="secondary" className="w-full" onClick={saveSettings}>
+              Save settings
+            </Button>
+          </section>
+
+          <section className="space-y-3 rounded-lg border border-zinc-800/80 bg-zinc-950/35 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Invites</p>
+            <Button className="w-full" onClick={generateInvite}>
+              Generate invite token
+            </Button>
+            <Button variant="secondary" className="w-full" onClick={rotatePrivate}>
+              Rotate private invite
+            </Button>
+            <Button variant="secondary" className="w-full" onClick={rotatePublic}>
+              Rotate public link
+            </Button>
+            {publicUrl ? (
+              <Alert>
+                <span className="break-all">Public URL: {publicUrl}</span>
+              </Alert>
+            ) : null}
+            {inviteToken ? (
+              <Alert tone="success">
+                <span className="break-all">Invite token: {inviteToken}</span>
+              </Alert>
+            ) : null}
+          </section>
         </div>
-        {inviteToken ? <Alert tone="success">Invite token: {inviteToken}</Alert> : null}
-        {feedback ? <Alert>{feedback}</Alert> : null}
+
+        <section className="space-y-4 rounded-lg border border-zinc-800/80 bg-zinc-950/35 p-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Join QR codes</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Scan while logged in. Left: compact join by channel id. Right: private channels — scan encodes the invite (single link, no extra fields).
+            </p>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="text-sm font-medium text-zinc-200">Channel #{channelId}</p>
+              <p className="text-[11px] text-zinc-500">Uses id only — best for public / unlisted.</p>
+              <div className="rounded-lg bg-white p-3 shadow-inner">
+                <QRCode value={buildJoinUrlWithChannelId(channelId)} size={160} />
+              </div>
+              <p className="text-xs font-mono text-zinc-400">?channel={channelId}</p>
+            </div>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="text-sm font-medium text-zinc-200">Private invite</p>
+              {inviteToken ? (
+                <>
+                  <p className="text-[11px] text-zinc-500">Full invite is inside the QR — nothing to type.</p>
+                  <div className="rounded-lg bg-white p-3 shadow-inner">
+                    <QRCode value={buildJoinLandingUrl(`/join/private/${inviteToken}`)} size={160} />
+                  </div>
+                </>
+              ) : (
+                <p className="py-6 text-sm text-zinc-500">Generate an invite token to show the private QR.</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-950/35">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Pending join requests</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                void loadJoinRequests();
+              }}
+            >
+              Refresh
+            </Button>
+          </div>
+          <div className="p-4">
+            {joinRequests.length === 0 ? (
+              <p className="py-2 text-center text-sm text-zinc-500">No pending requests.</p>
+            ) : (
+              <div className="space-y-2">
+                {joinRequests.map((jr: JoinRequestRow) => (
+                  <div
+                    key={jr.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium text-zinc-200">@{jr.username}</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await approveJoinRequest(channelId, jr.id);
+                            showToast("Member approved.", "success");
+                            await loadJoinRequests();
+                            await loadMembers();
+                          } catch (error) {
+                            const message = error instanceof Error ? error.message : "Approve failed.";
+                            showToast(message, "error");
+                          }
+                        }}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await rejectJoinRequest(channelId, jr.id);
+                            showToast("Request rejected.", "info");
+                            await loadJoinRequests();
+                          } catch (error) {
+                            const message = error instanceof Error ? error.message : "Reject failed.";
+                            showToast(message, "error");
+                          }
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-950/35">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Members</p>
+            <Button variant="secondary" size="sm" onClick={loadMembers}>
+              Refresh
+            </Button>
+          </div>
+          <ScrollArea className="h-[min(320px,40vh)]">
+            <div className="space-y-2 p-4 pr-3">
+              {members.length === 0 ? <p className="py-4 text-center text-sm text-zinc-500">No members yet.</p> : null}
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className="grid gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-3 text-xs md:grid-cols-[1fr_minmax(0,140px)_auto_auto] md:items-center"
+                >
+                  <span className="min-w-0 truncate font-medium text-zinc-200">{member.username}</span>
+                  <Select
+                    id={`channel-${channelId}-member-${member.id}-role`}
+                    name={`member_role_${member.id}`}
+                    aria-label={`Role for ${member.username}`}
+                    value={member.role}
+                    onChange={(e) =>
+                      setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: e.target.value as ChannelMember["role"] } : m)))
+                    }
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="moderator">Moderator</option>
+                    <option value="member">Member</option>
+                  </Select>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="md:justify-self-end"
+                    onClick={async () => {
+                      try {
+                        await updateChannelMemberRole(channelId, member.id, member.role);
+                        showToast(`Role updated for ${member.username}.`, "success");
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot update member role.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="md:justify-self-end"
+                    onClick={async () => {
+                      try {
+                        await removeChannelMember(channelId, member.id);
+                        showToast(`Removed ${member.username}.`, "success");
+                        await loadMembers();
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Cannot remove member.";
+                        showToast(message, "error");
+                      }
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </section>
+
+        {feedback ? (
+          <>
+            <Separator />
+            <Alert>{feedback}</Alert>
+          </>
+        ) : null}
       </CardContent>
     </Card>
   );

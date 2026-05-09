@@ -12,10 +12,18 @@ export function expectedTimeSeconds(state: SyncState): number {
 }
 
 export function applyDriftCorrection(audio: HTMLAudioElement, state: SyncState) {
+  // Only correct during active playback. When paused, server position can be stale
+  // relative to local user interactions and should not force hard seeks.
+  if (!state.isPlaying) {
+    audio.playbackRate = 1;
+    return;
+  }
+  if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
   const expected = expectedTimeSeconds(state);
-  const diff = audio.currentTime - expected;
+  const clampedExpected = Math.min(Math.max(0, expected), Math.max(0, audio.duration - 0.2));
+  const diff = audio.currentTime - clampedExpected;
   if (Math.abs(diff) > 0.1) {
-    audio.currentTime = expected;
+    audio.currentTime = clampedExpected;
     audio.playbackRate = 1;
     return;
   }

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import type { ChannelSummary } from "@/lib/api";
 
 type Props = {
@@ -37,42 +39,71 @@ export function ChannelManagementSection(props: Props) {
   } = props;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Card className="lg:col-span-2">
+    <div className="grid gap-6 lg:grid-cols-5">
+      <Card className="lg:col-span-3">
         <CardHeader>
-          <CardTitle>Your Channels</CardTitle>
+          <CardTitle>Your channels</CardTitle>
+          <CardDescription>Open a channel room or review its live status.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          {channels.map((channel) => <ChannelCard key={channel.id} channel={channel} />)}
-          {channels.length === 0 ? <p className="text-sm text-slate-400">No channels yet. Create your first one.</p> : null}
+        <CardContent className="p-0">
+          <ScrollArea className="h-[min(420px,55vh)] px-5 pb-5 pr-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {channels.map((channel) => (
+                <ChannelCard key={channel.id} channel={channel} />
+              ))}
+            </div>
+            {channels.length === 0 ? <p className="py-6 text-center text-sm text-zinc-500">No channels yet — create one on the right.</p> : null}
+          </ScrollArea>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-emerald-500/15 lg:col-span-2">
         <CardHeader>
-          <CardTitle>Create Channel</CardTitle>
+          <CardTitle className="text-base">New channel</CardTitle>
+          <CardDescription>Set a name, visibility, and capacity.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <Label>Channel name</Label>
-            <Input value={channelName} aria-invalid={Boolean(errors.channelName)} valid={Boolean(channelName.trim())} onChange={(e) => onChannelNameChange(e.target.value)} />
-            {errors.channelName ? <p className="text-xs text-rose-400">{errors.channelName}</p> : null}
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="dash-new-channel-name">Name</Label>
+            <Input
+              id="dash-new-channel-name"
+              value={channelName}
+              aria-invalid={Boolean(errors.channelName)}
+              valid={Boolean(channelName.trim())}
+              onChange={(e) => onChannelNameChange(e.target.value)}
+              placeholder="e.g. Friday Night Vinyl"
+            />
+            {errors.channelName ? <p className="text-xs text-red-400">{errors.channelName}</p> : null}
           </div>
-          <div className="space-y-1">
-            <Label>Privacy</Label>
-            <Select value={channelPrivacy} valid={Boolean(channelPrivacy)} onChange={(e) => onChannelPrivacyChange(e.target.value as ChannelSummary["privacy"])}>
-              <option value="public">public</option>
-              <option value="private">private</option>
-              <option value="unlisted">unlisted</option>
+          <div className="space-y-2">
+            <Label htmlFor="dash-new-channel-privacy">Privacy</Label>
+            <Select
+              id="dash-new-channel-privacy"
+              value={channelPrivacy}
+              valid={Boolean(channelPrivacy)}
+              onChange={(e) => onChannelPrivacyChange(e.target.value as ChannelSummary["privacy"])}
+            >
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="unlisted">Unlisted</option>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Members limit</Label>
-            <Input value={memberLimit} aria-invalid={Boolean(errors.memberLimit)} valid={Boolean(memberLimit.trim() && Number(memberLimit) > 0)} onChange={(e) => onMemberLimitChange(e.target.value)} />
-            {errors.memberLimit ? <p className="text-xs text-rose-400">{errors.memberLimit}</p> : null}
+          <div className="space-y-2">
+            <Label htmlFor="dash-new-channel-limit">Member limit</Label>
+            <Input
+              id="dash-new-channel-limit"
+              type="number"
+              inputMode="numeric"
+              value={memberLimit}
+              aria-invalid={Boolean(errors.memberLimit)}
+              valid={Boolean(memberLimit.trim() && Number(memberLimit) > 0)}
+              onChange={(e) => onMemberLimitChange(e.target.value)}
+            />
+            {errors.memberLimit ? <p className="text-xs text-red-400">{errors.memberLimit}</p> : null}
           </div>
-          <Button className="w-full" onClick={onCreateChannel}>
-            Create
+          <Separator />
+          <Button type="button" className="w-full" onClick={onCreateChannel}>
+            Create channel
           </Button>
         </CardContent>
       </Card>
@@ -95,20 +126,31 @@ function ChannelCard({ channel }: { channel: ChannelSummary }) {
   }, [channel.is_playing]);
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle>{channel.name}</CardTitle>
-        <div className="flex items-center gap-2">
-          <Badge variant={isOnline ? "success" : "warning"}>{isOnline ? "online" : "offline"}</Badge>
-          <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
-          <Badge variant={channel.privacy === "public" ? "success" : "warning"}>{channel.privacy}</Badge>
+    <Card className="overflow-hidden transition-shadow duration-300 hover:shadow-md">
+      <CardHeader className="space-y-3 border-0 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <CardTitle className="line-clamp-2 text-base">{channel.name}</CardTitle>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant={isOnline ? "success" : "secondary"}>{isOnline ? "Live" : "Idle"}</Badge>
+            <Badge variant={socketState === "connected" ? "success" : "warning"} className="text-[10px]">
+              {socketState}
+            </Badge>
+            <Badge variant="outline" className="capitalize">
+              {channel.privacy}
+            </Badge>
+            {channel.join_requires_approval ? (
+              <Badge variant="warning" className="text-[10px]" title="New members need moderator approval">
+                Approval required
+              </Badge>
+            ) : null}
+          </div>
         </div>
+        <p className="text-xs text-zinc-500">Members cap: {channel.member_limit ?? "—"}</p>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="text-xs text-slate-400">Members limit: {channel.member_limit ?? "-"}</p>
-        <Link href={`/channel/${channel.id}`}>
-          <Button className="w-full">Open channel</Button>
-        </Link>
+      <CardContent className="pt-0">
+        <Button variant="secondary" className="w-full" asChild>
+          <Link href={`/channel/${channel.id}`}>Open room</Link>
+        </Button>
       </CardContent>
     </Card>
   );

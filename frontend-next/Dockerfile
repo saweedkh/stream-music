@@ -2,9 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY .npmrc /app/.npmrc
-COPY package.json /app/package.json
-RUN npm install
+COPY .npmrc package.json package-lock.json ./
+RUN npm ci
 
 COPY . /app
 

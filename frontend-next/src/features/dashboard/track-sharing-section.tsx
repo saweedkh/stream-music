@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { ChannelSummary, TrackSharePermission, TrackSummary } from "@/lib/api";
@@ -38,9 +38,10 @@ export function TrackSharingSection(props: Props) {
   } = props;
 
   return (
-    <Card>
+    <Card className="border-zinc-800/90">
       <CardHeader>
-        <CardTitle>Track Share Permissions</CardTitle>
+        <CardTitle className="text-lg">Sharing</CardTitle>
+        <CardDescription>Grant users or channels access to specific tracks.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1">
@@ -77,13 +78,13 @@ export function TrackSharingSection(props: Props) {
           </Select>
         </div>
         <Button onClick={onAddShare}>Add Share Permission</Button>
-        <div className="space-y-1 text-xs text-slate-300">
+        <div className="space-y-1 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-400">
           {trackShares.map((share) => (
-            <div key={share.id} className="flex items-center gap-2">
+            <div key={share.id} className="flex items-center gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-2 py-1.5">
               <p className="flex-1">
                 {share.username ? `user: ${share.username}` : ""} {share.channel_name ? `channel: ${share.channel_name}` : ""}
               </p>
-              <Button variant="danger" className="px-2 py-1" onClick={() => onRemoveShare(share.id)}>
+              <Button variant="destructive" size="sm" className="px-2" onClick={() => onRemoveShare(share.id)}>
                 Remove
               </Button>
             </div>

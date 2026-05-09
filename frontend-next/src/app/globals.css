@@ -2,8 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #07090f;
+  --bg-elevated: #0d111d;
+  --surface: #111827;
+  --surface-2: #0f172a;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --brand: #22c55e;
+  --brand-strong: #16a34a;
+  --ring: #34d399;
+}
+
+/* Native <select> fallbacks (e.g. third-party markup) + dark option panels where supported */
+select,
+select option {
+  color-scheme: dark;
+  background-color: rgb(9 9 11);
+  color: rgb(244 244 245);
+}
+
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  @apply antialiased;
+  background:
+    radial-gradient(1200px 600px at 5% -10%, rgba(34, 197, 94, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 95% -20%, rgba(56, 189, 248, 0.08), transparent 55%),
+    linear-gradient(180deg, #05070d 0%, #07090f 100%);
+  color: var(--text);
 }
 
 a {
@@ -12,4 +37,9 @@ a {
 
 * {
   scrollbar-color: #334155 #020617;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.25);
+  color: #ffffff;
 }

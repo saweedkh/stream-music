@@ -16,11 +16,15 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }, []);
 
   if (state === "loading") {
-    return <p className="text-sm text-slate-400">Checking session...</p>;
+    return (
+      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4 text-sm text-slate-400 backdrop-blur">
+        Checking session...
+      </div>
+    );
   }
   if (state === "unauthorized") {
     return (
-      <Alert tone="error" className="space-y-3">
+      <Alert tone="error" className="space-y-3 rounded-2xl border-rose-800/70 bg-rose-950/30 p-4">
         <p>You are not logged in. Please login to manage channels and playback.</p>
         <Link href="/login">
           <Button>Go to login</Button>

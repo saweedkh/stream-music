@@ -1,11 +1,14 @@
+import { Suspense } from "react";
 import { AuthForm } from "@/features/auth/auth-form";
 
 export default function LoginPage() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Welcome back</h1>
+    <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-900/55 p-5 shadow-[0_24px_60px_-35px_rgba(16,185,129,0.45)] backdrop-blur">
+      <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
       <p className="text-sm text-slate-300">Login to create channels, manage playback, and invite users.</p>
-      <AuthForm mode="login" />
+      <Suspense fallback={<p className="text-sm text-slate-400">Loading…</p>}>
+        <AuthForm mode="login" />
+      </Suspense>
     </div>
   );
 }
