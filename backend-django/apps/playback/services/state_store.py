@@ -89,5 +89,14 @@ class PlaybackStateStore:
 
             return int(time() * 1000)
 
+    def clear_channel(self, channel_id: int) -> None:
+        if self._client is None:
+            return
+        for key in (self._playback_key(channel_id), self._queue_key(channel_id), self._event_seq_key(channel_id)):
+            try:
+                self._client.delete(key)
+            except Exception:
+                pass
+
 
 playback_state_store = PlaybackStateStore()

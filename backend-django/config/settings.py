@@ -3,8 +3,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _env_truthy(key: str, default: str = "0") -> bool:
+    return os.getenv(key, default).strip().lower() in ("1", "true", "yes", "on")
+
+
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
-DEBUG = os.getenv("DEBUG", "0") == "1"
+DEBUG = _env_truthy("DEBUG")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
@@ -28,7 +33,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    "config.csrf_middleware.LanTrustedCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -74,7 +79,7 @@ CHANNEL_LAYERS = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "config.authentication.LanSessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
@@ -105,18 +110,30 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
+    "https://localhost:8443",
+    "https://127.0.0.1:8443",
 ]
 CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 
-# Comma-separated, e.g. "http://192.168.1.10:8080" when testing from a phone on LAN.
+# Comma-separated, e.g. "http://192.168.1.10:8080,https://172.20.10.2:8443" for phone on LAN (CSRF needs exact origin).
 _extra_origins = [o.strip() for o in os.getenv("CORS_EXTRA_ORIGINS", "").split(",") if o.strip()]
 if _extra_origins:
     CORS_ALLOWED_ORIGINS = list(dict.fromkeys([*CORS_ALLOWED_ORIGINS, *_extra_origins]))
     CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *_extra_origins]))
 
-if DEBUG:
-    CORS_ALLOWED_ORIGIN_REGEXES = [
+# Private LAN origins: CORS regex + LanTrustedCsrfMiddleware. Enabled when DEBUG or TRUST_LAN_CSRF (see .env.example).
+LAN_ORIGIN_REGEX_ENABLED = DEBUG or _env_truthy("TRUST_LAN_CSRF")
+DEBUG_TRUSTED_ORIGIN_REGEXES: tuple[str, ...] = ()
+if LAN_ORIGIN_REGEX_ENABLED:
+    DEBUG_TRUSTED_ORIGIN_REGEXES = (
         r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
         r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
         r"^http://172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$",
-    ]
+        r"^https://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^https://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^https://172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$",
+    )
+    CORS_ALLOWED_ORIGIN_REGEXES = list(DEBUG_TRUSTED_ORIGIN_REGEXES)
+
+# Nginx terminates TLS and forwards to Django; keeps request.is_secure() and cookies consistent for HTTPS clients.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

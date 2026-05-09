@@ -15,8 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   approveJoinRequest,
-  buildJoinLandingUrl,
   buildJoinUrlWithChannelId,
+  buildPrivateInviteJoinUrl,
   createInvite,
   getChannelMembers,
   listChannelJoinRequests,
@@ -367,9 +367,11 @@ export function ChannelAdminPanel({
               <p className="text-sm font-medium text-zinc-200">Private invite</p>
               {inviteToken ? (
                 <>
-                  <p className="text-[11px] text-zinc-500">Full invite is inside the QR — nothing to type.</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Shorter URL than before — easier for phone cameras. Scan while logged in on the same site URL you opened here.
+                  </p>
                   <div className="rounded-lg bg-white p-3 shadow-inner">
-                    <QRCode value={buildJoinLandingUrl(`/join/private/${inviteToken}`)} size={160} />
+                    <QRCode value={buildPrivateInviteJoinUrl(inviteToken)} size={192} />
                   </div>
                 </>
               ) : (

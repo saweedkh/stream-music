@@ -18,6 +18,7 @@ export default async function ChannelPage({ params }: Props) {
     <AuthGuard>
       <ChannelDashboardTabs
         channelId={id}
+        channelOwnerId={data?.channel?.owner}
         channelName={data?.channel?.name ?? `Channel #${id}`}
         channelPrivacy={data?.channel?.privacy ?? "unknown"}
         isPlaying={isPlaying}

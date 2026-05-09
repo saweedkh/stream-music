@@ -1,9 +1,18 @@
 "use client";
 
-import { Activity, HeartPulse, Radio, Settings2, Sparkles } from "lucide-react";
+import { Activity, HeartPulse, LogOut, Radio, Settings2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
@@ -12,7 +21,7 @@ import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
-import { getChannelMembers, getMe, joinChannel, type QueueItemSummary } from "@/lib/api";
+import { getChannelMembers, getMe, joinChannel, leaveChannel, type QueueItemSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TAB_IDS = ["player", "queue", "admin", "health"] as const;
@@ -32,6 +41,8 @@ function readTabFromWindowSearch(): TabId | null {
 
 type Props = {
   channelId: string;
+  /** Django user id of channel owner — leave is hidden for owners (must transfer/delete elsewhere). */
+  channelOwnerId?: number;
   channelName: string;
   channelPrivacy: string;
   isPlaying: boolean;
@@ -47,6 +58,7 @@ type Props = {
 export function ChannelDashboardTabs(props: Props) {
   const {
     channelId,
+    channelOwnerId,
     channelName,
     channelPrivacy,
     isPlaying,
@@ -59,12 +71,16 @@ export function ChannelDashboardTabs(props: Props) {
     initialJoinRequiresApproval,
   } = props;
   const { showToast } = useToast();
+  const router = useRouter();
   const { upsertState: upsertGlobalPlayerState } = useGlobalChannelPlayer();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "player");
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
   const [canManageChannel, setCanManageChannel] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
   const [latestPlaybackPayload, setLatestPlaybackPayload] = useState<{
     action?: string;
     event_seq?: number;
@@ -121,7 +137,14 @@ export function ChannelDashboardTabs(props: Props) {
     [channelId, showToast],
   );
 
-  const { socketState, sendMessage } = useReconnectingChannelSocket({ channelId, onMessage: handleSocketMessage });
+  const { socketState, sendMessage } = useReconnectingChannelSocket({
+    channelId,
+    onMessage: handleSocketMessage,
+    enabled: !leaveBusy,
+  });
+
+  const isChannelOwner =
+    channelOwnerId != null && currentUserId != null && Number(channelOwnerId) === Number(currentUserId);
 
   useEffect(() => {
     latestSendMessageRef.current = sendMessage;
@@ -154,18 +177,62 @@ export function ChannelDashboardTabs(props: Props) {
   }, [channelId, showToast]);
 
   useEffect(() => {
-    Promise.all([getMe(), getChannelMembers(channelId)])
-      .then(([me, members]) => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await getMe();
+        if (cancelled) return;
         if (!me) {
+          setCurrentUserId(null);
           setCanManageChannel(false);
           return;
         }
-        const myMembership = members.results.find((member) => member.user_id === me.id);
-        const canManage = myMembership?.role === "owner" || myMembership?.role === "moderator";
-        setCanManageChannel(Boolean(canManage));
-      })
-      .catch(() => {});
+        setCurrentUserId(me.id);
+        try {
+          const members = await getChannelMembers(channelId);
+          if (cancelled) return;
+          const myMembership = members.results.find((member) => member.user_id === me.id);
+          const canManage = myMembership?.role === "owner" || myMembership?.role === "moderator";
+          setCanManageChannel(Boolean(canManage));
+        } catch {
+          if (!cancelled) setCanManageChannel(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUserId(null);
+          setCanManageChannel(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [channelId]);
+
+  async function confirmLeaveChannel() {
+    setLeaveBusy(true);
+    try {
+      await leaveChannel(channelId);
+      upsertGlobalPlayerState({
+        channelId: null,
+        socketState: "closed",
+        trackPath: undefined,
+        startedAt: undefined,
+        pausedAt: undefined,
+        initialIsPlaying: false,
+        canControl: false,
+        sendSocketMessage: undefined,
+        latestSocketPayload: null,
+      });
+      showToast("You left the channel.", "success");
+      setLeaveDialogOpen(false);
+      router.replace("/dashboard");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not leave channel.";
+      showToast(msg, "error");
+      setLeaveBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!canManageChannel && activeTab === "admin") {
@@ -230,7 +297,19 @@ export function ChannelDashboardTabs(props: Props) {
             <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
             <p className="max-w-xl text-sm text-zinc-400">Listen in the docked player, manage the queue, or open controls if you’re a moderator.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!isChannelOwner && currentUserId != null ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-red-900/60 text-red-200 hover:bg-red-950/40"
+                onClick={() => setLeaveDialogOpen(true)}
+              >
+                <LogOut className="h-4 w-4" aria-hidden />
+                Leave channel
+              </Button>
+            ) : null}
             <Badge variant={isChannelOnline ? "success" : "secondary"}>{isChannelOnline ? "Live" : "Idle"}</Badge>
             <Badge variant={isChannelOnline ? "success" : "outline"} className="capitalize">
               {isChannelOnline ? "Playing" : "Paused"}
@@ -335,6 +414,25 @@ export function ChannelDashboardTabs(props: Props) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={leaveDialogOpen} onOpenChange={(open) => !leaveBusy && setLeaveDialogOpen(open)}>
+        <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave this channel?</DialogTitle>
+            <DialogDescription>
+              Playback will stop and you will need to join again to listen. Moderators and owners stay via Control tab — owners cannot leave from here.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="secondary" disabled={leaveBusy} onClick={() => setLeaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" disabled={leaveBusy} onClick={() => void confirmLeaveChannel()}>
+              {leaveBusy ? "Leaving…" : "Leave channel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

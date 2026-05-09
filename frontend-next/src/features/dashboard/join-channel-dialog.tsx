@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { JoinQrCameraScanner } from "@/features/dashboard/join-qr-camera-scanner";
 import { joinChannelFromLink } from "@/lib/api";
+import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 import { Camera, LogIn } from "lucide-react";
 
 export function JoinChannelDialog() {
@@ -29,7 +30,7 @@ export function JoinChannelDialog() {
 
   const onQrDecoded = useCallback(
     (value: string) => {
-      setLink(value);
+      setLink(extractJoinInputFromScannedText(value));
       setCameraOpen(false);
       showToast("QR read — you can join or edit the field.", "success");
     },

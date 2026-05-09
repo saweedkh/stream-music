@@ -13,3 +13,10 @@ __pycache__/
 venv/
 .venv/
 media/
+
+.cursor/
+*.tsbuildinfo
+
+# Dev-only TLS assets (generate with infra/nginx/generate-dev-certs.sh)
+infra/nginx/ssl/*.crt
+infra/nginx/ssl/*.key

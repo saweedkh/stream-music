@@ -7,6 +7,16 @@ Advanced LAN synchronized group music playback with:
 - Redis pub/sub and PostgreSQL
 - Nginx static audio serving
 
+## Import audio from disk (CLI)
+
+Bulk-register files from a folder on the server into `MEDIA_ROOT` as tracks (default: **`public_lan`** for all users). See **[docs/import-audio-cli.md](docs/import-audio-cli.md)**.
+
+Quick example:
+
+```bash
+docker compose exec backend python manage.py import_audio /path/inside/container/to/music --owner yourusername
+```
+
 ## Run
 
 1. Copy backend env:

@@ -42,6 +42,7 @@ export type ChannelStateResponse = {
   channel: {
     id: number;
     name: string;
+    owner?: number;
     privacy?: string;
     description?: string;
     member_limit?: number;
@@ -64,6 +65,13 @@ export type ChannelSummary = {
 export function buildJoinUrlWithChannelId(channelId: string | number): string {
   const origin = typeof window !== "undefined" ? window.location.origin : getApiBase();
   return `${origin}/join?channel=${encodeURIComponent(String(channelId))}`;
+}
+
+/** Short QR for private invites — denser modules than `/join?link=…` (easier for phone cameras). */
+export function buildPrivateInviteJoinUrl(inviteToken: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : getApiBase();
+  const t = String(inviteToken).trim();
+  return `${origin}/join/private/${encodeURIComponent(t)}`;
 }
 
 /** Private / slug invites: one query `link` = path such as `/join/private/…` or `/join/public/…`. */
@@ -369,6 +377,11 @@ export async function updateChannelMemberRole(channelId: string, memberId: numbe
 export async function removeChannelMember(channelId: string, memberId: number) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/members/${memberId}`, await withAuthHeaders({ method: "DELETE" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove member"));
+}
+
+export async function leaveChannel(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/leave`, await withAuthHeaders({ method: "POST" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot leave channel"));
 }
 
 export async function rotatePrivateInvite(channelId: string) {

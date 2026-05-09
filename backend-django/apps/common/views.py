@@ -36,6 +36,7 @@ from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.channel_queue import apply_track_to_session, pick_shuffled_tracks, replace_queue_with_tracks
 from apps.playback.services.state_store import playback_state_store
+from apps.tracks.filesystem_import import import_audio_files_under_media
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
 
@@ -129,8 +130,9 @@ class ChannelViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        if not self._can_manage(instance.id):
-            raise PermissionDenied("permission_denied")
+        if instance.owner_id != self.request.user.id:
+            raise PermissionDenied("only_owner_can_delete_channel")
+        playback_state_store.clear_channel(instance.id)
         instance.delete()
 
 
@@ -628,9 +630,12 @@ class TrackSharePermissionsView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _validate_private_invite(channel: Channel, token_value) -> tuple[Response | None, InviteToken | None]:
+def _validate_private_invite(channel: Channel, token_value, user=None) -> tuple[Response | None, InviteToken | None]:
     """Validate private-channel invite. Does not consume a use."""
     if channel.privacy != Channel.Privacy.PRIVATE:
+        return None, None
+    # Owners reach join without an invite token (e.g. SPA calls POST /join on every channel load).
+    if user is not None and channel.owner_id == user.id:
         return None, None
     invite = InviteToken.objects.filter(channel=channel, token=token_value, is_active=True).first()
     if not invite:
@@ -652,16 +657,16 @@ def perform_channel_join(user, channel: Channel, token_value) -> Response:
     If join_requires_approval: create a pending ChannelJoinRequest (private invite use is consumed on approve).
     Otherwise: immediate membership, consuming a private invite now.
     """
-    err, invite = _validate_private_invite(channel, token_value)
+    membership = ChannelMembership.objects.filter(channel=channel, user=user).first()
+    if membership and membership.is_active:
+        return Response(MembershipSerializer(membership).data, status=status.HTTP_200_OK)
+
+    err, invite = _validate_private_invite(channel, token_value, user=user)
     if err:
         return err
     active_members = ChannelMembership.objects.filter(channel=channel, is_active=True).count()
     if active_members >= channel.member_limit:
         return Response({"detail": "channel_full"}, status=status.HTTP_403_FORBIDDEN)
-
-    membership = ChannelMembership.objects.filter(channel=channel, user=user).first()
-    if membership and membership.is_active:
-        return Response(MembershipSerializer(membership).data, status=status.HTTP_200_OK)
 
     if channel.join_requires_approval:
         existing_pending = ChannelJoinRequest.objects.filter(
@@ -926,6 +931,21 @@ class ChannelSettingsView(APIView):
             update_fields=["name", "description", "privacy", "member_limit", "join_requires_approval", "updated_at"]
         )
         return Response(ChannelSerializer(channel).data)
+
+
+class ChannelLeaveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        membership = ChannelMembership.objects.filter(channel=channel, user=request.user, is_active=True).first()
+        if not membership:
+            return Response({"detail": "not_a_member"}, status=status.HTTP_400_BAD_REQUEST)
+        if channel.owner_id == request.user.id or membership.role == ChannelMembership.Role.OWNER:
+            return Response({"detail": "owner_cannot_leave"}, status=status.HTTP_400_BAD_REQUEST)
+        membership.is_active = False
+        membership.save(update_fields=["is_active"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ChannelMembersView(APIView):

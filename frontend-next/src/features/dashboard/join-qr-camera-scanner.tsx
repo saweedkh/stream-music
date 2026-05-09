@@ -10,6 +10,17 @@ type Props = {
   onCancel: () => void;
 };
 
+function getCameraPrereqError(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) {
+    return "Camera is blocked: this page uses HTTP with a non-localhost address. Browsers only allow the camera on HTTPS (or http://localhost). Use HTTPS on your server, open the app on localhost on the same device, or paste the invite in the field above.";
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return "This browser does not expose the camera API.";
+  }
+  return null;
+}
+
 export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
   const regionId = useRef(`join-scan-${typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())}`).current;
   const onDecodedRef = useRef(onDecoded);
@@ -20,6 +31,16 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
   const [starting, setStarting] = useState(true);
 
   useEffect(() => {
+    const prereq = getCameraPrereqError();
+    if (prereq) {
+      setError(prereq);
+      setStarting(false);
+    }
+
+    if (prereq) {
+      return () => {};
+    }
+
     let cancelled = false;
     let settled = false;
 
@@ -29,29 +50,40 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
         if (cancelled) return;
         const html5 = new Html5Qrcode(regionId, false);
         html5Ref.current = html5;
-        await html5.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
-          (decodedText) => {
-            if (settled || cancelled) return;
-            const value = extractJoinInputFromScannedText(decodedText);
-            if (!value) return;
-            settled = true;
-            void html5
-              .stop()
-              .then(() => html5.clear())
-              .catch(() => {})
-              .finally(() => {
-                html5Ref.current = null;
-                onDecodedRef.current(value);
-              });
-          },
-          () => {},
-        );
+
+        const qrConfig = { fps: 10, qrbox: { width: 220, height: 220 } as const, aspectRatio: 1 as const };
+        const onScan = (decodedText: string) => {
+          if (settled || cancelled) return;
+          const value = extractJoinInputFromScannedText(decodedText);
+          if (!value) return;
+          settled = true;
+          void html5
+            .stop()
+            .then(() => html5.clear())
+            .catch(() => {})
+            .finally(() => {
+              html5Ref.current = null;
+              onDecodedRef.current(value);
+            });
+        };
+
+        try {
+          await html5.start({ facingMode: "environment" }, qrConfig, onScan, () => {});
+        } catch {
+          const devices = await Html5Qrcode.getCameras();
+          if (cancelled || devices.length === 0) throw new Error("No camera found.");
+          await html5.start(devices[0].id, qrConfig, onScan, () => {});
+        }
+
         if (!cancelled) setStarting(false);
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Could not use the camera.");
+          const msg = e instanceof Error ? e.message : "Could not use the camera.";
+          const hint =
+            msg.includes("Permission") || msg.includes("NotAllowed")
+              ? " Allow camera access in the browser site settings."
+              : "";
+          setError(msg + hint);
           setStarting(false);
         }
       }
