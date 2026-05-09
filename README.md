@@ -27,6 +27,19 @@ docker compose exec backend python manage.py import_audio /path/inside/container
    - `docker compose exec backend python manage.py migrate`
    - if tables already exist from prior sync mode: `docker compose exec backend python manage.py migrate --fake-initial`
 
+## Production (central server, Docker + TLS)
+
+Full guide (Persian): **[docs/production-deployment.md](docs/production-deployment.md)**.
+
+Quick start:
+
+```bash
+cp deploy/env.production.example .env.production
+# edit SECRET_KEY and POSTGRES_PASSWORD
+./deploy/up.sh
+# or: SITE_DOMAIN=music.example.com ./deploy/up.sh
+```
+
 ## Mirrors
 
 - Python packages are installed via `https://pypi.devneeds.ir/simple/`.

@@ -1,4 +1,5 @@
 import json
+import math
 import time
 
 from asgiref.sync import sync_to_async
@@ -15,6 +16,14 @@ from apps.tracks.models import Track
 
 
 class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
+    @staticmethod
+    def _incoming_action_text(raw) -> str | None:
+        """Accept only JSON string actions after trim (avoids accidental non-string types)."""
+        if not isinstance(raw, str):
+            return None
+        text = raw.strip()
+        return text or None
+
     @staticmethod
     def _serialize_queue_rows(queue_rows: list[ChannelQueueItem]) -> list[dict]:
         return [
@@ -74,12 +83,24 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        raw_action = data.get("action")
-        if raw_action == "PING_LATENCY":
-            await self.send(text_data=json.dumps({"type": "PONG_LATENCY", "client_ts": data.get("client_ts")}))
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({"type": "ERROR", "message": "invalid_json"}))
             return
-        action = self._normalize_action(raw_action)
+        if not isinstance(data, dict):
+            await self.send(text_data=json.dumps({"type": "ERROR", "message": "invalid_action"}))
+            return
+        raw_action = data.get("action")
+        action_text = self._incoming_action_text(raw_action)
+        if action_text and action_text.upper() == "PING_LATENCY":
+            await self.send(
+                text_data=json.dumps(
+                    {"type": "PONG_LATENCY", "client_ts": data.get("client_ts"), "server_time": time.time()},
+                ),
+            )
+            return
+        action = self._normalize_action(action_text)
         user = self.scope.get("user")
         if action is None:
             await self.send(text_data=json.dumps({"type": "ERROR", "message": "invalid_action"}))
@@ -89,7 +110,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             if not getattr(user, "is_authenticated", False):
                 await self.send(text_data=json.dumps({"type": "ERROR", "message": "permission_denied"}))
                 return
-            payload = await sync_to_async(self._apply_auto_next)(user.id)
+            payload = await sync_to_async(self._apply_auto_next)(user.id, data)
             if payload is None:
                 return
             if payload.get("type") == "ERROR":
@@ -193,8 +214,9 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             **extra,
         }
 
-    def _apply_auto_next(self, user_id: int) -> dict | None:
+    def _apply_auto_next(self, user_id: int, data: dict | None = None) -> dict | None:
         """Advance queue like next(); any active member may trigger after server timeline nears track end."""
+        data = data or {}
         channel_id_int = int(self.channel_id)
         channel = Channel.objects.filter(id=channel_id_int).first()
         if channel is None or not channel.is_active:
@@ -222,11 +244,33 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
 
         expected_pos = time.time() - float(started)
         dur = float(track.duration_seconds or 0)
+        cdur_raw = data.get("client_duration_sec")
+        cdur = 0.0
+        try:
+            if cdur_raw is not None and cdur_raw != "":
+                cdur = float(cdur_raw)
+        except (TypeError, ValueError):
+            cdur = 0.0
+        if not math.isfinite(cdur) or cdur < 0:
+            cdur = 0.0
+
+        candidates = []
         if dur >= 5.0:
-            if expected_pos < dur - 3.0:
+            candidates.append(dur)
+        if cdur >= 5.0:
+            candidates.append(cdur)
+        if candidates:
+            ref = min(candidates)
+            slack = max(8.0, min(45.0, ref * 0.15))
+            if expected_pos < ref - slack:
                 return None
-        elif expected_pos < 15.0:
-            return None
+        else:
+            ref_small = max(dur, cdur)
+            if ref_small > 0 and ref_small < 5.0:
+                if expected_pos < max(0.0, ref_small - 0.35):
+                    return None
+            elif expected_pos < 15.0:
+                return None
 
         current_index = 0
         if playback_session.track_id is not None:

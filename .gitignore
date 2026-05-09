@@ -20,3 +20,8 @@ media/
 # Dev-only TLS assets (generate with infra/nginx/generate-dev-certs.sh)
 infra/nginx/ssl/*.crt
 infra/nginx/ssl/*.key
+
+# Production deploy (generated locally / on server)
+deploy/.env.generated
+deploy/.env.runtime.merged
+deploy/Caddyfile.generated

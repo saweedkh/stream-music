@@ -10,7 +10,10 @@ def _env_truthy(key: str, default: str = "0") -> bool:
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = _env_truthy("DEBUG")
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
+
+SESSION_COOKIE_SECURE = _env_truthy("SESSION_COOKIE_SECURE", "1" if not DEBUG else "0")
+CSRF_COOKIE_SECURE = _env_truthy("CSRF_COOKIE_SECURE", "1" if not DEBUG else "0")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

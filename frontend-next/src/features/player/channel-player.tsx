@@ -21,6 +21,13 @@ import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "
 import { cn } from "@/lib/utils";
 import { expectedTimeSeconds } from "./sync-client";
 
+/** Blend repeated clock samples to reduce jitter (WS pong / sync). */
+function blendClockOffset(prevMs: number, sampleMs: number, alpha: number): number {
+  if (!Number.isFinite(sampleMs)) return prevMs;
+  if (!Number.isFinite(prevMs) || Math.abs(prevMs) < 1) return sampleMs;
+  return prevMs + (sampleMs - prevMs) * alpha;
+}
+
 export type ChannelPlaybackEventPayload = {
   action?: string;
   event_seq?: number;
@@ -29,6 +36,8 @@ export type ChannelPlaybackEventPayload = {
   position?: number | null;
   track_file?: string | null;
   queue_version?: number;
+  /** Unix seconds — refine client clock vs server on sync messages */
+  server_time?: number;
 };
 
 type Props = {
@@ -158,6 +167,10 @@ export function ChannelPlayer({
     const action = String(payload.action ?? "").toLowerCase();
     if (action === "initial_sync") {
       applySocketPayload(payload);
+      if (typeof payload.server_time === "number" && Number.isFinite(payload.server_time)) {
+        const sample = payload.server_time * 1000 - Date.now();
+        setOffsetMs((prev) => blendClockOffset(prev, sample, 0.45));
+      }
       const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
       if (seq !== null) {
         lastAppliedEventSeqRef.current = Math.max(lastAppliedEventSeqRef.current, seq);
@@ -200,8 +213,41 @@ export function ChannelPlayer({
   }
 
   useEffect(() => {
-    getServerTime().then(({ offset }) => setOffsetMs(offset)).catch(() => setOffsetMs(0));
+    const sync = () => {
+      void getServerTime()
+        .then(({ offset }) => setOffsetMs((prev) => blendClockOffset(prev, offset, 0.5)))
+        .catch(() => {});
+    };
+    sync();
+    const id = window.setInterval(sync, 45_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
+
+  useEffect(() => {
+    const onClock = (ev: Event) => {
+      const e = ev as CustomEvent<{ channelId?: string; offsetMs?: number }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      const next = e.detail?.offsetMs;
+      if (typeof next !== "number" || !Number.isFinite(next)) return;
+      setOffsetMs((prev) => blendClockOffset(prev, next, 0.35));
+    };
+    window.addEventListener("channel-clock-sync", onClock as EventListener);
+    return () => window.removeEventListener("channel-clock-sync", onClock as EventListener);
+  }, [channelId]);
+
+  useEffect(() => {
+    if (socketState !== "connected") return;
+    void getServerTime()
+      .then(({ offset }) => setOffsetMs((prev) => blendClockOffset(prev, offset, 0.55)))
+      .catch(() => {});
+  }, [socketState, channelId]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -283,9 +329,12 @@ export function ChannelPlayer({
       onend: () => {
         if (!isPlayingRef.current || !socketConnectedRef.current) return;
         const send = sendSocketMessageRef.current;
-        const ok = send?.({ action: "auto_next" });
+        const clientDurationSec =
+          typeof howl.duration === "function" ? Number(howl.duration()) || 0 : 0;
+        const payload = { action: "auto_next" as const, client_duration_sec: clientDurationSec };
+        const ok = send?.(payload);
         if (!ok) {
-          pendingSocketCommandRef.current = { action: "auto_next" };
+          pendingSocketCommandRef.current = payload;
         }
       },
     });
@@ -316,6 +365,10 @@ export function ChannelPlayer({
         setPosition(current);
       }
 
+      const setHowlRate = (rate: number) => {
+        if (typeof howl.rate === "function") howl.rate(rate);
+      };
+
       if (isPlaying) {
         const expected = expectedTimeSeconds({
           startedAt: syncStartedAt,
@@ -324,9 +377,21 @@ export function ChannelPlayer({
           isPlaying,
         });
         const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-        if (Math.abs(current - expected) > 0.85 && !isDraggingSeekRef.current) {
-          howl.seek(Math.max(0, expected));
+        const diff = current - expected;
+        if (!isDraggingSeekRef.current) {
+          const hardSeek = 0.38;
+          const softLo = 0.045;
+          if (Math.abs(diff) > hardSeek) {
+            howl.seek(Math.max(0, expected));
+            setHowlRate(1);
+          } else if (Math.abs(diff) > softLo) {
+            setHowlRate(diff > 0 ? 0.988 : 1.012);
+          } else {
+            setHowlRate(1);
+          }
         }
+      } else {
+        setHowlRate(1);
       }
 
       rafRef.current = window.requestAnimationFrame(tick);
@@ -352,11 +417,13 @@ export function ChannelPlayer({
         offsetMs,
         isPlaying,
       });
+      if (typeof howl.rate === "function") howl.rate(1);
       howl.seek(Math.max(0, expected));
       howl.play();
       return;
     }
 
+    if (typeof howl.rate === "function") howl.rate(1);
     howl.pause();
     if (typeof syncPausedAt === "number") {
       howl.seek(Math.max(0, syncPausedAt));

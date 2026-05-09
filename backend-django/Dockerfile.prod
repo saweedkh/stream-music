@@ -1,0 +1,17 @@
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt /app/requirements.txt
+# Strip regional mirror lines so images build on any registry/PyPI mirror.
+RUN sed '/^--index-url/d;/^--trusted-host/d' /app/requirements.txt > /tmp/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY . /app
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 config.asgi:application"]

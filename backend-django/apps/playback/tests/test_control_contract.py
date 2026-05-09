@@ -30,5 +30,13 @@ class ControlContractTests(SimpleTestCase):
         self.assertEqual(ChannelPlaybackConsumer._normalize_action("play_playlist"), "play_playlist")
         self.assertEqual(ChannelPlaybackConsumer._normalize_action("add_to_queue"), "add_to_queue")
         self.assertEqual(ChannelPlaybackConsumer._normalize_action("enqueue_next"), "enqueue_next")
+        self.assertEqual(ChannelPlaybackConsumer._normalize_action("auto_next"), "auto_next")
         self.assertIsNone(ChannelPlaybackConsumer._normalize_action("PING_LATENCY"))
         self.assertIsNone(ChannelPlaybackConsumer._normalize_action("drop_db"))
+
+    def test_ws_incoming_action_text_only_strings(self):
+        self.assertEqual(ChannelPlaybackConsumer._incoming_action_text(" play "), "play")
+        self.assertEqual(ChannelPlaybackConsumer._incoming_action_text(" PING_LATENCY "), "PING_LATENCY")
+        self.assertIsNone(ChannelPlaybackConsumer._incoming_action_text("   "))
+        self.assertIsNone(ChannelPlaybackConsumer._incoming_action_text(None))
+        self.assertIsNone(ChannelPlaybackConsumer._incoming_action_text(1))

@@ -133,8 +133,23 @@ export function ChannelDashboardTabs(props: Props) {
         track_file?: string | null;
         message?: string;
         queue?: QueueItemSummary[];
+        server_time?: number;
+        client_ts?: number;
       };
       const type = (data.type ?? "").toLowerCase();
+      if (type === "pong_latency") {
+        const serverTime = typeof data.server_time === "number" ? data.server_time : null;
+        const clientTs = typeof data.client_ts === "number" ? data.client_ts : null;
+        if (serverTime != null && clientTs != null) {
+          const now = Date.now();
+          const rtt = Math.max(0, now - clientTs);
+          const offsetMs = serverTime * 1000 - (clientTs + rtt / 2);
+          window.dispatchEvent(
+            new CustomEvent("channel-clock-sync", { detail: { channelId: String(channelId), offsetMs } }),
+          );
+        }
+        return;
+      }
       if (type === "error") {
         const map: Record<string, string> = {
           queue_empty: "Queue is empty. Select a playlist/track first.",
