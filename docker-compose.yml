@@ -5,15 +5,16 @@ services:
       POSTGRES_DB: stream_music
       POSTGRES_USER: stream_music
       POSTGRES_PASSWORD: stream_music
+    # Host ports avoid clash with local/other Postgres on the server (container still listens on 5432).
     ports:
-      - "5432:5432"
+      - "5431:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7
     ports:
-      - "6379:6379"
+      - "6380:6379"
 
   backend:
     build:

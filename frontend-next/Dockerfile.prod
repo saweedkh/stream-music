@@ -11,6 +11,9 @@ RUN npm config set registry https://registry.npmjs.org/ \
 
 COPY . .
 
+# Next.js allows omitting `public/`; ensure it exists so the runner stage can COPY it.
+RUN mkdir -p public
+
 RUN npm run build
 
 FROM node:20-bookworm-slim AS runner

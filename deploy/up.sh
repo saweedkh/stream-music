@@ -24,8 +24,9 @@ if ! grep -qE '^SECRET_KEY=.+' "$ENV_MAIN"; then
   exit 1
 fi
 if grep -qiE '^SECRET_KEY=.*change-me' "$ENV_MAIN"; then
-  echo "[deploy] Replace the example SECRET_KEY with a long random value"
-  exit 1
+  new_key="$(openssl rand -hex 64)"
+  sed -i "s/^SECRET_KEY=.*/SECRET_KEY=${new_key}/" "$ENV_MAIN"
+  echo "[deploy] Generated SECRET_KEY in .env.production (replaced example placeholder)"
 fi
 
 if ! grep -qE '^POSTGRES_PASSWORD=.+' "$ENV_MAIN"; then
@@ -33,14 +34,41 @@ if ! grep -qE '^POSTGRES_PASSWORD=.+' "$ENV_MAIN"; then
   exit 1
 fi
 
-PRIMARY_IP="$("$DETECT_IP")"
-SITE_DOMAIN="${SITE_DOMAIN:-}"
-
-echo "[deploy] Detected primary IPv4: ${PRIMARY_IP}"
-if [[ -n "$SITE_DOMAIN" ]]; then
-  echo "[deploy] SITE_DOMAIN=${SITE_DOMAIN} (automatic HTTPS via Let's Encrypt)"
+# SITE_DOMAIN: if .env.production defines SITE_DOMAIN=... (even empty), that wins — avoids stale `export SITE_DOMAIN` in the shell.
+_site_domain_shell="${SITE_DOMAIN:-}"
+SITE_DOMAIN=""
+SITE_DOMAIN_SOURCE=""
+if grep -qE '^SITE_DOMAIN=' "$ENV_MAIN" 2>/dev/null; then
+  _sd_line="$(grep '^SITE_DOMAIN=' "$ENV_MAIN" | head -1)"
+  SITE_DOMAIN="${_sd_line#SITE_DOMAIN=}"
+  SITE_DOMAIN="${SITE_DOMAIN//$'\r'/}"
+  SITE_DOMAIN_SOURCE=".env.production"
 else
-  echo "[deploy] No SITE_DOMAIN — using IP ${PRIMARY_IP} with tls internal (browser warning OK)"
+  SITE_DOMAIN="${_site_domain_shell}"
+  [[ -n "${SITE_DOMAIN:-}" ]] && SITE_DOMAIN_SOURCE="environment"
+fi
+
+# PRIMARY_IP: shell env wins, then .env.production PRIMARY_IP=..., else route-based detect.
+PRIMARY_IP_SOURCE="detected"
+if [[ -n "${PRIMARY_IP:-}" ]]; then
+  PRIMARY_IP_SOURCE="environment"
+elif [[ -f "$ENV_MAIN" ]]; then
+  _line="$(grep -E '^PRIMARY_IP=[^[:space:]]+' "$ENV_MAIN" 2>/dev/null | head -1 || true)"
+  if [[ -n "$_line" ]]; then
+    PRIMARY_IP="${_line#PRIMARY_IP=}"
+    PRIMARY_IP="${PRIMARY_IP//$'\r'/}"
+    PRIMARY_IP_SOURCE=".env.production"
+  fi
+fi
+if [[ -z "${PRIMARY_IP:-}" ]]; then
+  PRIMARY_IP="$("$DETECT_IP")"
+fi
+
+echo "[deploy] Primary IPv4 (${PRIMARY_IP_SOURCE}): ${PRIMARY_IP}"
+if [[ -n "$SITE_DOMAIN" ]]; then
+  echo "[deploy] SITE_DOMAIN=${SITE_DOMAIN} (${SITE_DOMAIN_SOURCE:-set}) — automatic HTTPS via Let's Encrypt"
+else
+  echo "[deploy] No SITE_DOMAIN (${SITE_DOMAIN_SOURCE:-unset}) — using IP ${PRIMARY_IP} with tls internal (browser warning OK)"
 fi
 
 bash "${ROOT}/deploy/render-env-generated.sh" "$PRIMARY_IP" "$SITE_DOMAIN" >"$ENV_GEN"
@@ -55,18 +83,23 @@ echo "[deploy] Wrote $CADDY_OUT"
 docker compose \
   --env-file "$ENV_MERGED" \
   -f "${ROOT}/docker-compose.prod.yml" \
-  up -d --build "$@"
+  up -d --build --remove-orphans "$@"
 
 echo ""
 echo "[deploy] Running."
 if [[ -n "$SITE_DOMAIN" ]]; then
-  echo "  App:    https://${SITE_DOMAIN}"
+  echo "  HTTPS:  https://${SITE_DOMAIN}/  |  https://${SITE_DOMAIN}:8443/"
+  echo "  HTTP:   http://${PRIMARY_IP}:8080/  (plain HTTP on LAN — works when HTTPS tools/proxies fail)"
 else
-  echo "  App:    https://${PRIMARY_IP}"
+  echo "  HTTPS:  https://${PRIMARY_IP}/  |  https://${PRIMARY_IP}:8443/"
+  echo "  HTTP:   http://${PRIMARY_IP}:8080/  (plain HTTP on LAN — works when HTTPS tools/proxies fail)"
 fi
+echo "  Stack:  Caddy — publish 80→redirect, 443/8443→HTTPS, 8080→HTTP (same paths as dev nginx :8080)."
+echo "  Hint:   For login via http://…:8080 set SESSION_COOKIE_SECURE=0 and CSRF_COOKIE_SECURE=0 in .env.production."
+echo "  Hint:   If curl/browser HTTPS breaks, disable system proxy or add ${PRIMARY_IP} to NO_PROXY (http_proxy/all_proxy tunnel TLS incorrectly)."
 if grep -q '^DETECTED_PUBLIC_IPV4=[0-9]' "$ENV_GEN" 2>/dev/null; then
   pub="$(grep '^DETECTED_PUBLIC_IPV4=' "$ENV_GEN" | cut -d= -f2-)"
-  echo "  Public: ${pub} (if behind NAT, open 80/443 to this host)"
+  echo "  Public: ${pub} (if behind NAT, open 80/443/8443/8080 to this host)"
 fi
 echo ""
 echo "  Logs:   docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml logs -f"

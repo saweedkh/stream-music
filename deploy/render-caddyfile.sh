@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Renders Caddy config: Let's Encrypt when SITE_DOMAIN is set; tls internal for IP-only.
-# Args: PRIMARY_IP [SITE_DOMAIN]
+# Plain HTTP on PRIMARY_IP:8080 is always emitted so LAN clients work even when TLS handshakes fail (proxies / local tooling).
 
 set -euo pipefail
 
@@ -15,10 +15,9 @@ else
   TLS_DIRECTIVE=$'tls internal\n\t# Self-signed for IP / quick prod; browsers will warn unless you trust the cert.'
 fi
 
-cat <<EOF
-${BLOCK_HOST} {
-	${TLS_DIRECTIVE}
-
+# Shared handlers (HTTPS site + HTTP :8080 + optional HTTP hostname).
+HANDLERS=$(
+  cat <<'HAND'
 	encode gzip zstd
 
 	handle_path /audio/* {
@@ -39,5 +38,26 @@ ${BLOCK_HOST} {
 	handle {
 		reverse_proxy frontend:3000
 	}
+HAND
+)
+
+cat <<EOF
+http://${PRIMARY_IP}:8080 {
+${HANDLERS}
+}
+
+${BLOCK_HOST} {
+	${TLS_DIRECTIVE}
+
+${HANDLERS}
 }
 EOF
+
+if [[ -n "$SITE_DOMAIN" ]]; then
+  cat <<EOF
+
+http://${SITE_DOMAIN}:8080 {
+${HANDLERS}
+}
+EOF
+fi

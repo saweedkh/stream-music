@@ -49,17 +49,40 @@ python manage.py import_audio "/data/incoming/albums" --owner dj --private
 
 ## Usage (Docker)
 
-The backend container must **see** the source path. Typical options:
+The backend process must **read** the source folder and **write** under `MEDIA_ROOT` (in prod that is the `media_data` volume at `/media`). Your **database** must be the same one the stack uses (don’t run `manage.py` from a local venv against `localhost` unless Postgres credentials and DB match that stack — the usual failure is `password authentication failed for user "stream_music"`).
 
-1. **Bind-mount** your music folder into the container (e.g. `/media/inbox`) and run:
+### Production stack (`docker-compose.prod.yml`)
+
+One-shot import without changing the running backend container (bind-mounts only for this command):
+
+```bash
+cd /path/to/stream-music
+
+docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml run --rm \
+  -v "/ABSOLUTE/PATH/TO/YOUR/MUSIC:/inbox:ro" \
+  backend python manage.py import_audio /inbox --owner YOUR_USERNAME
+```
+
+Or use the helper:
+
+```bash
+chmod +x deploy/import-audio.sh   # once
+./deploy/import-audio.sh "/ABSOLUTE/PATH/TO/YOUR/MUSIC" --owner YOUR_USERNAME
+```
+
+`YOUR_USERNAME` must exist in **that** database (create a superuser inside the backend container if needed: `docker compose … exec backend python manage.py createsuperuser`).
+
+Files are copied into `/media` inside the container (persisted in the `media_data` volume); Caddy already serves `/audio/` from that volume.
+
+### Dev stack (`docker-compose.yml`)
+
+1. Bind-mount your music folder (e.g. under `./media/inbox`) **or** copy into the repo `./media` tree, then:
 
    ```bash
    docker compose exec backend python manage.py import_audio /media/inbox --owner youruser
    ```
 
-2. Or copy files into an existing mounted volume (e.g. the repo’s `./media` is often mounted at `/media` in `docker-compose.yml`) under a staging folder, then import from **inside** that mount path.
-
-Ensure `MEDIA_ROOT` in the container points at the volume where you want files stored (see `backend-django/.env.example` — often `/media` in Docker).
+2. Ensure `MEDIA_ROOT` in the container matches where you’re writing (see `backend-django/.env.example`).
 
 ## Idempotency
 

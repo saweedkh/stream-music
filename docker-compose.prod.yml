@@ -65,6 +65,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # Same TLS site as :443 (matches dev nginx convention on LAN).
+      - "8443:443"
+      # Plain HTTP for LAN when HTTPS stack/clients misbehave (must relax SESSION_COOKIE_SECURE — see deploy/up.sh hint).
+      - "8080:8080"
     volumes:
       - ./deploy/Caddyfile.generated:/etc/caddy/Caddyfile:ro
       - media_data:/srv/media:ro
