@@ -25,7 +25,15 @@ if ! grep -qE '^SECRET_KEY=.+' "$ENV_MAIN"; then
 fi
 if grep -qiE '^SECRET_KEY=.*change-me' "$ENV_MAIN"; then
   new_key="$(openssl rand -hex 64)"
-  sed -i "s/^SECRET_KEY=.*/SECRET_KEY=${new_key}/" "$ENV_MAIN"
+  # macOS BSD sed requires `sed -i '' …`; GNU sed accepts `sed -i …` only.
+  case "$(uname -s)" in
+    Darwin)
+      sed -i '' "s/^SECRET_KEY=.*/SECRET_KEY=${new_key}/" "$ENV_MAIN"
+      ;;
+    *)
+      sed -i "s/^SECRET_KEY=.*/SECRET_KEY=${new_key}/" "$ENV_MAIN"
+      ;;
+  esac
   echo "[deploy] Generated SECRET_KEY in .env.production (replaced example placeholder)"
 fi
 
