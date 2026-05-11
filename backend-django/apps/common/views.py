@@ -23,6 +23,53 @@ from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership,
 
 def _channel_closed_response():
     return Response({"detail": "channel_closed"}, status=status.HTTP_410_GONE)
+
+
+_UUID_TOKEN_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+_PUBLIC_JOIN_CODE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]{2,39}$")
+_PUBLIC_JOIN_RESERVED = frozenset(
+    {
+        "join",
+        "api",
+        "www",
+        "static",
+        "channel",
+        "dashboard",
+        "login",
+        "register",
+        "admin",
+        "media",
+        "audio",
+        "private",
+        "public",
+        "invite",
+        "ws",
+        "app",
+        "next",
+    },
+)
+
+
+def _normalize_public_join_slug_for_save(raw) -> str | None | bool:
+    """Return normalized slug, None to clear, False if invalid."""
+    if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+        return None
+    s = str(raw).strip().lower()
+    if len(s) > 40 or s in _PUBLIC_JOIN_RESERVED or s.isdigit():
+        return False
+    if not _PUBLIC_JOIN_CODE_RE.match(s):
+        return False
+    return s
+
+
+def _resolve_public_join_segment(seg: str) -> Channel | None:
+    low = seg.strip().lower()
+    ch = Channel.objects.filter(public_join_slug__iexact=low).first()
+    if ch:
+        return ch
+    if _UUID_TOKEN_RE.match(seg):
+        return Channel.objects.filter(public_slug=seg).first()
+    return None
 from apps.common.serializers import (
     ChannelSerializer,
     ChannelJoinRequestSerializer,
@@ -133,6 +180,7 @@ class ChannelViewSet(viewsets.ModelViewSet):
         channel = serializer.save(owner=self.request.user)
         ChannelMembership.objects.create(channel=channel, user=self.request.user, role=ChannelMembership.Role.OWNER)
         PlaybackSession.objects.get_or_create(channel=channel)
+        InviteToken.objects.create(channel=channel, created_by=self.request.user, is_active=True)
 
     def _can_manage(self, channel_id: int) -> bool:
         return _can_manage_channel(self.request.user, channel_id)
@@ -844,7 +892,7 @@ class ChannelJoinView(APIView):
 
 
 class ChannelJoinFromLinkView(APIView):
-    """Parse a pasted channel URL or id and join (supports /channel/<id>, /join/private/<token>, /join/public/<slug>)."""
+    """Join from numeric id, invite UUID, public slug/code, or pasted URL path."""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -859,6 +907,24 @@ class ChannelJoinFromLinkView(APIView):
             if not channel:
                 return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
             return perform_channel_join(request.user, channel, extra_token)
+
+        if _UUID_TOKEN_RE.match(raw):
+            invite = InviteToken.objects.filter(token=raw, is_active=True).select_related("channel").first()
+            if invite:
+                return perform_channel_join(request.user, invite.channel, str(invite.token))
+            channel = Channel.objects.filter(public_slug=raw).first()
+            if channel:
+                if channel.privacy == Channel.Privacy.PRIVATE:
+                    return Response({"detail": "private_requires_invite"}, status=status.HTTP_403_FORBIDDEN)
+                return perform_channel_join(request.user, channel, None)
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if _PUBLIC_JOIN_CODE_RE.match(raw) and not _UUID_TOKEN_RE.match(raw):
+            channel = Channel.objects.filter(public_join_slug__iexact=raw.lower()).first()
+            if channel:
+                if channel.privacy == Channel.Privacy.PRIVATE:
+                    return Response({"detail": "private_requires_invite"}, status=status.HTTP_403_FORBIDDEN)
+                return perform_channel_join(request.user, channel, None)
 
         path = raw
         try:
@@ -888,10 +954,10 @@ class ChannelJoinFromLinkView(APIView):
                 return Response({"detail": "invite_invalid"}, status=status.HTTP_404_NOT_FOUND)
             return perform_channel_join(request.user, invite.channel, token_str)
 
-        m = re.search(r"/join/public/([0-9a-f-]{36})", path, re.I)
+        m = re.search(r"/join/public/([a-zA-Z0-9-]+)", path, re.I)
         if m:
-            slug = m.group(1)
-            channel = Channel.objects.filter(public_slug=slug).first()
+            seg = m.group(1)
+            channel = _resolve_public_join_segment(seg)
             if not channel:
                 return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
             if channel.privacy == Channel.Privacy.PRIVATE:
@@ -980,12 +1046,39 @@ class ChannelSettingsView(APIView):
         if not _can_manage_channel(request.user, channel_id):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
         channel = get_object_or_404(Channel, id=channel_id)
+        update_fields = []
         for field in ["name", "description", "privacy", "member_limit", "join_requires_approval"]:
             if field in request.data:
                 setattr(channel, field, request.data[field])
-        channel.save(
-            update_fields=["name", "description", "privacy", "member_limit", "join_requires_approval", "updated_at"]
-        )
+                update_fields.append(field)
+        if "public_join_slug" in request.data:
+            if channel.privacy == Channel.Privacy.PRIVATE:
+                if _normalize_public_join_slug_for_save(request.data.get("public_join_slug")) not in (None, False):
+                    return Response({"detail": "public_join_slug_not_allowed"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                normalized = _normalize_public_join_slug_for_save(request.data.get("public_join_slug"))
+                if normalized is False:
+                    return Response({"detail": "invalid_public_join_slug"}, status=status.HTTP_400_BAD_REQUEST)
+                if normalized is None:
+                    channel.public_join_slug = None
+                else:
+                    taken = (
+                        Channel.objects.exclude(pk=channel.pk)
+                        .filter(public_join_slug__iexact=normalized)
+                        .exists()
+                    )
+                    if taken:
+                        return Response({"detail": "public_join_slug_taken"}, status=status.HTTP_400_BAD_REQUEST)
+                    channel.public_join_slug = normalized
+                update_fields.append("public_join_slug")
+        if channel.privacy == Channel.Privacy.PRIVATE and channel.public_join_slug:
+            channel.public_join_slug = None
+            if "public_join_slug" not in update_fields:
+                update_fields.append("public_join_slug")
+        if not update_fields:
+            return Response(ChannelSerializer(channel, context={"request": request}).data)
+        update_fields.append("updated_at")
+        channel.save(update_fields=list(dict.fromkeys(update_fields)))
         return Response(ChannelSerializer(channel, context={"request": request}).data)
 
 

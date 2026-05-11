@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { joinChannelFromLink } from "@/lib/api";
+import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 
 export function HomeActions() {
   const [joinInput, setJoinInput] = useState("");
@@ -16,7 +17,7 @@ export function HomeActions() {
     if (!joinInput.trim()) return;
     setStatus("Joining channel...");
     try {
-      const out = await joinChannelFromLink(joinInput.trim());
+      const out = await joinChannelFromLink(extractJoinInputFromScannedText(joinInput.trim()));
       if (out.status === "pending") {
         setStatus("Join request sent — wait for a moderator to approve.");
         return;
@@ -47,7 +48,7 @@ export function HomeActions() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
-            placeholder="Channel id, link, or /join/private/…"
+            placeholder="Room id, invite code, or public code"
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
           />

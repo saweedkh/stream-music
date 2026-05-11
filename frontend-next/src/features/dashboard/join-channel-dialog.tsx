@@ -44,7 +44,8 @@ export function JoinChannelDialog() {
     }
     setBusy(true);
     try {
-      const out = await joinChannelFromLink(link.trim());
+      const normalized = extractJoinInputFromScannedText(link.trim());
+      const out = await joinChannelFromLink(normalized);
       setLink("");
       if (out.status === "pending") {
         showToast("Join request sent. Wait for a channel moderator to approve.", "info");
@@ -80,8 +81,9 @@ export function JoinChannelDialog() {
         <DialogHeader>
           <DialogTitle>Join a channel</DialogTitle>
           <DialogDescription>
-            One field: channel id (e.g. <span className="font-mono text-zinc-300">5</span>), a share URL, or an invite path like{" "}
-            <span className="font-mono text-zinc-300">/join/private/…</span> — private invites always include the token in that path.
+            Enter the <strong className="text-zinc-200">room id</strong> (number), <strong className="text-zinc-200">invite code</strong> (long
+            UUID), or a <strong className="text-zinc-200">public join code</strong> you were given — no need to paste the full URL. QR scan fills
+            this automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
@@ -95,10 +97,10 @@ export function JoinChannelDialog() {
           ) : (
             <>
               <div className="space-y-1.5">
-                <Label htmlFor="join-channel-link">Invite or channel</Label>
+                <Label htmlFor="join-channel-link">Join code</Label>
                 <Input
                   id="join-channel-link"
-                  placeholder="5 — or paste full link /join/private/…"
+                  placeholder="e.g. 12 — or paste full link if you prefer"
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !busy && handleJoin()}

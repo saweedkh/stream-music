@@ -17,6 +17,8 @@ class Channel(models.Model):
     member_limit = models.PositiveIntegerField(default=50)
     join_requires_approval = models.BooleanField(default=False)
     public_slug = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    # Optional short code for /join/public/<code> when privacy is public or unlisted (letters + digits + hyphen).
+    public_join_slug = models.CharField(max_length=40, null=True, blank=True, unique=True, db_index=True)
     current_track_id = models.BigIntegerField(null=True, blank=True)
     is_playing = models.BooleanField(default=False)
     started_at = models.FloatField(null=True, blank=True)

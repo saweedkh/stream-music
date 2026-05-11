@@ -47,6 +47,7 @@ export type ChannelStateResponse = {
     description?: string;
     member_limit?: number;
     public_slug?: string;
+    public_join_slug?: string | null;
     join_requires_approval?: boolean;
     is_active?: boolean;
     membership_is_active?: boolean | null;
@@ -86,6 +87,13 @@ export function buildPrivateInviteJoinUrl(inviteToken: string): string {
   const origin = typeof window !== "undefined" ? window.location.origin : getApiBase();
   const t = String(inviteToken).trim();
   return `${origin}/join/private/${encodeURIComponent(t)}`;
+}
+
+/** Public room link — uses custom slug when set, otherwise UUID `public_slug`. */
+export function buildPublicJoinUrl(publicSlug: string, publicJoinSlug?: string | null): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : getApiBase();
+  const seg = (publicJoinSlug && String(publicJoinSlug).trim()) || String(publicSlug);
+  return `${origin}/join/public/${encodeURIComponent(seg)}`;
 }
 
 /** Private / slug invites: one query `link` = path such as `/join/private/…` or `/join/public/…`. */
@@ -331,6 +339,12 @@ export async function rejectJoinRequest(channelId: string, requestId: number) {
   return res.json();
 }
 
+export async function listChannelInvites(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/invite`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load invites"));
+  return (await res.json()) as { results: Array<{ id: number; token: string; is_active: boolean }> };
+}
+
 export async function createInvite(channelId: string) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/invite`, await withAuthHeaders({ method: "POST" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot create invite"));
@@ -381,6 +395,7 @@ export async function updateChannelSettings(
     privacy?: "public" | "private" | "unlisted";
     member_limit?: number;
     join_requires_approval?: boolean;
+    public_join_slug?: string | null;
   },
 ) {
   const res = await fetch(

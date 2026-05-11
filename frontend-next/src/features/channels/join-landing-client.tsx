@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { joinChannelFromLink } from "@/lib/api";
+import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 
 export function JoinLandingClient() {
   const router = useRouter();
@@ -12,13 +13,14 @@ export function JoinLandingClient() {
   useEffect(() => {
     const channel = searchParams.get("channel");
     const link = searchParams.get("link");
-    const payload = channel?.trim() || link?.trim();
+    const payloadRaw = channel?.trim() || link?.trim();
+    const payload = payloadRaw ? extractJoinInputFromScannedText(payloadRaw) : "";
     if (!payload) {
       setMessage("Missing channel id or invite. Open a valid QR or link from your admin.");
       return;
     }
     let cancelled = false;
-    joinChannelFromLink(payload)
+    joinChannelFromLink(extractJoinInputFromScannedText(payload))
       .then((out) => {
         if (cancelled) return;
         if (out.status === "pending") {

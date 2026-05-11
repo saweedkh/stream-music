@@ -11,12 +11,11 @@ export function JoinPrivateInviteClient({ token }: { token: string }) {
   useEffect(() => {
     const raw = token.trim();
     if (!raw || !/^[0-9a-f-]{36}$/i.test(raw)) {
-      setMessage("Invalid invite link.");
+      setMessage("Invalid invite code.");
       return;
     }
-    const linkPath = `/join/private/${raw}`;
     let cancelled = false;
-    joinChannelFromLink(linkPath)
+    joinChannelFromLink(raw.toLowerCase())
       .then((out) => {
         if (cancelled) return;
         if (out.status === "pending") {

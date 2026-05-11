@@ -36,13 +36,23 @@ class ChannelSerializer(serializers.ModelSerializer):
             "member_limit",
             "join_requires_approval",
             "public_slug",
+            "public_join_slug",
             "is_playing",
             "started_at",
             "paused_at",
             "is_active",
             "membership_is_active",
         ]
-        read_only_fields = ["owner", "public_slug", "is_playing", "started_at", "paused_at", "is_active", "membership_is_active"]
+        read_only_fields = [
+            "owner",
+            "public_slug",
+            "public_join_slug",
+            "is_playing",
+            "started_at",
+            "paused_at",
+            "is_active",
+            "membership_is_active",
+        ]
 
     def get_membership_is_active(self, obj):
         request = self.context.get("request")

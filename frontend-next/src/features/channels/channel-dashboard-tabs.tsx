@@ -68,6 +68,7 @@ type Props = {
   initialDescription?: string;
   initialMemberLimit?: number;
   publicSlug?: string;
+  publicJoinSlug?: string | null;
   initialJoinRequiresApproval?: boolean;
   /** When false, sync/listening is off until the owner reopens the room. */
   channelIsActive?: boolean;
@@ -86,6 +87,7 @@ export function ChannelDashboardTabs(props: Props) {
     initialDescription,
     initialMemberLimit,
     publicSlug,
+    publicJoinSlug,
     initialJoinRequiresApproval,
     channelIsActive = true,
   } = props;
@@ -561,6 +563,7 @@ export function ChannelDashboardTabs(props: Props) {
               initialPrivacy={(channelPrivacy as "public" | "private" | "unlisted") ?? "public"}
               initialMemberLimit={initialMemberLimit ?? 50}
               publicSlug={publicSlug}
+              publicJoinSlug={publicJoinSlug}
               initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
               sendSocketMessage={sendMessage}
               channelIsActive={channelIsActive}
