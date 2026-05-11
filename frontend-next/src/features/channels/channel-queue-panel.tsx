@@ -23,14 +23,17 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
   const [queue, setQueue] = useState<QueueItemSummary[]>([]);
   const [trackMap, setTrackMap] = useState<Record<number, TrackSummary>>({});
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function refresh() {
     if (readOnly) {
       setQueue([]);
       setTrackMap({});
       setStatus(null);
+      setLoading(false);
       return;
     }
+    setLoading(true);
     try {
       const [queueData, tracks] = await Promise.all([listChannelQueue(channelId), listTracks()]);
       setQueue(queueData.results);
@@ -39,6 +42,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
       const message = error instanceof Error ? error.message : "Cannot load queue.";
       setStatus(message);
       showToast(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -63,7 +68,19 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
             {readOnly ? (
               <p className="py-6 text-center text-sm text-zinc-500">Reopen the channel to load or edit the queue.</p>
             ) : null}
+            {!readOnly && loading ? (
+              <div className="space-y-2 py-2">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-14 animate-pulse rounded-lg bg-zinc-800/50"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                  />
+                ))}
+              </div>
+            ) : null}
             {!readOnly &&
+              !loading &&
               queue.map((item) => (
               <div
                 key={item.id}

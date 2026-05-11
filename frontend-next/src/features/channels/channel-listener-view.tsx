@@ -31,6 +31,9 @@ type ListenerProps = {
   nowPlayingLabel: string | null;
   showLeave: boolean;
   onLeaveClick: () => void;
+  brandLogoUrl?: string;
+  sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
+  experience?: import("@/features/experience/room-experience-chrome").ChannelExperience;
 };
 
 export function ChannelListenerView({
@@ -45,23 +48,49 @@ export function ChannelListenerView({
   nowPlayingLabel,
   showLeave,
   onLeaveClick,
+  brandLogoUrl,
+  experience,
 }: ListenerProps) {
   const connected = socketState === "connected";
+  const accent = (experience?.accent || "emerald").toLowerCase();
+  const headerAccent =
+    accent === "violet"
+      ? "border-violet-500/20 bg-gradient-to-br from-zinc-950 via-violet-950/25 to-zinc-950 shadow-[0_24px_60px_-20px_rgba(139,92,246,0.35)]"
+      : accent === "rose"
+        ? "border-rose-500/20 bg-gradient-to-br from-zinc-950 via-rose-950/25 to-zinc-950 shadow-[0_24px_60px_-20px_rgba(244,63,94,0.3)]"
+        : accent === "amber"
+          ? "border-amber-500/20 bg-gradient-to-br from-zinc-950 via-amber-950/25 to-zinc-950 shadow-[0_24px_60px_-20px_rgba(245,158,11,0.28)]"
+          : accent === "sky"
+            ? "border-sky-500/20 bg-gradient-to-br from-zinc-950 via-sky-950/25 to-zinc-950 shadow-[0_24px_60px_-20px_rgba(14,165,233,0.3)]"
+            : "border-emerald-500/20 bg-gradient-to-br from-zinc-950 via-emerald-950/25 to-zinc-950 shadow-[0_24px_60px_-20px_rgba(16,185,129,0.35)]";
+  const labelAccent =
+    accent === "violet"
+      ? "text-violet-400/90"
+      : accent === "rose"
+        ? "text-rose-400/90"
+        : accent === "amber"
+          ? "text-amber-400/90"
+          : accent === "sky"
+            ? "text-sky-400/90"
+            : "text-emerald-400/90";
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-32 pt-2 sm:px-6 sm:pt-4">
       <header
         className={cn(
-          "relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-zinc-950 via-emerald-950/25 to-zinc-950",
-          "p-6 shadow-[0_24px_60px_-20px_rgba(16,185,129,0.35)] sm:p-8 lg:p-10",
+          "relative overflow-hidden rounded-3xl border p-6 sm:p-8 lg:p-10",
+          headerAccent,
         )}
       >
-        <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-32 w-32 rounded-full bg-teal-500/10 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-white/5 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-32 w-32 rounded-full bg-white/5 blur-3xl" aria-hidden />
 
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400/90">Listening</p>
+            {brandLogoUrl ? (
+              <img src={brandLogoUrl} alt="" className="h-14 w-14 rounded-2xl border border-white/10 object-cover shadow-lg" />
+            ) : null}
+            <p className={cn("text-[11px] font-semibold uppercase tracking-[0.25em]", labelAccent)}>Listening</p>
             <h1 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">{channelName}</h1>
             {description?.trim() ? (
               <p className="max-w-lg text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">{description.trim()}</p>

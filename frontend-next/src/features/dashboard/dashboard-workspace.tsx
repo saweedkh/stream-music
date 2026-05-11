@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
 import { JoinChannelDialog } from "@/features/dashboard/join-channel-dialog";
-import { PlaylistBuilderSection } from "@/features/dashboard/playlist-builder-section";
+import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
+import { PlaylistManager } from "@/features/dashboard/playlist-manager";
 import { TrackLibrarySection } from "@/features/dashboard/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/track-sharing-section";
 import {
@@ -97,7 +98,7 @@ export function DashboardWorkspace() {
   async function refreshAll() {
     try {
       const me = await getMe();
-      setCurrentUserId(me?.id ?? null);
+      setCurrentUserId(me?.user?.id ?? null);
       const [c, t, p, u] = await Promise.all([listChannels(), listTracks(), listPlaylists(), listUsers()]);
       const pi = await listPlaylistItems();
       setChannels(c);
@@ -315,6 +316,8 @@ export function DashboardWorkspace() {
         </div>
       </section>
 
+      <NotificationPreferencesCard />
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full animate-in fade-in duration-500">
         <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
           <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-center">
@@ -372,26 +375,7 @@ export function DashboardWorkspace() {
           </TabsContent>
 
           <TabsContent value="playlists" className="m-0 focus-visible:outline-none">
-            <PlaylistBuilderSection
-              channels={channels}
-              playlists={playlists}
-              tracks={tracks}
-              groupedPlaylistItems={groupedPlaylistItems}
-              playlistName={playlistName}
-              playlistChannel={playlistChannel}
-              itemPlaylistId={itemPlaylistId}
-              itemTrackId={itemTrackId}
-              errors={fieldErrors}
-              onPlaylistNameChange={setPlaylistName}
-              onPlaylistChannelChange={setPlaylistChannel}
-              onItemPlaylistIdChange={setItemPlaylistId}
-              onItemTrackIdChange={setItemTrackId}
-              onCreatePlaylist={handleCreatePlaylist}
-              onAddPlaylistItem={handleAddPlaylistItem}
-              onReorderDrop={handleReorderPlaylist}
-              setDraggingPlaylistItemId={setDraggingPlaylistItemId}
-              draggingPlaylistItemId={draggingPlaylistItemId}
-            />
+            <PlaylistManager />
           </TabsContent>
 
           <TabsContent value="sharing" className="m-0 focus-visible:outline-none">

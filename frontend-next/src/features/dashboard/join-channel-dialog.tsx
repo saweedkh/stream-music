@@ -39,7 +39,7 @@ export function JoinChannelDialog() {
 
   async function handleJoin() {
     if (!link.trim()) {
-      showToast("Paste a channel link or id.", "error");
+      showToast("Paste an invite code, public code, or join link.", "error");
       return;
     }
     setBusy(true);
@@ -81,9 +81,8 @@ export function JoinChannelDialog() {
         <DialogHeader>
           <DialogTitle>Join a channel</DialogTitle>
           <DialogDescription>
-            Enter the <strong className="text-zinc-200">room id</strong> (number), <strong className="text-zinc-200">invite code</strong> (long
-            UUID), or a <strong className="text-zinc-200">public join code</strong> you were given — no need to paste the full URL. QR scan fills
-            this automatically.
+            Paste an <strong className="text-zinc-200">invite code</strong> (UUID), a <strong className="text-zinc-200">public join code</strong>,
+            or a full join URL. QR scan fills this automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
@@ -100,7 +99,7 @@ export function JoinChannelDialog() {
                 <Label htmlFor="join-channel-link">Join code</Label>
                 <Input
                   id="join-channel-link"
-                  placeholder="e.g. 12 — or paste full link if you prefer"
+                  placeholder="Invite code, public code, or paste join link"
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !busy && handleJoin()}

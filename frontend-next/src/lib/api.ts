@@ -28,6 +28,20 @@ export type AuthUser = {
   email: string;
   first_name: string;
   last_name: string;
+  is_staff: boolean;
+};
+
+export type UserNotificationSettings = {
+  chat_notify: "muted" | "mentions" | "all";
+  admin_notify_reactions: boolean;
+  admin_notify_votes: boolean;
+  updated_at: string;
+};
+
+export type MeBootstrap = {
+  user: AuthUser;
+  notification_settings?: UserNotificationSettings;
+  webpush?: { vapid_public_key: string };
 };
 
 export type PlaybackState = {
@@ -36,6 +50,17 @@ export type PlaybackState = {
   is_playing: boolean;
   queue_version?: number;
   track?: { file?: string | null; title?: string | null } | null;
+};
+
+/** Room experience flags (stored on `Channel.experience` JSON). */
+export type ChannelExperienceSettings = {
+  accent?: string;
+  rehearsal_mode?: boolean;
+  queue_locked?: boolean;
+  blind_playlist_id?: number | null;
+  intro_preview_seconds?: number;
+  veto_skip_threshold?: number;
+  oled_hint?: boolean;
 };
 
 export type ChannelStateResponse = {
@@ -51,6 +76,8 @@ export type ChannelStateResponse = {
     join_requires_approval?: boolean;
     is_active?: boolean;
     membership_is_active?: boolean | null;
+    experience?: ChannelExperienceSettings | Record<string, unknown> | null;
+    brand_logo_url?: string | null;
   };
   playback: PlaybackState;
 };
@@ -74,12 +101,6 @@ export class ChannelClosedError extends Error {
     super("channel_closed");
     this.name = "ChannelClosedError";
   }
-}
-
-/** Shorter QR: `/join?channel=<id>` — no long URL on screen; works for public/unlisted (and server join rules). */
-export function buildJoinUrlWithChannelId(channelId: string | number): string {
-  const origin = typeof window !== "undefined" ? window.location.origin : getApiBase();
-  return `${origin}/join?channel=${encodeURIComponent(String(channelId))}`;
 }
 
 /** Short QR for private invites — denser modules than `/join?link=…` (easier for phone cameras). */
@@ -371,11 +392,43 @@ export async function logoutUser() {
   if (!res.ok) throw new Error(await extractApiError(res, "Logout failed"));
 }
 
-export async function getMe() {
+export async function getMe(): Promise<MeBootstrap | null> {
   const res = await fetch(`${getApiBase()}/api/auth/me`, { credentials: "include", cache: "no-store" });
   if (!res.ok) return null;
-  const body = (await res.json()) as { user: AuthUser };
-  return body.user;
+  return (await res.json()) as MeBootstrap;
+}
+
+export async function patchNotificationSettings(
+  payload: Partial<Pick<UserNotificationSettings, "chat_notify" | "admin_notify_reactions" | "admin_notify_votes">>,
+): Promise<UserNotificationSettings> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/notification-settings`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot save notification settings"));
+  return (await res.json()) as UserNotificationSettings;
+}
+
+export async function registerWebPushSubscription(subscription: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}): Promise<void> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/push-subscription`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(subscription) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot register push subscription"));
+}
+
+export async function deleteWebPushSubscriptions(endpoint?: string): Promise<void> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/push-subscription`,
+    await withAuthHeaders({
+      method: "DELETE",
+      body: endpoint ? JSON.stringify({ endpoint }) : JSON.stringify({}),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove push subscription"));
 }
 
 export type ChannelMember = {
@@ -396,6 +449,7 @@ export async function updateChannelSettings(
     member_limit?: number;
     join_requires_approval?: boolean;
     public_join_slug?: string | null;
+    experience?: ChannelExperienceSettings;
   },
 ) {
   const res = await fetch(
@@ -404,6 +458,53 @@ export async function updateChannelSettings(
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot update channel settings"));
   return res.json();
+}
+
+export async function uploadChannelBrandLogo(channelId: string, file: File) {
+  const body = new FormData();
+  body.append("brand_logo", file);
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${channelId}/settings`,
+    await withAuthFormData({ method: "PATCH", body }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot upload channel logo"));
+  return res.json() as Promise<{ brand_logo_url?: string | null }>;
+}
+
+export async function getSimilarTracks(channelId: string, fromTrackId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/tracks/similar?from_track=${encodeURIComponent(String(fromTrackId))}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load similar tracks"));
+  return (await res.json()) as { results: TrackSummary[] };
+}
+
+export type ChannelChatReaction = { user_id: number; username: string; emoji: string };
+
+export type ChannelChatMessageRow = {
+  id: number;
+  channel: number;
+  user_id: number;
+  username: string;
+  body: string;
+  created_at: string;
+  edited_at?: string | null;
+  deleted_at?: string | null;
+  reactions?: ChannelChatReaction[];
+};
+
+export async function listChannelChatMessages(channelId: string, options?: { limit?: number; before?: number }) {
+  const sp = new URLSearchParams();
+  if (options?.limit != null) sp.set("limit", String(options.limit));
+  if (options?.before != null) sp.set("before", String(options.before));
+  const q = sp.toString();
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/chat${q ? `?${q}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load chat"));
+  return (await res.json()) as { results: ChannelChatMessageRow[] };
 }
 
 export async function getChannelMembers(channelId: string) {
@@ -440,6 +541,12 @@ export async function reopenChannel(channelId: string) {
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot reopen channel"));
 }
 
+/** Deletes the channel permanently. Server allows only the channel owner. */
+export async function deleteChannel(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${channelId}/`, await withAuthHeaders({ method: "DELETE" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete channel"));
+}
+
 export async function rotatePrivateInvite(channelId: string) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/invite/rotate`, await withAuthHeaders({ method: "POST" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot rotate private invite"));
@@ -469,8 +576,15 @@ export async function createChannel(payload: {
   return (await res.json()) as ChannelSummary;
 }
 
-export async function listTracks() {
-  const res = await fetch(`${getApiBase()}/api/tracks/`, { credentials: "include", cache: "no-store" });
+export async function listTracks(options?: { search?: string; limit?: number }) {
+  const params = new URLSearchParams();
+  const q = (options?.search ?? "").trim();
+  if (q) params.set("search", q);
+  if (options?.limit != null && Number.isFinite(options.limit)) {
+    params.set("limit", String(Math.floor(options.limit)));
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`${getApiBase()}/api/tracks/${suffix}`, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error("Cannot load tracks");
   return (await res.json()) as TrackSummary[];
 }
@@ -627,6 +741,19 @@ export async function addPlaylistItem(payload: { playlist: number; track: number
   return (await res.json()) as PlaylistItemSummary;
 }
 
+/** Server caps each request (see PLAYLIST_BULK_ADD_MAX); send smaller chunks for very large selections. */
+export async function bulkAddTracksToPlaylist(playlistId: number, trackIds: number[]) {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/add-tracks/`,
+    await withAuthHeaders({
+      method: "POST",
+      body: JSON.stringify({ track_ids: trackIds }),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot add tracks to playlist"));
+  return (await res.json()) as { added: number; requested: number; skipped_not_allowed: number };
+}
+
 export async function reorderPlaylistItem(itemId: number, position: number) {
   const res = await fetch(
     `${getApiBase()}/api/playlist-items/${itemId}/`,
@@ -643,6 +770,15 @@ export async function playPlaylistInChannel(channelId: string, playlistId: numbe
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot play playlist in channel"));
   return res.json();
+}
+
+export async function playTrackInChannel(channelId: string, trackId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${channelId}/tracks/${trackId}/play`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({}) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot play track on channel"));
+  return res.json() as Promise<{ playback: unknown; queue: QueueItemSummary[] }>;
 }
 
 export async function shufflePlayInChannel(channelId: string, payload?: { limit?: number }) {
@@ -669,6 +805,32 @@ export async function deletePlaylistItem(itemId: number) {
 export async function deletePlaylist(playlistId: number) {
   const res = await fetch(`${getApiBase()}/api/playlists/${playlistId}/`, await withAuthHeaders({ method: "DELETE" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete playlist"));
+}
+
+export async function updatePlaylist(playlistId: number, payload: { name?: string; channel?: number | null }) {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update playlist"));
+  return (await res.json()) as PlaylistSummary;
+}
+
+export async function deleteTrack(trackId: number) {
+  const res = await fetch(`${getApiBase()}/api/tracks/${trackId}/`, await withAuthHeaders({ method: "DELETE" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete track"));
+}
+
+export async function updateTrack(
+  trackId: number,
+  payload: { title?: string; artist?: string; album?: string; visibility?: TrackSummary["visibility"] },
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/tracks/${trackId}/`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update track"));
+  return (await res.json()) as TrackSummary;
 }
 
 export async function listChannelQueue(channelId: string) {

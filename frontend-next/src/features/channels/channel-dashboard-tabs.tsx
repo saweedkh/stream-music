@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, DoorClosed, HeartPulse, LogOut, Radio, Settings2, Sparkles } from "lucide-react";
+import { Activity, DoorClosed, HeartPulse, LogOut, MessageSquare, Radio, Settings2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
+import { ChannelChatPanel } from "@/features/channels/channel-chat-panel";
 import { ChannelListenerView, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
+import { RoomExperienceChrome, type ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import {
   closeChannel,
@@ -33,7 +35,7 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const TAB_IDS = ["player", "queue", "admin", "health"] as const;
+const TAB_IDS = ["chat", "player", "queue", "admin", "health"] as const;
 
 type TabId = (typeof TAB_IDS)[number];
 
@@ -72,6 +74,8 @@ type Props = {
   initialJoinRequiresApproval?: boolean;
   /** When false, sync/listening is off until the owner reopens the room. */
   channelIsActive?: boolean;
+  initialExperience?: Record<string, unknown> | null;
+  brandLogoUrl?: string | null;
 };
 
 export function ChannelDashboardTabs(props: Props) {
@@ -90,13 +94,16 @@ export function ChannelDashboardTabs(props: Props) {
     publicJoinSlug,
     initialJoinRequiresApproval,
     channelIsActive = true,
+    initialExperience,
+    brandLogoUrl,
   } = props;
+  const [experience, setExperience] = useState<ChannelExperience>((initialExperience as ChannelExperience) ?? {});
   const { showToast } = useToast();
   const router = useRouter();
   const { upsertState: upsertGlobalPlayerState } = useGlobalChannelPlayer();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "player");
+  const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "chat");
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
   const [canManageChannel, setCanManageChannel] = useState(false);
   const [membershipLoaded, setMembershipLoaded] = useState(false);
@@ -118,6 +125,10 @@ export function ChannelDashboardTabs(props: Props) {
   const latestSendMessageRef = useRef<((payload: Record<string, unknown>) => boolean) | undefined>(undefined);
   const startedAtText = startedAt == null ? "No active playback session yet" : `${startedAt}`;
   const pausedAtText = pausedAt == null ? (isChannelOnline ? "Not paused" : "No paused position available") : `${pausedAt}s`;
+
+  useEffect(() => {
+    setExperience((initialExperience as ChannelExperience) ?? {});
+  }, [initialExperience]);
 
   const stableSendSocketMessage = useCallback((payload: Record<string, unknown>) => {
     return latestSendMessageRef.current?.(payload) ?? false;
@@ -152,6 +163,14 @@ export function ChannelDashboardTabs(props: Props) {
         }
         return;
       }
+      if (type === "social") {
+        window.dispatchEvent(
+          new CustomEvent("channel-social", {
+            detail: { channelId: String(channelId), payload: data },
+          }),
+        );
+        return;
+      }
       if (type === "error") {
         const map: Record<string, string> = {
           queue_empty: "Queue is empty. Select a playlist/track first.",
@@ -159,12 +178,22 @@ export function ChannelDashboardTabs(props: Props) {
           playlist_not_allowed: "This playlist is not allowed for this channel.",
           no_tracks: "No tracks available to shuffle.",
           permission_denied: "You do not have permission for this action.",
+          shout_cooldown: "Wait a few seconds before shouting again.",
+          queue_locked: "Queue is locked — only the room owner can add tracks.",
         };
         const key = String(data.message ?? "invalid_state");
         showToast(map[key] ?? `Playback error: ${key}`, "error");
         return;
       }
       const action = (data.action ?? data.type ?? "").toLowerCase();
+      if (action === "initial_sync") {
+        const exp = (data as { experience?: unknown }).experience;
+        if (exp && typeof exp === "object") {
+          window.dispatchEvent(
+            new CustomEvent("channel-experience", { detail: { channelId: String(channelId), experience: exp } }),
+          );
+        }
+      }
       if (typeof data.is_playing === "boolean") setIsChannelOnline(data.is_playing);
       if (action === "play") setIsChannelOnline(true);
       if (action === "pause") setIsChannelOnline(false);
@@ -195,12 +224,25 @@ export function ChannelDashboardTabs(props: Props) {
 
   useEffect(() => {
     const syncFromHistory = () => {
-      const next = readTabFromWindowSearch() ?? "player";
+      const next = readTabFromWindowSearch() ?? "chat";
       setActiveTab(next);
     };
     window.addEventListener("popstate", syncFromHistory);
     return () => window.removeEventListener("popstate", syncFromHistory);
   }, []);
+
+  useEffect(() => {
+    const next = tabFromSearchValue(searchParams.get("tab"));
+    if (next) setActiveTab(next);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== "chat" || !membershipLoaded) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("channel-chat-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, membershipLoaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,16 +265,16 @@ export function ChannelDashboardTabs(props: Props) {
       try {
         const me = await getMe();
         if (cancelled) return;
-        if (!me) {
+        if (!me?.user) {
           setCurrentUserId(null);
           setCanManageChannel(false);
           return;
         }
-        setCurrentUserId(me.id);
+        setCurrentUserId(me.user.id);
         try {
           const members = await getChannelMembers(channelId);
           if (cancelled) return;
-          const myMembership = members.results.find((member) => member.user_id === me.id);
+          const myMembership = members.results.find((member) => member.user_id === me.user.id);
           const canManage = myMembership?.role === "owner" || myMembership?.role === "moderator";
           setCanManageChannel(Boolean(canManage));
         } catch {
@@ -253,6 +295,18 @@ export function ChannelDashboardTabs(props: Props) {
     };
   }, [channelId, showToast]);
 
+  useEffect(() => {
+    const fn = (ev: Event) => {
+      const e = ev as CustomEvent<{ channelId?: string; experience?: ChannelExperience }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      if (e.detail?.experience && typeof e.detail.experience === "object") {
+        setExperience(e.detail.experience);
+      }
+    };
+    window.addEventListener("channel-experience", fn);
+    return () => window.removeEventListener("channel-experience", fn);
+  }, [channelId]);
+
   function applyChannelClosedNavigation() {
     upsertGlobalPlayerState({
       channelId: null,
@@ -264,6 +318,7 @@ export function ChannelDashboardTabs(props: Props) {
       canControl: false,
       sendSocketMessage: undefined,
       latestSocketPayload: null,
+      experience: null,
     });
     router.replace("/dashboard");
   }
@@ -282,6 +337,7 @@ export function ChannelDashboardTabs(props: Props) {
         canControl: false,
         sendSocketMessage: undefined,
         latestSocketPayload: null,
+        experience: null,
       });
       showToast("You left the channel.", "success");
       setLeaveDialogOpen(false);
@@ -305,7 +361,7 @@ export function ChannelDashboardTabs(props: Props) {
     params.set("tab", activeTab);
     const qs = params.toString();
     window.history.replaceState(window.history.state, "", qs.length ? `${pathname}?${qs}` : pathname);
-  }, [activeTab, pathname]);
+  }, [activeTab, pathname, searchParams]);
 
   useEffect(() => {
     upsertGlobalPlayerState({
@@ -318,11 +374,13 @@ export function ChannelDashboardTabs(props: Props) {
       canControl: canManageChannel && channelIsActive,
       sendSocketMessage: stableSendSocketMessage,
       latestSocketPayload: latestPlaybackPayload,
+      experience,
     });
   }, [
     canManageChannel,
     channelIsActive,
     channelId,
+    experience,
     isPlaying,
     latestPlaybackPayload,
     pausedAt,
@@ -414,6 +472,13 @@ export function ChannelDashboardTabs(props: Props) {
   if (!canManageChannel) {
     return (
       <>
+        <RoomExperienceChrome
+          channelId={channelId}
+          sendMessage={sendMessage}
+          socketState={socketState}
+          canControl={false}
+          experience={experience}
+        />
         <ChannelListenerView
           channelId={channelId}
           channelName={channelName}
@@ -426,7 +491,19 @@ export function ChannelDashboardTabs(props: Props) {
           nowPlayingLabel={nowPlayingLabel}
           showLeave={!isChannelOwner && currentUserId !== null}
           onLeaveClick={() => setLeaveDialogOpen(true)}
+          brandLogoUrl={brandLogoUrl ?? undefined}
+          sendSocketMessage={sendMessage}
+          experience={experience}
         />
+        <div className="mx-auto w-full max-w-3xl px-3 sm:px-6">
+          <ChannelChatPanel
+            channelId={channelId}
+            channelIsActive={channelIsActive}
+            connectEnabled={membershipLoaded && currentUserId !== null}
+            variant="listener"
+            canModerate={canManageChannel}
+          />
+        </div>
         {leaveDialog}
       </>
     );
@@ -434,6 +511,13 @@ export function ChannelDashboardTabs(props: Props) {
 
   return (
     <div className="space-y-6 pb-28">
+      <RoomExperienceChrome
+        channelId={channelId}
+        sendMessage={sendMessage}
+        socketState={socketState}
+        canControl={Boolean(canManageChannel && channelIsActive)}
+        experience={experience}
+      />
       {!channelIsActive && isChannelOwner ? (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-amber-100/90">This channel is closed — playback and sync stay off until you reopen.</p>
@@ -464,9 +548,14 @@ export function ChannelDashboardTabs(props: Props) {
         )}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Control room</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            {brandLogoUrl ? (
+              <img src={brandLogoUrl} alt="" className="h-14 w-14 shrink-0 rounded-2xl border border-white/10 object-cover shadow-lg" />
+            ) : null}
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Control room</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isChannelOwner && channelIsActive ? (
@@ -512,6 +601,10 @@ export function ChannelDashboardTabs(props: Props) {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="w-full animate-in fade-in duration-500">
         <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
           <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-center">
+            <TabsTrigger value="chat" className="gap-1.5">
+              <MessageSquare className="h-4 w-4 opacity-80" aria-hidden />
+              Chat
+            </TabsTrigger>
             <TabsTrigger value="player" className="gap-1.5">
               <Radio className="h-4 w-4 opacity-80" aria-hidden />
               Listen
@@ -532,6 +625,16 @@ export function ChannelDashboardTabs(props: Props) {
             </TabsTrigger>
           </TabsList>
         </div>
+
+        <TabsContent value="chat" className="mt-5">
+          <ChannelChatPanel
+            channelId={channelId}
+            channelIsActive={channelIsActive}
+            connectEnabled={membershipLoaded && currentUserId !== null}
+            variant="admin"
+            canModerate={canManageChannel}
+          />
+        </TabsContent>
 
         <TabsContent value="player" className="mt-5 focus-visible:outline-none space-y-6">
           <ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel && channelIsActive} sendSocketMessage={sendMessage} />
@@ -567,6 +670,8 @@ export function ChannelDashboardTabs(props: Props) {
               initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
               sendSocketMessage={sendMessage}
               channelIsActive={channelIsActive}
+              canDeleteChannel={isChannelOwner}
+              initialExperience={initialExperience ?? null}
             />
           </TabsContent>
         ) : null}

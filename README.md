@@ -73,7 +73,8 @@ cp deploy/env.production.example .env.production
 - `GET /api/auth/users`
 - `GET/POST/DELETE /api/tracks/{trackId}/share-permissions`
 - `PATCH /api/playlist-items/{id}` (reorder by `position`)
-- `WS /ws/channels/{id}`
+- `WS /ws/channels/{id}` (playback + control)
+- `WS /ws/channels/{id}/chat` (text chat: `send`, `edit`, `delete`, `react`, `history`, staff-only `purge_all`; client fullscreen is UI-only)
 
 ## Control + Sync Contract
 

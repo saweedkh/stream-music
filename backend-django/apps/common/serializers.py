@@ -1,7 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
-from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership, InviteToken
+from apps.channels.models import (
+    Channel,
+    ChannelChatMessage,
+    ChannelJoinRequest,
+    ChannelMembership,
+    InviteToken,
+    UserNotificationSettings,
+)
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
@@ -24,6 +31,7 @@ class TrackSharePermissionSerializer(serializers.ModelSerializer):
 
 class ChannelSerializer(serializers.ModelSerializer):
     membership_is_active = serializers.SerializerMethodField()
+    brand_logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Channel
@@ -42,6 +50,8 @@ class ChannelSerializer(serializers.ModelSerializer):
             "paused_at",
             "is_active",
             "membership_is_active",
+            "experience",
+            "brand_logo_url",
         ]
         read_only_fields = [
             "owner",
@@ -52,7 +62,18 @@ class ChannelSerializer(serializers.ModelSerializer):
             "paused_at",
             "is_active",
             "membership_is_active",
+            "experience",
+            "brand_logo_url",
         ]
+
+    def get_brand_logo_url(self, obj):
+        if not obj.brand_logo:
+            return None
+        request = self.context.get("request")
+        url = obj.brand_logo.url
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
     def get_membership_is_active(self, obj):
         request = self.context.get("request")
@@ -66,6 +87,27 @@ class MembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChannelMembership
         fields = ["id", "channel", "user", "role", "is_active", "joined_at"]
+
+
+class ChannelChatMessageSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    reactions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChannelChatMessage
+        fields = ["id", "channel", "user_id", "username", "body", "created_at", "edited_at", "deleted_at", "reactions"]
+        read_only_fields = ["id", "channel", "user_id", "username", "body", "created_at", "edited_at", "deleted_at", "reactions"]
+
+    def get_reactions(self, obj):
+        cache = getattr(obj, "_prefetched_objects_cache", {})
+        rows = cache.get("reactions")
+        if rows is not None:
+            return [{"user_id": r.user_id, "username": r.user.username, "emoji": r.emoji} for r in rows]
+        return [
+            {"user_id": r.user_id, "username": r.user.username, "emoji": r.emoji}
+            for r in obj.reactions.select_related("user").all()
+        ]
 
 
 class PlaylistSerializer(serializers.ModelSerializer):
@@ -105,6 +147,13 @@ class PlaybackSessionSerializer(serializers.ModelSerializer):
             "queue_version",
             "updated_at",
         ]
+
+
+class UserNotificationSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserNotificationSettings
+        fields = ["chat_notify", "admin_notify_reactions", "admin_notify_votes", "updated_at"]
+        read_only_fields = ["updated_at"]
 
 
 class AuthUserSerializer(serializers.ModelSerializer):

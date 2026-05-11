@@ -1,6 +1,8 @@
 import json
 import math
+import random
 import time
+from collections import defaultdict
 
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -16,8 +18,43 @@ from apps.playback.services.channel_queue import (
     replace_queue_with_tracks,
 )
 from apps.playback.services.state_store import playback_state_store
-from apps.playlists.models import ChannelQueueItem, Playlist
+from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track
+
+
+def _notify_channel_staff_webpush(channel_id: int, action: str, payload: dict, actor_user_id: int) -> None:
+    from apps.common.webpush_service import notify_channel_staff_social_push
+
+    notify_channel_staff_social_push(channel_id, action, payload, actor_user_id)
+
+
+# In-process presence / social (single worker; use Redis if you scale horizontally).
+_PRESENCE: dict[int, dict[int, float]] = defaultdict(dict)
+_SHOUT_COOLDOWN: dict[int, dict[int, float]] = defaultdict(dict)
+_SKIP_VOTES: dict[tuple[int, int], set[int]] = {}
+
+
+def _touch_presence(channel_id: int, user_id: int) -> None:
+    _PRESENCE[channel_id][user_id] = time.monotonic()
+
+
+def _clear_presence(channel_id: int, user_id: int) -> None:
+    _PRESENCE[channel_id].pop(user_id, None)
+
+
+def _presence_snapshot(channel_id: int) -> tuple[list[dict], int]:
+    now = time.monotonic()
+    bucket = _PRESENCE.get(channel_id, {})
+    stale = [uid for uid, ts in bucket.items() if now - ts > 45]
+    for uid in stale:
+        bucket.pop(uid, None)
+    uids = list(bucket.keys())[:32]
+    names: dict[int, str] = {}
+    if uids:
+        for u in User.objects.filter(id__in=uids).only("id", "username"):
+            names[u.id] = u.username
+    members = [{"id": uid, "username": names.get(uid, "?")} for uid in uids]
+    return members, len(bucket)
 
 
 class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
@@ -59,6 +96,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             "add_to_queue",
             "enqueue_next",
             "auto_next",
+            "blind_draw",
         }:
             return value
         return None
@@ -81,10 +119,16 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         self.group_name = f"channel_{self.channel_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
+        user = self.scope.get("user")
+        if getattr(user, "is_authenticated", False):
+            await sync_to_async(_touch_presence)(int(self.channel_id), user.id)
         initial_payload = await self._build_initial_sync_payload()
         await self.send(text_data=json.dumps(initial_payload))
 
     async def disconnect(self, close_code):
+        user = self.scope.get("user")
+        if getattr(user, "is_authenticated", False):
+            await sync_to_async(_clear_presence)(int(self.channel_id), user.id)
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data):
@@ -105,8 +149,34 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                 ),
             )
             return
-        action = self._normalize_action(action_text)
+
         user = self.scope.get("user")
+        at_low = (action_text or "").strip().lower()
+        if at_low in {"presence_ping", "reaction", "shout", "vote_skip"}:
+            if not getattr(user, "is_authenticated", False):
+                await self.send(text_data=json.dumps({"type": "ERROR", "message": "permission_denied"}))
+                return
+            allowed = await sync_to_async(ChannelPlaybackConsumer._active_member)(int(self.channel_id), user.id)
+            if not allowed:
+                await self.send(text_data=json.dumps({"type": "ERROR", "message": "permission_denied"}))
+                return
+            payload = await sync_to_async(ChannelPlaybackConsumer._apply_social)(at_low, int(self.channel_id), user, data)
+            if payload is None:
+                return
+            if payload.get("type") == "ERROR":
+                await self.send(text_data=json.dumps(payload))
+                return
+            next_payload = payload.pop("_next_playback_payload", None)
+            await self.channel_layer.group_send(self.group_name, {"type": "broadcast_event", "payload": payload})
+            if next_payload:
+                await self.channel_layer.group_send(self.group_name, {"type": "broadcast_event", "payload": next_payload})
+            act = str(payload.get("action") or "").lower()
+            if act in {"reaction", "vote_skip"}:
+                push_payload = {k: v for k, v in payload.items() if not str(k).startswith("_")}
+                await sync_to_async(_notify_channel_staff_webpush)(int(self.channel_id), act, push_payload, user.id)
+            return
+
+        action = self._normalize_action(action_text)
         if action is None:
             await self.send(text_data=json.dumps({"type": "ERROR", "message": "invalid_action"}))
             return
@@ -193,9 +263,84 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             "track_file": track_file,
             "track": track_payload,
             "queue": queue_snapshot,
+            "experience": channel.experience or {},
+            "brand_logo_url": channel.brand_logo.url if channel.brand_logo else None,
         }
 
-    def _build_payload(self, channel: Channel, action: str, playback_session: PlaybackSession, position: float | None, **extra):
+    @staticmethod
+    def _active_member(channel_id: int, user_id: int) -> bool:
+        return ChannelMembership.objects.filter(channel_id=channel_id, user_id=user_id, is_active=True).exists()
+
+    @staticmethod
+    def _apply_social(at_low: str, channel_id: int, user, data: dict) -> dict | None:
+        if at_low == "presence_ping":
+            _touch_presence(channel_id, user.id)
+            members, count = _presence_snapshot(channel_id)
+            return {
+                "type": "SOCIAL",
+                "action": "presence_update",
+                "channel_id": channel_id,
+                "count": count,
+                "members": members,
+            }
+        if at_low == "reaction":
+            emoji = str(data.get("emoji") or "♪")[:8]
+            return {
+                "type": "SOCIAL",
+                "action": "reaction",
+                "channel_id": channel_id,
+                "emoji": emoji,
+                "username": getattr(user, "username", "?"),
+                "user_id": user.id,
+            }
+        if at_low == "shout":
+            msg = str(data.get("message") or "").strip()[:40]
+            if not msg:
+                return None
+            now = time.monotonic()
+            last = _SHOUT_COOLDOWN[channel_id].get(user.id, 0)
+            if now - last < 30:
+                return {"type": "ERROR", "message": "shout_cooldown"}
+            _SHOUT_COOLDOWN[channel_id][user.id] = now
+            return {
+                "type": "SOCIAL",
+                "action": "shout",
+                "channel_id": channel_id,
+                "message": msg,
+                "username": getattr(user, "username", "?"),
+            }
+        if at_low == "vote_skip":
+            ps = PlaybackSession.objects.filter(channel_id=channel_id).select_related("track").first()
+            tid = ps.track_id if ps and ps.track_id else 0
+            key = (channel_id, tid)
+            s = _SKIP_VOTES.setdefault(key, set())
+            s.add(user.id)
+            ch = Channel.objects.filter(id=channel_id).first()
+            threshold = 0
+            if ch and isinstance(ch.experience, dict):
+                try:
+                    threshold = int(ch.experience.get("veto_skip_threshold") or 0)
+                except (TypeError, ValueError):
+                    threshold = 0
+            votes = len(s)
+            out: dict = {
+                "type": "SOCIAL",
+                "action": "vote_skip",
+                "channel_id": channel_id,
+                "votes": votes,
+                "track_id": tid,
+                "threshold": threshold,
+            }
+            if threshold > 0 and votes >= threshold and tid:
+                _SKIP_VOTES.pop(key, None)
+                nxt = ChannelPlaybackConsumer._advance_next_sync(channel_id)
+                if nxt:
+                    out["_next_playback_payload"] = nxt
+            return out
+        return None
+
+    @staticmethod
+    def _build_payload(channel: Channel, action: str, playback_session: PlaybackSession, position: float | None, **extra):
         track_payload = None
         if playback_session.track:
             track_payload = {
@@ -218,6 +363,35 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             "track": track_payload,
             **extra,
         }
+
+    @staticmethod
+    def _advance_next_sync(channel_id: int) -> dict | None:
+        """Advance to the next queue item (same rules as control `next`). Returns broadcast payload or None."""
+        channel = Channel.objects.filter(id=channel_id).first()
+        if channel is None:
+            return None
+        playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+        queue = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position"))
+        if not queue:
+            return None
+        current_index = 0
+        if playback_session.track_id is not None:
+            for idx, row in enumerate(queue):
+                if row.track_id == playback_session.track_id:
+                    current_index = idx
+                    break
+        target_index = (current_index + 1) % len(queue)
+        playback_session.track = queue[target_index].track
+        playback_session.is_playing = True
+        playback_session.started_at_server_time = time.time()
+        playback_session.paused_at_position = 0
+        playback_session.queue_version += 1
+        playback_session.save(
+            update_fields=["track", "is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"]
+        )
+        payload = ChannelPlaybackConsumer._build_payload(channel, "next", playback_session, 0.0)
+        playback_state_store.save_playback_snapshot(channel.id, payload)
+        return payload
 
     def _apply_auto_next(self, user_id: int, data: dict | None = None) -> dict | None:
         """Advance queue like next(); any active member may trigger after server timeline nears track end."""
@@ -293,7 +467,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             update_fields=["track", "is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"]
         )
 
-        payload = self._build_payload(channel=channel, action="next", playback_session=playback_session, position=0.0)
+        payload = ChannelPlaybackConsumer._build_payload(channel=channel, action="next", playback_session=playback_session, position=0.0)
         playback_state_store.save_playback_snapshot(channel.id, payload)
         return payload
 
@@ -338,7 +512,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             playback_session.save(
                 update_fields=["track", "is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"]
             )
-            payload = self._build_payload(
+            payload = ChannelPlaybackConsumer._build_payload(
                 channel=channel,
                 action="play",
                 playback_session=playback_session,
@@ -383,7 +557,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                     "updated_at",
                 ]
             )
-            payload = self._build_payload(
+            payload = ChannelPlaybackConsumer._build_payload(
                 channel=channel,
                 action="play",
                 playback_session=playback_session,
@@ -394,6 +568,51 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             playback_state_store.save_queue_snapshot(channel.id, self._serialize_queue_rows(persisted_rows))
             return payload
 
+        if action == "blind_draw":
+            if not user_id:
+                return {"type": "ERROR", "message": "permission_denied"}
+            ex = channel.experience or {}
+            pid = data.get("playlist_id") or ex.get("blind_playlist_id")
+            if not pid:
+                return {"type": "ERROR", "message": "playlist_required"}
+            try:
+                pid_int = int(pid)
+            except (TypeError, ValueError):
+                return {"type": "ERROR", "message": "playlist_required"}
+            playlist = Playlist.objects.filter(id=pid_int).first()
+            if playlist is None or playlist.channel_id != channel.id:
+                return {"type": "ERROR", "message": "playlist_not_found"}
+            items = list(PlaylistItem.objects.filter(playlist=playlist).select_related("track"))
+            if not items:
+                return {"type": "ERROR", "message": "playlist_empty"}
+            pick = random.choice(items)
+            track = pick.track
+            if track is None:
+                return {"type": "ERROR", "message": "track_not_found"}
+            queue_rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
+            next_position = queue_rows[-1].position + 1 if queue_rows else 0
+            new_row = ChannelQueueItem.objects.create(
+                channel=channel,
+                track=track,
+                position=next_position,
+                added_by_id=user_id,
+            )
+            queue_snapshot_rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
+            playback_session.queue_version += 1
+            playback_session.save(update_fields=["queue_version", "updated_at"])
+            payload = ChannelPlaybackConsumer._build_payload(
+                channel=channel,
+                action="add_to_queue",
+                playback_session=playback_session,
+                position=playback_session.paused_at_position,
+                added_track_id=new_row.track_id,
+                added_position=new_row.position,
+                blind_pick=True,
+            )
+            playback_state_store.save_playback_snapshot(channel.id, payload)
+            playback_state_store.save_queue_snapshot(channel.id, self._serialize_queue_rows(queue_snapshot_rows))
+            return payload
+
         if action in {"add_to_queue", "enqueue_next"}:
             track_id = data.get("track_id")
             if not track_id:
@@ -401,6 +620,9 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             track = Track.objects.filter(id=int(track_id)).first()
             if track is None:
                 return {"type": "ERROR", "message": "track_not_found"}
+            ex = channel.experience or {}
+            if ex.get("queue_locked") and channel.owner_id != user_id:
+                return {"type": "ERROR", "message": "queue_locked"}
             queue_rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
             if action == "enqueue_next":
                 insert_at = 0
@@ -430,7 +652,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             queue_snapshot_rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
             playback_session.queue_version += 1
             playback_session.save(update_fields=["queue_version", "updated_at"])
-            payload = self._build_payload(
+            payload = ChannelPlaybackConsumer._build_payload(
                 channel=channel,
                 action=action,
                 playback_session=playback_session,
@@ -478,6 +700,6 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             playback_session.queue_version += 1
 
         playback_session.save(update_fields=["is_playing", "started_at_server_time", "paused_at_position", "queue_version", "track", "updated_at"])
-        payload = self._build_payload(channel=channel, action=action, playback_session=playback_session, position=position)
+        payload = ChannelPlaybackConsumer._build_payload(channel=channel, action=action, playback_session=playback_session, position=position)
         playback_state_store.save_playback_snapshot(channel.id, payload)
         return payload

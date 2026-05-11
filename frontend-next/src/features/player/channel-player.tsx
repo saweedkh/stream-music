@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Howl } from "howler";
-import { ChevronUp, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { ChevronUp, Headphones, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Drawer,
   DrawerContent,
@@ -20,6 +21,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { expectedTimeSeconds } from "./sync-client";
+import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 
 /** Blend repeated clock samples to reduce jitter (WS pong / sync). */
 function blendClockOffset(prevMs: number, sampleMs: number, alpha: number): number {
@@ -52,6 +54,7 @@ type Props = {
   latestSocketPayload?: ChannelPlaybackEventPayload | null;
   drawerOpen: boolean;
   onDrawerOpenChange: (open: boolean) => void;
+  experience?: ChannelExperience | null;
 };
 
 function formatTime(value: number): string {
@@ -61,11 +64,95 @@ function formatTime(value: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function ArtworkRing({ letter, size = "md" }: { letter: string; size?: "xs" | "sm" | "md" | "lg" }) {
+const ACCENT_PALETTE: Record<string, { ring: string; text: string }> = {
+  emerald: {
+    ring: "from-emerald-400/95 via-teal-500 to-cyan-500 shadow-[0_20px_50px_-25px_rgba(16,185,129,0.75)]",
+    text: "text-emerald-100",
+  },
+  violet: {
+    ring: "from-violet-400/95 via-purple-500 to-fuchsia-500 shadow-[0_20px_50px_-25px_rgba(139,92,246,0.55)]",
+    text: "text-violet-100",
+  },
+  rose: {
+    ring: "from-rose-400/95 via-pink-500 to-orange-400 shadow-[0_20px_50px_-25px_rgba(244,63,94,0.5)]",
+    text: "text-rose-100",
+  },
+  amber: {
+    ring: "from-amber-400/95 via-orange-500 to-yellow-500 shadow-[0_20px_50px_-25px_rgba(245,158,11,0.45)]",
+    text: "text-amber-100",
+  },
+  sky: {
+    ring: "from-sky-400/95 via-cyan-500 to-blue-500 shadow-[0_20px_50px_-25px_rgba(14,165,233,0.45)]",
+    text: "text-sky-100",
+  },
+};
+
+function DeckVisualizer({ active, accent }: { active: boolean; accent: string }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const key = (accent || "emerald").toLowerCase();
+  const stroke =
+    key === "violet"
+      ? "#a78bfa"
+      : key === "rose"
+        ? "#fb7185"
+        : key === "amber"
+          ? "#fbbf24"
+          : key === "sky"
+            ? "#38bdf8"
+            : "#34d399";
+
+  useEffect(() => {
+    let id = 0;
+    const draw = () => {
+      const canvas = ref.current;
+      if (!canvas) {
+        id = window.requestAnimationFrame(draw);
+        return;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        id = window.requestAnimationFrame(draw);
+        return;
+      }
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      if (active) {
+        const bars = 14;
+        for (let i = 0; i < bars; i += 1) {
+          const t = Date.now() / 320 + i * 0.55;
+          const amp = 0.22 + 0.78 * (0.5 + 0.5 * Math.sin(t));
+          const bh = amp * (h - 4);
+          ctx.fillStyle = stroke;
+          ctx.globalAlpha = 0.35 + amp * 0.55;
+          ctx.fillRect((i / bars) * w + 1.5, h - bh - 2, w / bars - 3, bh);
+        }
+        ctx.globalAlpha = 1;
+      }
+      id = window.requestAnimationFrame(draw);
+    };
+    id = window.requestAnimationFrame(draw);
+    return () => window.cancelAnimationFrame(id);
+  }, [active, stroke]);
+
+  return <canvas ref={ref} width={128} height={32} className="h-8 w-32 shrink-0 opacity-90" aria-hidden />;
+}
+
+function ArtworkRing({
+  letter,
+  size = "md",
+  accent = "emerald",
+}: {
+  letter: string;
+  size?: "xs" | "sm" | "md" | "lg";
+  accent?: string;
+}) {
+  const a = (accent || "emerald").toLowerCase();
+  const pal = ACCENT_PALETTE[a] ?? ACCENT_PALETTE.emerald;
   if (size === "lg") {
     return (
-      <div className="h-44 w-44 shrink-0 overflow-hidden rounded-[22px] bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-[2px] shadow-[0_20px_50px_-25px_rgba(16,185,129,0.75)]">
-        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-black/65 text-4xl font-bold text-emerald-100">
+      <div className={cn("h-44 w-44 shrink-0 overflow-hidden rounded-[22px] bg-gradient-to-br p-[2px]", pal.ring)}>
+        <div className={cn("flex h-full w-full items-center justify-center rounded-[20px] bg-black/65 text-4xl font-bold", pal.text)}>
           {letter}
         </div>
       </div>
@@ -73,21 +160,21 @@ function ArtworkRing({ letter, size = "md" }: { letter: string; size?: "xs" | "s
   }
   if (size === "md") {
     return (
-      <div className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-[2px] shadow-[0_16px_40px_-20px_rgba(16,185,129,0.6)]">
-        <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-black/65 text-xl font-bold text-emerald-100">{letter}</div>
+      <div className={cn("h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br p-[2px]", pal.ring)}>
+        <div className={cn("flex h-full w-full items-center justify-center rounded-[14px] bg-black/65 text-xl font-bold", pal.text)}>{letter}</div>
       </div>
     );
   }
   if (size === "sm") {
     return (
-      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-emerald-400/95 via-teal-500 to-cyan-500 p-px shadow-[0_10px_24px_-12px_rgba(16,185,129,0.5)]">
-        <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-black/65 text-sm font-bold text-emerald-100">{letter}</div>
+      <div className={cn("h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br p-px", pal.ring)}>
+        <div className={cn("flex h-full w-full items-center justify-center rounded-[10px] bg-black/65 text-sm font-bold", pal.text)}>{letter}</div>
       </div>
     );
   }
   return (
-    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-emerald-400/90 via-teal-500 to-cyan-500 p-px shadow-[0_6px_16px_-8px_rgba(16,185,129,0.45)]">
-      <div className="flex h-full w-full items-center justify-center rounded-[7px] bg-black/60 text-xs font-bold text-emerald-100">{letter}</div>
+    <div className={cn("h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br p-px", pal.ring)}>
+      <div className={cn("flex h-full w-full items-center justify-center rounded-[7px] bg-black/60 text-xs font-bold", pal.text)}>{letter}</div>
     </div>
   );
 }
@@ -104,10 +191,12 @@ export function ChannelPlayer({
   latestSocketPayload = null,
   drawerOpen,
   onDrawerOpenChange,
+  experience = null,
 }: Props) {
   const { showToast } = useToast();
 
   const howlRef = useRef<Howl | null>(null);
+  const cueHowlRef = useRef<Howl | null>(null);
   const rafRef = useRef<number | null>(null);
   const controlRequestInFlightRef = useRef(false);
   const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
@@ -134,6 +223,47 @@ export function ChannelPlayer({
   const artworkLetter = title && title !== "No active track" ? title.charAt(0).toUpperCase() : "♪";
   const seekMax = Math.max(duration, 0.1);
   const seekValue = Math.min(position, seekMax);
+  const accentKey = (experience?.accent || "emerald").toLowerCase();
+  const introCapSec = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
+
+  function stopCue() {
+    try {
+      cueHowlRef.current?.stop();
+      cueHowlRef.current?.unload();
+    } catch {
+      /* ignore */
+    }
+    cueHowlRef.current = null;
+  }
+
+  function playCue() {
+    if (!canControl || !activeTrackPath) return;
+    stopCue();
+    const src = `${getApiBase()}${activeTrackPath}`;
+    const h = new Howl({
+      src: [src],
+      html5: true,
+      volume: 0.34,
+      onload: () => {
+        h.seek(0);
+        h.play();
+      },
+      onloaderror: () => showToast("Cannot load cue preview.", "error"),
+    });
+    cueHowlRef.current = h;
+  }
+
+  useEffect(() => {
+    return () => {
+      try {
+        cueHowlRef.current?.stop();
+        cueHowlRef.current?.unload();
+      } catch {
+        /* ignore */
+      }
+      cueHowlRef.current = null;
+    };
+  }, []);
 
   async function refreshChannelPlaybackState(options?: { silent?: boolean }) {
     try {
@@ -312,6 +442,7 @@ export function ChannelPlayer({
     const src = activeTrackPath ? `${getApiBase()}${activeTrackPath}` : null;
 
     if (!src) {
+      stopCue();
       howlRef.current?.unload();
       howlRef.current = null;
       setPosition(0);
@@ -351,12 +482,6 @@ export function ChannelPlayer({
   }, [activeTrackPath, queueVersion]);
 
   useEffect(() => {
-    const howl = howlRef.current;
-    if (!howl) return;
-    howl.volume(volume);
-  }, [volume]);
-
-  useEffect(() => {
     const tick = () => {
       const howl = howlRef.current;
       if (!howl) return;
@@ -394,6 +519,12 @@ export function ChannelPlayer({
         setHowlRate(1);
       }
 
+      const posNow = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
+      const introCap = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
+      const introGate = !canControl && introCap > 0 && posNow >= introCap;
+      const rehearsalMute = Boolean(experience?.rehearsal_mode && !canControl);
+      howl.volume(rehearsalMute || introGate ? 0 : volume);
+
       rafRef.current = window.requestAnimationFrame(tick);
     };
 
@@ -404,7 +535,7 @@ export function ChannelPlayer({
         rafRef.current = null;
       }
     };
-  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs]);
+  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs, volume, canControl, experience]);
 
   useEffect(() => {
     const howl = howlRef.current;
@@ -569,84 +700,137 @@ export function ChannelPlayer({
   return (
     <>
       <Drawer open={drawerOpen} onOpenChange={onDrawerOpenChange} shouldScaleBackground={false}>
-        <DrawerContent className="border-zinc-800/90 px-3 pb-6 pt-0 sm:px-5">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
-            <DrawerHeader className="shrink-0 space-y-1 px-0.5">
+        <DrawerContent
+          className={cn(
+            "border-zinc-800/90 px-3 pb-6 pt-0 sm:px-6",
+            "h-auto max-h-[92dvh] sm:max-h-[92dvh] overflow-hidden",
+            // Desktop: sheet not edge-to-edge (no translate — avoids fighting Vaul slide)
+            "inset-x-0 md:inset-x-10 lg:inset-x-16 xl:inset-x-[max(1.5rem,calc((100vw-72rem)/2))]",
+            "md:rounded-t-2xl",
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto w-full max-w-none overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]",
+              "max-h-[min(calc(92dvh-2.75rem),880px)]",
+            )}
+          >
+            <DrawerHeader className="space-y-1 border-b border-zinc-800/70 px-0.5 pb-3 pt-0">
               <div className="flex items-center justify-center gap-2 sm:justify-start">
                 <Radio className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden />
                 <DrawerTitle className="text-base sm:text-lg">Live channel player</DrawerTitle>
               </div>
               <DrawerDescription className="text-xs sm:text-sm">
-                <span className="block sm:inline">Synced playback · Channel #{channelId}</span>{" "}
-                <span className="text-zinc-500">· socket {socketState}</span>
+                <span className="block sm:inline">Synced playback · Channel </span>
+                <span className="font-mono text-[11px] text-slate-400 sm:text-xs" title={channelId}>
+                  #{channelId.slice(0, 8)}…
+                </span>
+                <span className="text-slate-500"> · socket </span>
+                <span className={socketState === "connected" ? "text-emerald-400/90" : "text-amber-400/85"}>{socketState}</span>
               </DrawerDescription>
+              <div className="mt-2 flex items-center justify-center gap-3 sm:justify-start">
+                <DeckVisualizer active={Boolean(activeTrackPath && isPlaying)} accent={accentKey} />
+              </div>
             </DrawerHeader>
 
-            {!activeTrackPath ? (
-              <Alert tone="error" className="mb-3 sm:mb-4">
-                No active track in this channel.
-              </Alert>
-            ) : null}
+            <div className="pb-1 pt-1">
+              {!activeTrackPath ? (
+                <Alert tone="error" className="mb-3 mt-3 sm:mb-4">
+                  No active track in this channel.
+                </Alert>
+              ) : null}
 
-            <div className="mt-2 grid shrink-0 grid-cols-1 gap-5 md:grid-cols-[minmax(0,200px)_1fr] md:items-start md:gap-6">
-              <div className="flex flex-col items-center gap-2 sm:gap-3 md:items-start">
-                <div className="md:hidden">
-                  <ArtworkRing letter={artworkLetter} size="md" />
-                </div>
-                <div className="hidden md:block">
-                  <ArtworkRing letter={artworkLetter} size="lg" />
-                </div>
-                <div className="w-full text-center md:w-auto md:text-left">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400/90 sm:text-[11px] sm:tracking-[0.25em]">Now playing</p>
-                  <p className="mt-0.5 line-clamp-2 text-lg font-semibold text-white sm:text-xl">{title || "No active track"}</p>
-                </div>
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-                <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3 shadow-inner sm:p-4">
-                  {seekSlider()}
-                  {playbackControls(false)}
-                  <Separator className="my-5 bg-zinc-800" />
-                  <div className="space-y-2">
-                    <Label className="text-zinc-400">Volume</Label>
-                    {volumeRow}
+              <div className="mt-2 grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,220px)_1fr] md:items-start md:gap-6">
+                <div className="flex flex-col items-center gap-2 sm:gap-3 md:items-start">
+                  <div className="md:hidden">
+                    <ArtworkRing letter={artworkLetter} size="md" accent={accentKey} />
+                  </div>
+                  <div className="hidden md:block">
+                    <ArtworkRing letter={artworkLetter} size="lg" accent={accentKey} />
+                  </div>
+                  <div className="w-full text-center md:w-auto md:text-left">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400/90 sm:text-[11px] sm:tracking-[0.25em]">Now playing</p>
+                    <p className="mt-0.5 line-clamp-2 text-lg font-semibold text-white sm:text-xl">{title || "No active track"}</p>
                   </div>
                 </div>
 
-                {needsUserInteraction && isPlaying ? (
-                  <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-sm">Browser blocked autoplay. Tap to continue.</span>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        const howl = howlRef.current;
-                        if (!howl) return;
-                        howl.play();
-                        setNeedsUserInteraction(false);
-                      }}
-                    >
-                      Enable audio
-                    </Button>
-                  </Alert>
-                ) : null}
+                <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+                  <Card className="border-zinc-800/80 bg-zinc-950/40 shadow-inner shadow-black/30">
+                    <CardHeader className="space-y-0 pb-3 pt-5">
+                      <CardTitle className="text-sm font-medium text-zinc-300">Playback</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5 pb-5 pt-0">
+                      {seekSlider()}
+                      <div className="flex justify-center py-1">{playbackControls(false)}</div>
+                      <Separator className="bg-zinc-800/90" />
+                      <div className="space-y-2">
+                        <Label className="text-xs text-zinc-400">Volume</Label>
+                        {volumeRow}
+                      </div>
+                      {experience?.rehearsal_mode && !canControl ? (
+                        <p className="text-xs text-amber-200/90">Soundcheck mode — main mix is muted for listeners.</p>
+                      ) : null}
+                      {canControl && activeTrackPath ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="secondary" className="gap-1.5" onClick={() => playCue()}>
+                            <Headphones className="h-4 w-4" />
+                            Cue preview (local)
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="text-zinc-400" onClick={() => stopCue()}>
+                            Stop cue
+                          </Button>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
 
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <Badge variant={isPlaying ? "success" : "warning"}>{isPlaying ? "Playing" : "Paused"}</Badge>
-                  <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
-                  <Badge className="text-[10px] sm:text-xs">Δ {Math.round(offsetMs)}ms</Badge>
-                  <Badge className="hidden max-w-full truncate sm:inline-flex sm:max-w-none">
-                    {lastSyncAt ? `Sync ${new Date(lastSyncAt).toLocaleTimeString()}` : "Sync …"}
-                  </Badge>
-                  {canControl ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="h-9 w-full px-3 text-xs sm:h-8 sm:w-auto"
-                      onClick={() => void refreshChannelPlaybackState()}
-                    >
-                      Refresh sync
-                    </Button>
+                  {needsUserInteraction && isPlaying ? (
+                    <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm">Browser blocked autoplay. Tap to continue.</span>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          const howl = howlRef.current;
+                          if (!howl) return;
+                          howl.play();
+                          setNeedsUserInteraction(false);
+                        }}
+                      >
+                        Enable audio
+                      </Button>
+                    </Alert>
                   ) : null}
+
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <Badge variant={isPlaying ? "success" : "warning"}>{isPlaying ? "Playing" : "Paused"}</Badge>
+                    <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
+                    <Badge
+                      className={cn(
+                        "text-[10px] sm:text-xs",
+                        Math.abs(offsetMs) > 240 && "border-amber-500/40 bg-amber-950/50 text-amber-100",
+                      )}
+                    >
+                      Δ {Math.round(offsetMs)}ms
+                    </Badge>
+                    {introCapSec > 0 && !canControl ? (
+                      <Badge variant="secondary" className="max-w-[220px] truncate text-[10px] sm:text-xs">
+                        Intro {introCapSec}s — muted after
+                      </Badge>
+                    ) : null}
+                    <Badge className="hidden max-w-full truncate sm:inline-flex sm:max-w-none">
+                      {lastSyncAt ? `Sync ${new Date(lastSyncAt).toLocaleTimeString()}` : "Sync …"}
+                    </Badge>
+                    {canControl ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-9 w-full px-3 text-xs sm:h-8 sm:w-auto"
+                        onClick={() => void refreshChannelPlaybackState()}
+                      >
+                        Refresh sync
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
@@ -656,12 +840,12 @@ export function ChannelPlayer({
 
       <div
         className={cn(
-          "fixed inset-x-2 z-40 mx-auto w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl border border-zinc-800/90",
+          "fixed inset-x-2 z-40 mx-auto w-[calc(100%-1rem)] max-w-6xl overflow-hidden rounded-2xl border border-zinc-800/90",
           "bg-gradient-to-r from-zinc-950/90 via-zinc-900/75 to-zinc-950/90",
           "shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]",
           "backdrop-blur-2xl backdrop-saturate-150",
           "transition-[box-shadow,transform] duration-300",
-          "bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:inset-x-4 sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] lg:max-w-4xl",
+          "bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:inset-x-4 sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
           drawerOpen && "ring-1 ring-emerald-500/35 ring-offset-0 shadow-[0_12px_40px_-10px_rgba(16,185,129,0.2)]",
         )}
       >
@@ -674,7 +858,7 @@ export function ChannelPlayer({
               onClick={() => onDrawerOpenChange(true)}
               aria-label="Open full player"
             >
-              <ArtworkRing letter={artworkLetter} size="xs" />
+              <ArtworkRing letter={artworkLetter} size="xs" accent={accentKey} />
             </button>
             <p
               className="min-w-0 flex-1 truncate text-left text-[11px] font-semibold leading-tight text-white/95"
@@ -703,7 +887,7 @@ export function ChannelPlayer({
             onClick={() => onDrawerOpenChange(true)}
             aria-label="Open full player"
           >
-            <ArtworkRing letter={artworkLetter} size="xs" />
+            <ArtworkRing letter={artworkLetter} size="xs" accent={accentKey} />
           </button>
           <p
             className="min-w-0 max-w-[min(22vw,200px)] shrink truncate text-left text-[11px] font-medium leading-tight text-white/95 md:max-w-[min(28vw,260px)] lg:max-w-[min(32vw,300px)]"
@@ -711,6 +895,9 @@ export function ChannelPlayer({
           >
             {title || "No track"}
           </p>
+          <div className="hidden shrink-0 md:flex md:items-center">
+            <DeckVisualizer active={Boolean(activeTrackPath && isPlaying)} accent={accentKey} />
+          </div>
           <div className="min-w-0 flex-1">{miniSeekRow}</div>
           <div className="flex shrink-0 items-center border-l border-zinc-800/80 pl-2 md:pl-2.5">{playbackControls(true)}</div>
           <button

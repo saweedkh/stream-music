@@ -43,3 +43,29 @@ a {
   background: rgba(52, 211, 153, 0.25);
   color: #ffffff;
 }
+
+@keyframes floater {
+  0% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-140px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+html.theme-oled body {
+  background: #000000;
+  color: #f4f4f5;
+}
+
+html.theme-oled {
+  --bg: #000000;
+  --bg-elevated: #050505;
+  --surface: #0a0a0a;
+  --surface-2: #000000;
+}

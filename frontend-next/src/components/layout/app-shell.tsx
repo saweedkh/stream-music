@@ -1,9 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, logoutUser, type AuthUser } from "@/lib/api";
@@ -15,10 +16,29 @@ const GlobalChannelPlayerDock = dynamic(
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<AuthUser | null>(null);
+  const [oled, setOled] = useState(false);
 
   useEffect(() => {
-    getMe().then(setMe).catch(() => setMe(null));
+    getMe().then((res) => setMe(res?.user ?? null)).catch(() => setMe(null));
   }, []);
+
+  useEffect(() => {
+    try {
+      setOled(window.localStorage.getItem("stream-music-oled") === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.toggle("theme-oled", oled);
+    try {
+      window.localStorage.setItem("stream-music-oled", oled ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [oled]);
 
   async function handleLogout() {
     try {
@@ -37,7 +57,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href={me ? "/dashboard" : "/login"} className="text-lg font-semibold tracking-tight text-slate-100">
               Stream Music
             </Link>
-            <nav className="flex items-center gap-3 text-sm text-slate-300">
+            <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-sm text-slate-300">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+                <Switch checked={oled} onCheckedChange={setOled} aria-label="OLED true black background" />
+                <span className="select-none">OLED</span>
+              </label>
               <Link href="/dashboard" className="hover:text-white">
                 Dashboard
               </Link>

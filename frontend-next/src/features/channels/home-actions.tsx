@@ -25,7 +25,7 @@ export function HomeActions() {
       setStatus("Joined. Opening channel page...");
       window.location.href = `/channel/${out.channel}`;
     } catch {
-      setStatus("Join failed. Check your link or id, and that you are logged in.");
+      setStatus("Join failed. Check your invite or link, and that you are logged in.");
     }
   }
 
@@ -48,7 +48,7 @@ export function HomeActions() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
-            placeholder="Room id, invite code, or public code"
+            placeholder="Invite code, public code, or join link"
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
           />

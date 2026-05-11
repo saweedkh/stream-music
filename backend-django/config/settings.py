@@ -140,3 +140,10 @@ if LAN_ORIGIN_REGEX_ENABLED:
 
 # Nginx terminates TLS and forwards to Django; keeps request.is_secure() and cookies consistent for HTTPS clients.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Absolute base URL of the Next.js app (used in web push notification links). LAN example: http://192.168.1.5:3000
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").strip()
+# Web Push (VAPID). Generate with: `npx web-push generate-vapid-keys` or `openssl ecparam -name prime256v1 -genkey -noout`
+WEBPUSH_VAPID_PUBLIC_KEY = os.getenv("WEBPUSH_VAPID_PUBLIC_KEY", "").strip()
+WEBPUSH_VAPID_PRIVATE_KEY = os.getenv("WEBPUSH_VAPID_PRIVATE_KEY", "").strip()
+WEBPUSH_VAPID_SUBJECT = os.getenv("WEBPUSH_VAPID_SUBJECT", "mailto:admin@localhost").strip()

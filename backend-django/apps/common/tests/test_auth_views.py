@@ -24,7 +24,10 @@ class AuthViewsTests(TestCase):
 
         me = self.client.get("/api/auth/me")
         self.assertEqual(me.status_code, 200)
-        self.assertEqual(me.json()["user"]["username"], "alice")
+        data = me.json()
+        self.assertEqual(data["user"]["username"], "alice")
+        self.assertIn("notification_settings", data)
+        self.assertEqual(data["notification_settings"]["chat_notify"], "all")
 
         csrf = self.client.cookies["csrftoken"].value
         logout = self.client.post("/api/auth/logout", {}, format="json", HTTP_X_CSRFTOKEN=csrf)

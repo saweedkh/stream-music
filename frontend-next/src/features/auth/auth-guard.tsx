@@ -11,7 +11,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     getMe()
-      .then((user) => setState(user ? "ok" : "unauthorized"))
+      .then((res) => setState(res?.user ? "ok" : "unauthorized"))
       .catch(() => setState("unauthorized"));
   }, []);
 

@@ -11,16 +11,20 @@ export function JoinLandingClient() {
   const [message, setMessage] = useState("Connecting…");
 
   useEffect(() => {
-    const channel = searchParams.get("channel");
-    const link = searchParams.get("link");
-    const payloadRaw = channel?.trim() || link?.trim();
+    const link = searchParams.get("link")?.trim();
+    const legacyChannel = searchParams.get("channel")?.trim();
+    if (legacyChannel && !link) {
+      setMessage("Joining with a room id is no longer supported. Ask the host for an invite link or scan their invite QR.");
+      return;
+    }
+    const payloadRaw = link ?? "";
     const payload = payloadRaw ? extractJoinInputFromScannedText(payloadRaw) : "";
     if (!payload) {
-      setMessage("Missing channel id or invite. Open a valid QR or link from your admin.");
+      setMessage("Missing join link. Open the invite link or QR from your channel admin.");
       return;
     }
     let cancelled = false;
-    joinChannelFromLink(extractJoinInputFromScannedText(payload))
+    joinChannelFromLink(payload)
       .then((out) => {
         if (cancelled) return;
         if (out.status === "pending") {

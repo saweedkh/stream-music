@@ -54,17 +54,18 @@ def init_session(*, user_id: int, filename: str, size: int, meta: dict) -> str:
     return upload_id
 
 
-def get_session(upload_id: str) -> dict | None:
-    return cache.get(_CACHE_PREFIX + upload_id)
+def get_session(upload_id: str | uuid.UUID) -> dict | None:
+    return cache.get(_CACHE_PREFIX + str(upload_id))
 
 
-def delete_session(upload_id: str) -> None:
-    cache.delete(_CACHE_PREFIX + upload_id)
+def delete_session(upload_id: str | uuid.UUID) -> None:
+    cache.delete(_CACHE_PREFIX + str(upload_id))
 
 
-def append_chunk(*, upload_id: str, user_id: int, data: bytes) -> dict:
+def append_chunk(*, upload_id: str | uuid.UUID, user_id: int, data: bytes) -> dict:
     if len(data) > _max_chunk_bytes():
         raise ValueError("chunk_too_large")
+    upload_id = str(upload_id)
     meta = get_session(upload_id)
     if not meta or meta.get("user_id") != user_id:
         raise PermissionError("invalid_session")
@@ -81,7 +82,8 @@ def append_chunk(*, upload_id: str, user_id: int, data: bytes) -> dict:
     return meta_after
 
 
-def finalize_path(upload_id: str, *, user_id: int) -> dict:
+def finalize_path(upload_id: str | uuid.UUID, *, user_id: int) -> dict:
+    upload_id = str(upload_id)
     meta = get_session(upload_id)
     if not meta or meta.get("user_id") != user_id:
         raise PermissionError("invalid_session")
@@ -91,7 +93,8 @@ def finalize_path(upload_id: str, *, user_id: int) -> dict:
     return meta
 
 
-def cleanup_files(upload_id: str) -> None:
+def cleanup_files(upload_id: str | uuid.UUID) -> None:
+    upload_id = str(upload_id)
     meta = get_session(upload_id)
     if not meta:
         return

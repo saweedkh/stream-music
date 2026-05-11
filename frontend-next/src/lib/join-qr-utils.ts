@@ -4,7 +4,7 @@ const PUBLIC_PATH_RE = /^\/join\/public\/([a-zA-Z0-9-]+)$/i;
 
 /**
  * Normalize QR / pasted text into a short value for `joinChannelFromLink`
- * (numeric id, invite UUID, public slug/code, or legacy path).
+ * (invite UUID, public slug/code, or `/join?link=…` — not numeric room id).
  */
 export function extractJoinInputFromScannedText(raw: string): string {
   const t = raw.trim();
@@ -18,8 +18,6 @@ export function extractJoinInputFromScannedText(raw: string): string {
       const pub = u.pathname.match(PUBLIC_PATH_RE);
       if (pub) return pub[1];
       if (u.pathname === "/join") {
-        const c = u.searchParams.get("channel");
-        if (c?.trim()) return c.trim();
         const l = u.searchParams.get("link");
         if (l) return extractJoinInputFromScannedText(decodeURIComponent(l));
       }
@@ -36,8 +34,6 @@ export function extractJoinInputFromScannedText(raw: string): string {
       const pub = u.pathname.match(PUBLIC_PATH_RE);
       if (pub) return pub[1];
       if (u.pathname === "/join" || u.pathname.endsWith("/join")) {
-        const c = u.searchParams.get("channel");
-        if (c?.trim()) return c.trim();
         const l = u.searchParams.get("link");
         if (l) return extractJoinInputFromScannedText(decodeURIComponent(l));
       }

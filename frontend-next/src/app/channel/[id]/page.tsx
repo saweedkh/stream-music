@@ -38,6 +38,11 @@ export default async function ChannelPage({ params }: Props) {
   const trackPath = data?.playback?.track?.file ?? undefined;
   const isPlaying = data?.playback?.is_playing ?? false;
   const channelIsActive = data.channel.is_active !== false;
+  const initialExperience =
+    data.channel.experience && typeof data.channel.experience === "object"
+      ? (data.channel.experience as Record<string, unknown>)
+      : null;
+  const brandLogoUrl = data.channel.brand_logo_url ?? null;
 
   return (
     <AuthGuard>
@@ -56,6 +61,8 @@ export default async function ChannelPage({ params }: Props) {
         publicSlug={data?.channel?.public_slug}
         publicJoinSlug={data?.channel?.public_join_slug ?? null}
         initialJoinRequiresApproval={Boolean(data?.channel?.join_requires_approval)}
+        initialExperience={initialExperience}
+        brandLogoUrl={brandLogoUrl}
       />
     </AuthGuard>
   );

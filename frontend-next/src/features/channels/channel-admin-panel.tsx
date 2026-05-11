@@ -8,14 +8,24 @@ import {
   RefreshCw,
   Shield,
   Sparkles,
+  Trash2,
   UserPlus,
   Users,
 } from "lucide-react";
 import QRCode from "react-qr-code";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,21 +35,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   approveJoinRequest,
-  buildJoinUrlWithChannelId,
   buildPrivateInviteJoinUrl,
   buildPublicJoinUrl,
   createInvite,
+  deleteChannel,
   getChannelMembers,
   listChannelInvites,
   listChannelJoinRequests,
+  listPlaylists,
   rejectJoinRequest,
   removeChannelMember,
   rotatePrivateInvite,
   rotatePublicLink,
   updateChannelMemberRole,
   updateChannelSettings,
+  uploadChannelBrandLogo,
   type ChannelMember,
   type JoinRequestRow,
+  type PlaylistSummary,
 } from "@/lib/api";
 import { channelSettingsSchema } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -55,6 +68,9 @@ type Props = {
   initialJoinRequiresApproval?: boolean;
   sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
   channelIsActive?: boolean;
+  /** Only the channel owner may permanently delete the room (matches API). */
+  canDeleteChannel?: boolean;
+  initialExperience?: Record<string, unknown> | null;
 };
 
 async function copyText(text: string, showToast: (m: string, t?: "success" | "error" | "info") => void) {
@@ -122,8 +138,11 @@ export function ChannelAdminPanel({
   initialJoinRequiresApproval = false,
   sendSocketMessage,
   channelIsActive = true,
+  canDeleteChannel = false,
+  initialExperience = null,
 }: Props) {
   const { showToast } = useToast();
+  const router = useRouter();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
@@ -136,9 +155,17 @@ export function ChannelAdminPanel({
   const [joinRequiresApproval, setJoinRequiresApproval] = useState(Boolean(initialJoinRequiresApproval));
   const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [deleteChannelDialogOpen, setDeleteChannelDialogOpen] = useState(false);
+  const [deleteChannelBusy, setDeleteChannelBusy] = useState(false);
+  const [adminPlaylists, setAdminPlaylists] = useState<PlaylistSummary[]>([]);
+  const [expAccent, setExpAccent] = useState("emerald");
+  const [expRehearsal, setExpRehearsal] = useState(false);
+  const [expQueueLocked, setExpQueueLocked] = useState(false);
+  const [expBlindPlaylistId, setExpBlindPlaylistId] = useState("");
+  const [expIntro, setExpIntro] = useState("0");
+  const [expVeto, setExpVeto] = useState("0");
+  const [expOled, setExpOled] = useState(false);
 
-  const numericId = String(channelId);
-  const idJoinUrl = typeof window !== "undefined" ? buildJoinUrlWithChannelId(channelId) : "";
   const privateJoinUrl = inviteToken && typeof window !== "undefined" ? buildPrivateInviteJoinUrl(inviteToken) : null;
   const publicJoinUrl =
     publicSlug && typeof window !== "undefined" ? buildPublicJoinUrl(publicSlug, publicJoinSlugSaved || null) : null;
@@ -171,6 +198,24 @@ export function ChannelAdminPanel({
       setInviteToken(null);
     }
   }, [channelId, channelIsActive]);
+
+  useEffect(() => {
+    void listPlaylists(channelId)
+      .then((list) => setAdminPlaylists(list.filter((p) => p.channel === Number(channelId))))
+      .catch(() => setAdminPlaylists([]));
+  }, [channelId]);
+
+  useEffect(() => {
+    const raw = initialExperience && typeof initialExperience === "object" ? initialExperience : {};
+    setExpAccent(typeof raw.accent === "string" ? String(raw.accent) : "emerald");
+    setExpRehearsal(Boolean(raw.rehearsal_mode));
+    setExpQueueLocked(Boolean(raw.queue_locked));
+    const b = raw.blind_playlist_id;
+    setExpBlindPlaylistId(b != null && b !== "" ? String(b) : "");
+    setExpIntro(raw.intro_preview_seconds != null ? String(raw.intro_preview_seconds) : "0");
+    setExpVeto(raw.veto_skip_threshold != null ? String(raw.veto_skip_threshold) : "0");
+    setExpOled(Boolean(raw.oled_hint));
+  }, [initialExperience]);
 
   useEffect(() => {
     void loadMembers();
@@ -255,6 +300,46 @@ export function ChannelAdminPanel({
     }
   }
 
+  async function saveExperience() {
+    setBusy("experience");
+    const intro = Math.max(0, Math.min(120, Number(expIntro) || 0));
+    const veto = Math.max(0, Math.min(999, Number(expVeto) || 0));
+    const blindRaw = expBlindPlaylistId.trim();
+    const blindNum = blindRaw ? Number(blindRaw) : null;
+    try {
+      await updateChannelSettings(channelId, {
+        experience: {
+          accent: expAccent,
+          rehearsal_mode: expRehearsal,
+          queue_locked: expQueueLocked,
+          blind_playlist_id: blindNum != null && Number.isFinite(blindNum) ? blindNum : null,
+          intro_preview_seconds: intro,
+          veto_skip_threshold: veto,
+          oled_hint: expOled,
+        },
+      });
+      showToast("Room experience saved.", "success");
+      router.refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not save experience.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function uploadBrandLogo(file: File) {
+    setBusy("logo");
+    try {
+      await uploadChannelBrandLogo(channelId, file);
+      showToast("Brand logo updated.", "success");
+      router.refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Logo upload failed.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function loadMembers() {
     try {
       const data = await getChannelMembers(channelId);
@@ -287,6 +372,20 @@ export function ChannelAdminPanel({
       showToast(error instanceof Error ? error.message : "Rotate failed.", "error");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function confirmDeleteChannel() {
+    setDeleteChannelBusy(true);
+    try {
+      await deleteChannel(channelId);
+      showToast("Channel deleted.", "success");
+      setDeleteChannelDialogOpen(false);
+      router.replace("/dashboard");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not delete channel.", "error");
+    } finally {
+      setDeleteChannelBusy(false);
     }
   }
 
@@ -411,25 +510,154 @@ export function ChannelAdminPanel({
               </div>
             </div>
 
+            <div className="rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Room experience</h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Accent colors, soundcheck mode, queue lock, blind roulette playlist, skip-vote threshold, intro clip length, and channel logo.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-accent-${channelId}`}>Accent</Label>
+                  <Select
+                    id={`ch-exp-accent-${channelId}`}
+                    value={expAccent}
+                    onChange={(e) => setExpAccent(e.target.value)}
+                    className="border-zinc-800 bg-zinc-900/80"
+                  >
+                    <option value="emerald">Emerald</option>
+                    <option value="violet">Violet</option>
+                    <option value="rose">Rose</option>
+                    <option value="amber">Amber</option>
+                    <option value="sky">Sky</option>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-blind-pl-${channelId}`}>Blind roulette playlist</Label>
+                  <Select
+                    id={`ch-blind-pl-${channelId}`}
+                    value={expBlindPlaylistId}
+                    onChange={(e) => setExpBlindPlaylistId(e.target.value)}
+                    className="border-zinc-800 bg-zinc-900/80"
+                  >
+                    <option value="">— none —</option>
+                    {adminPlaylists.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-zinc-500">Used when DJs send a blind draw over the live socket.</p>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-100">Soundcheck (rehearsal) mode</p>
+                    <p className="text-xs text-zinc-500">Listeners hear silence until moderators disable this.</p>
+                  </div>
+                  <Switch checked={expRehearsal} onCheckedChange={setExpRehearsal} id={`ch-exp-reh-${channelId}`} />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-100">Lock queue adds</p>
+                    <p className="text-xs text-zinc-500">Only the room owner can enqueue while locked.</p>
+                  </div>
+                  <Switch checked={expQueueLocked} onCheckedChange={setExpQueueLocked} id={`ch-exp-lock-${channelId}`} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-intro-${channelId}`}>Intro clip length (seconds)</Label>
+                  <Input
+                    id={`ch-exp-intro-${channelId}`}
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={expIntro}
+                    onChange={(e) => setExpIntro(e.target.value)}
+                    className="border-zinc-800 bg-zinc-900/80"
+                  />
+                  <p className="text-xs text-zinc-500">After this point, listeners are muted locally (sync stays aligned).</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-veto-${channelId}`}>Skip vote threshold</Label>
+                  <Input
+                    id={`ch-exp-veto-${channelId}`}
+                    type="number"
+                    min={0}
+                    max={999}
+                    value={expVeto}
+                    onChange={(e) => setExpVeto(e.target.value)}
+                    className="border-zinc-800 bg-zinc-900/80"
+                  />
+                  <p className="text-xs text-zinc-500">0 = tally only. When reached, the room auto-advances like “next”.</p>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-100">Suggest OLED theme</p>
+                    <p className="text-xs text-zinc-500">Shows a hint in the app shell toggle for true-black backgrounds.</p>
+                  </div>
+                  <Switch checked={expOled} onCheckedChange={setExpOled} id={`ch-exp-oled-${channelId}`} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-brand-logo-${channelId}`}>Brand logo</Label>
+                  <Input
+                    id={`ch-brand-logo-${channelId}`}
+                    type="file"
+                    accept="image/*"
+                    className="cursor-pointer border-zinc-800 bg-zinc-900/80"
+                    disabled={busy === "logo"}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void uploadBrandLogo(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="bg-emerald-600 hover:bg-emerald-500"
+                  disabled={!channelIsActive || busy === "experience"}
+                  onClick={() => void saveExperience()}
+                >
+                  {busy === "experience" ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Save experience
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!channelIsActive || !sendSocketMessage}
+                  onClick={() => {
+                    const ok = sendSocketMessage?.({ action: "blind_draw" });
+                    if (!ok) showToast("Connect to the live room first.", "error");
+                    else showToast("Blind draw sent — random track from the configured playlist.", "success");
+                  }}
+                >
+                  Blind roulette draw
+                </Button>
+              </div>
+            </div>
+
             <div className="h-px bg-zinc-800/90" />
 
-            <div className="rounded-2xl border border-zinc-800/70 bg-zinc-950/30 p-5">
-              <h3 className="text-sm font-semibold text-zinc-200">Playback (WebSocket)</h3>
-              <p className="mt-1 text-xs text-zinc-500">Quick transport controls for testing sync from this tab.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(["play", "pause", "next", "prev"] as const).map((a) => (
-                  <Button
-                    key={a}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={!channelIsActive || Boolean(busy)}
-                    onClick={() => void control(a)}
-                  >
-                    {a}
-                  </Button>
-                ))}
-              </div>
+            <div className="rounded-2xl border border-red-900/35 bg-red-950/15 p-5">
+              <h3 className="text-sm font-semibold text-red-200">Danger zone</h3>
+              <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+                Permanently delete this channel and its related data. Only the channel owner sees this option — moderators and guests cannot remove
+                the room.
+              </p>
+              {canDeleteChannel ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="mt-4 gap-2"
+                  onClick={() => setDeleteChannelDialogOpen(true)}
+                >
+                  <Trash2 className="size-4" />
+                  Delete channel
+                </Button>
+              ) : (
+                <p className="mt-4 text-xs text-zinc-500">Only the room owner can delete this channel.</p>
+              )}
             </div>
           </TabsContent>
 
@@ -480,7 +708,7 @@ export function ChannelAdminPanel({
                   <h3 className="font-semibold text-zinc-100">Public join code</h3>
                 </div>
                 <p className="mt-1 text-sm text-zinc-500">
-                  Set a short memorable code (letters, numbers, hyphens). Guests type this code to join — or use the numeric room id.
+                  Set a short memorable code (letters, numbers, hyphens). Guests type this code to join.
                 </p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <Input
@@ -508,14 +736,7 @@ export function ChannelAdminPanel({
 
             <div>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">QR codes</h3>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <QrTile
-                  title="Room id"
-                  subtitle={`Code: ${numericId}`}
-                  value={idJoinUrl || null}
-                  disabled={!idJoinUrl}
-                  onCopy={() => void copyText(idJoinUrl, showToast)}
-                />
+              <div className="grid gap-6 sm:grid-cols-2">
                 <QrTile
                   title="Private invite"
                   subtitle="Guests paste the code above"
@@ -663,6 +884,27 @@ export function ChannelAdminPanel({
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <Dialog open={deleteChannelDialogOpen} onOpenChange={setDeleteChannelDialogOpen}>
+        <DialogContent className="border-red-900/40">
+          <DialogHeader>
+            <DialogTitle>Delete this channel?</DialogTitle>
+            <DialogDescription>
+              This removes the channel, playlists, queue state, and memberships for everyone. This action cannot be undone. Only the channel owner
+              can delete the room.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="secondary" disabled={deleteChannelBusy} onClick={() => setDeleteChannelDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" disabled={deleteChannelBusy} onClick={() => void confirmDeleteChannel()}>
+              {deleteChannelBusy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

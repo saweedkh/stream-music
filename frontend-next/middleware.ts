@@ -4,6 +4,9 @@ const PUBLIC_PATHS = new Set(["/login", "/register"]);
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/sw.js") {
+    return NextResponse.next();
+  }
   const hasSession = request.cookies.has("sessionid");
 
   if (PUBLIC_PATHS.has(pathname)) {
@@ -28,5 +31,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp)$).*)"],
+  // Important: include "/" explicitly. Depending on path-to-regexp normalization,
+  // Next middleware matcher can miss the root path and you end up with a 404.
+  matcher: ["/", "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp)$).*)"],
 };

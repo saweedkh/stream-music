@@ -1,3 +1,4 @@
+import json
 import re
 import time
 import uuid
@@ -6,23 +7,47 @@ from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.conf import settings as django_settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership, InviteToken
+from apps.channels.models import (
+    Channel,
+    ChannelChatMessage,
+    ChannelJoinRequest,
+    ChannelMembership,
+    InviteToken,
+    UserNotificationSettings,
+    WebPushSubscription,
+)
 
 
 def _channel_closed_response():
     return Response({"detail": "channel_closed"}, status=status.HTTP_410_GONE)
+
+
+_ALLOWED_EXPERIENCE_KEYS = frozenset(
+    {
+        "accent",
+        "rehearsal_mode",
+        "queue_locked",
+        "blind_playlist_id",
+        "intro_preview_seconds",
+        "veto_skip_threshold",
+        "oled_hint",
+    },
+)
 
 
 _UUID_TOKEN_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
@@ -70,8 +95,11 @@ def _resolve_public_join_segment(seg: str) -> Channel | None:
     if _UUID_TOKEN_RE.match(seg):
         return Channel.objects.filter(public_slug=seg).first()
     return None
+
+
 from apps.common.serializers import (
     ChannelSerializer,
+    ChannelChatMessageSerializer,
     ChannelJoinRequestSerializer,
     MembershipSerializer,
     PlaybackSessionSerializer,
@@ -82,6 +110,7 @@ from apps.common.serializers import (
     AuthUserSerializer,
     InviteTokenSerializer,
     TrackSharePermissionSerializer,
+    UserNotificationSettingsSerializer,
 )
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
@@ -96,6 +125,9 @@ from apps.playback.services.state_store import playback_state_store
 from apps.tracks.filesystem_import import import_audio_files_under_media
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
+
+# Per-request cap for playlist bulk-add (client may send smaller chunks).
+PLAYLIST_BULK_ADD_MAX = 150
 
 
 @api_view(["GET"])
@@ -152,7 +184,57 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response({"user": AuthUserSerializer(request.user).data})
+        body = {"user": AuthUserSerializer(request.user).data}
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
+        body["notification_settings"] = UserNotificationSettingsSerializer(prefs).data
+        pub = (getattr(django_settings, "WEBPUSH_VAPID_PUBLIC_KEY", None) or "").strip()
+        if pub:
+            body["webpush"] = {"vapid_public_key": pub}
+        return Response(body)
+
+
+class UserNotificationSettingsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
+        return Response(UserNotificationSettingsSerializer(prefs).data)
+
+    def patch(self, request):
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
+        ser = UserNotificationSettingsSerializer(prefs, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)
+
+
+class WebPushSubscriptionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ep = request.data.get("endpoint")
+        keys = request.data.get("keys") if isinstance(request.data.get("keys"), dict) else {}
+        p256dh = keys.get("p256dh") if isinstance(keys, dict) else None
+        auth = keys.get("auth") if isinstance(keys, dict) else None
+        if not ep or not p256dh or not auth:
+            return Response({"detail": "invalid_subscription"}, status=status.HTTP_400_BAD_REQUEST)
+        WebPushSubscription.objects.update_or_create(
+            endpoint=str(ep),
+            defaults={
+                "user_id": request.user.id,
+                "p256dh": str(p256dh)[:255],
+                "auth": str(auth)[:255],
+            },
+        )
+        return Response({"detail": "ok"})
+
+    def delete(self, request):
+        ep = request.data.get("endpoint") if isinstance(request.data, dict) else None
+        qs = WebPushSubscription.objects.filter(user_id=request.user.id)
+        if ep:
+            qs = qs.filter(endpoint=str(ep))
+        deleted, _ = qs.delete()
+        return Response({"deleted": deleted})
 
 
 class UsersListView(APIView):
@@ -193,7 +275,7 @@ class ChannelViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.owner_id != self.request.user.id:
-            raise PermissionDenied("only_owner_can_delete_channel")
+            raise PermissionDenied("only_channel_owner_can_delete_channel")
         playback_state_store.clear_channel(instance.id)
         instance.delete()
 
@@ -204,7 +286,45 @@ class TrackViewSet(viewsets.ModelViewSet):
     queryset = Track.objects.select_related("owner").all()
 
     def get_queryset(self):
-        return tracks_accessible_to_user(self.request.user)
+        qs = tracks_accessible_to_user(self.request.user).order_by("title", "id")
+        search = (self.request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(artist__icontains=search))
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        offset_raw = request.query_params.get("offset")
+        if offset_raw is not None and offset_raw != "":
+            try:
+                offset = max(0, int(offset_raw))
+            except (TypeError, ValueError):
+                offset = 0
+            raw_limit = request.query_params.get("limit", "50")
+            try:
+                lim = int(raw_limit)
+            except (TypeError, ValueError):
+                lim = 50
+            lim = max(1, min(lim, 200))
+            total = qs.count()
+            page_qs = qs[offset : offset + lim]
+            serializer = self.get_serializer(page_qs, many=True)
+            return Response({"results": serializer.data, "total": total, "offset": offset, "limit": lim})
+
+        raw_limit = request.query_params.get("limit")
+        search = (self.request.query_params.get("search") or "").strip()
+        if raw_limit not in (None, ""):
+            try:
+                lim = int(raw_limit)
+            except (TypeError, ValueError):
+                lim = None
+            if lim is not None:
+                lim = max(1, min(lim, 500))
+                qs = qs[:lim]
+        elif search:
+            qs = qs[:100]
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -247,6 +367,54 @@ class PlaylistViewSet(viewsets.ModelViewSet):
         if not _can_edit_channel_playlist(self.request.user, instance):
             raise PermissionDenied("permission_denied")
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="add-tracks")
+    def add_tracks(self, request, pk=None):
+        playlist = self.get_object()
+        if not _can_edit_channel_playlist(request.user, playlist):
+            raise PermissionDenied("permission_denied")
+
+        raw_ids = request.data.get("track_ids")
+        if not isinstance(raw_ids, list) or len(raw_ids) == 0:
+            return Response({"detail": "track_ids_required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(raw_ids) > PLAYLIST_BULK_ADD_MAX:
+            return Response(
+                {"detail": "too_many_tracks", "max": PLAYLIST_BULK_ADD_MAX},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        parsed: list[int] = []
+        for x in raw_ids:
+            try:
+                parsed.append(int(x))
+            except (TypeError, ValueError):
+                return Response({"detail": "invalid_track_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        seen: set[int] = set()
+        ordered_unique: list[int] = []
+        for tid in parsed:
+            if tid in seen:
+                continue
+            seen.add(tid)
+            ordered_unique.append(tid)
+
+        allowed = set(tracks_accessible_to_user(request.user).filter(id__in=ordered_unique).values_list("id", flat=True))
+        to_add = [tid for tid in ordered_unique if tid in allowed]
+
+        with transaction.atomic():
+            base = playlist.items.aggregate(m=Max("position"))["m"]
+            start = 0 if base is None else int(base) + 1
+            rows = [PlaylistItem(playlist=playlist, track_id=tid, position=start + i) for i, tid in enumerate(to_add)]
+            if rows:
+                PlaylistItem.objects.bulk_create(rows)
+
+        return Response(
+            {
+                "added": len(to_add),
+                "requested": len(parsed),
+                "skipped_not_allowed": len(ordered_unique) - len(to_add),
+            }
+        )
 
 
 class PlaylistItemViewSet(viewsets.ModelViewSet):
@@ -481,6 +649,64 @@ class ChannelPlayPlaylistView(APIView):
             "title": playback_session.track.title,
             "artist": playback_session.track.artist,
             "file": playback_session.track.file.url if playback_session.track.file else None,
+        }
+        queue_serialized = QueueItemSerializer(ChannelQueueItem.objects.filter(channel=channel).order_by("position"), many=True).data
+        playback_state_store.save_playback_snapshot(channel.id, payload)
+        playback_state_store.save_queue_snapshot(channel.id, list(queue_serialized))
+
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(f"channel_{channel.id}", {"type": "broadcast_event", "payload": payload})
+
+        return Response(
+            {
+                "playback": PlaybackSessionSerializer(playback_session).data,
+                "queue": queue_serialized,
+            }
+        )
+
+
+class ChannelPlayTrackView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_id: int, track_id: int):
+        if not can_control_channel(request.user, channel_id):
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
+
+        track = get_object_or_404(tracks_accessible_to_user(request.user), id=track_id)
+        if not track.file:
+            return Response({"detail": "track_no_file"}, status=status.HTTP_400_BAD_REQUEST)
+
+        replace_queue_with_tracks(channel=channel, tracks=[track], user_id=request.user.id)
+        playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+        apply_track_to_session(playback_session, track)
+        playback_session.save(
+            update_fields=[
+                "track",
+                "is_playing",
+                "started_at_server_time",
+                "paused_at_position",
+                "queue_version",
+                "updated_at",
+            ]
+        )
+
+        payload = ChannelControlView._build_control_payload(
+            channel_id=channel.id,
+            action="play",
+            playback_session=playback_session,
+            position=0.0,
+        )
+        payload["track_file"] = playback_session.track.file.url if playback_session.track and playback_session.track.file else None
+        payload["track"] = {
+            "id": track.id,
+            "title": track.title,
+            "artist": track.artist,
+            "file": track.file.url if track.file else None,
         }
         queue_serialized = QueueItemSerializer(ChannelQueueItem.objects.filter(channel=channel).order_by("position"), many=True).data
         playback_state_store.save_playback_snapshot(channel.id, payload)
@@ -1039,8 +1265,77 @@ class ChannelPublicLinkRotateView(APIView):
         return Response({"public_url": f"/join/public/{channel.public_slug}"})
 
 
+class ChannelSimilarTracksView(APIView):
+    """Tracks in this channel's playlists that share the same artist string as `from_track`."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active and channel.owner_id != request.user.id:
+            return _channel_closed_response()
+        if not ChannelMembership.objects.filter(channel=channel, user=request.user, is_active=True).exists():
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        from_track_id = request.query_params.get("from_track")
+        if not from_track_id:
+            return Response({"results": []})
+        try:
+            tid = int(from_track_id)
+        except (TypeError, ValueError):
+            return Response({"results": []})
+        ref = Track.objects.filter(id=tid).first()
+        if ref is None:
+            return Response({"results": []})
+        artist = (ref.artist or "").strip()
+        if not artist:
+            return Response({"results": []})
+        qs = (
+            Track.objects.filter(playlist_items__playlist__channel_id=channel.id)
+            .exclude(id=ref.id)
+            .filter(artist__iexact=artist)
+            .distinct()
+            .order_by("title")[:24]
+        )
+        return Response({"results": TrackSerializer(qs, many=True, context={"request": request}).data})
+
+
+class ChannelChatView(APIView):
+    """Channel-scoped chat: only active members of this channel can read or post."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, channel_id: int):
+        if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active and channel.owner_id != request.user.id:
+            return _channel_closed_response()
+        try:
+            limit = int(request.query_params.get("limit", 50))
+        except (TypeError, ValueError):
+            limit = 50
+        limit = min(100, max(1, limit))
+        qs = (
+            ChannelChatMessage.objects.filter(channel_id=channel_id)
+            .select_related("user")
+            .prefetch_related("reactions__user")
+            .order_by("-id")
+        )
+        before = request.query_params.get("before")
+        if before:
+            try:
+                bid = int(before)
+                qs = qs.filter(id__lt=bid)
+            except (TypeError, ValueError):
+                pass
+        rows = list(qs[:limit])
+        rows.reverse()
+        return Response({"results": ChannelChatMessageSerializer(rows, many=True, context={"request": request}).data})
+
+
 class ChannelSettingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def patch(self, request, channel_id: int):
         if not _can_manage_channel(request.user, channel_id):
@@ -1075,6 +1370,23 @@ class ChannelSettingsView(APIView):
             channel.public_join_slug = None
             if "public_join_slug" not in update_fields:
                 update_fields.append("public_join_slug")
+        if "experience" in request.data:
+            raw = request.data.get("experience")
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except json.JSONDecodeError:
+                    return Response({"detail": "invalid_experience"}, status=status.HTTP_400_BAD_REQUEST)
+            if isinstance(raw, dict):
+                ex = dict(channel.experience or {})
+                for k, v in raw.items():
+                    if k in _ALLOWED_EXPERIENCE_KEYS:
+                        ex[k] = v
+                channel.experience = ex
+                update_fields.append("experience")
+        if "brand_logo" in getattr(request, "FILES", {}):
+            channel.brand_logo = request.FILES["brand_logo"]
+            update_fields.append("brand_logo")
         if not update_fields:
             return Response(ChannelSerializer(channel, context={"request": request}).data)
         update_fields.append("updated_at")
