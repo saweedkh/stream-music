@@ -38,7 +38,13 @@ from apps.common.serializers import (
 )
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import apply_track_to_session, pick_shuffled_tracks, replace_queue_with_tracks
+from apps.playback.services.channel_queue import (
+    MAX_SHUFFLE_TRACKS,
+    apply_track_to_session,
+    pick_shuffled_tracks,
+    replace_queue_with_tracks,
+    tracks_accessible_to_user,
+)
 from apps.playback.services.state_store import playback_state_store
 from apps.tracks.filesystem_import import import_audio_files_under_media
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
@@ -150,16 +156,7 @@ class TrackViewSet(viewsets.ModelViewSet):
     queryset = Track.objects.select_related("owner").all()
 
     def get_queryset(self):
-        user = self.request.user
-        return (
-            self.queryset.filter(
-                Q(owner=user)
-                | Q(visibility=Track.Visibility.PUBLIC_LAN)
-                | Q(visibility=Track.Visibility.SHARED_WITH_USERS, share_permissions__user=user)
-                | Q(visibility=Track.Visibility.SHARED_WITH_CHANNELS, share_permissions__channel__memberships__user=user)
-            )
-            .distinct()
-        )
+        return tracks_accessible_to_user(self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -463,11 +460,18 @@ class ChannelShufflePlayView(APIView):
         channel = get_object_or_404(Channel, id=channel_id)
         if not channel.is_active:
             return _channel_closed_response()
-        try:
-            limit = int(request.data.get("limit") or 50)
-        except (TypeError, ValueError):
-            limit = 50
-        limit = max(1, min(limit, 200))
+        raw = request.data.get("limit")
+        if raw in (None, ""):
+            limit = None
+        else:
+            try:
+                limit = int(raw)
+            except (TypeError, ValueError):
+                limit = None
+            if limit is not None and limit <= 0:
+                limit = None
+            elif limit is not None:
+                limit = min(limit, MAX_SHUFFLE_TRACKS)
         tracks = pick_shuffled_tracks(request.user, channel, limit)
         if not tracks:
             return Response({"detail": "no_tracks"}, status=status.HTTP_400_BAD_REQUEST)

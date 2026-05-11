@@ -16,28 +16,44 @@ from apps.tracks.models import Track
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
+# Hard cap so one shuffle cannot create an unbounded queue / SQL IN clause.
+MAX_SHUFFLE_TRACKS = 15_000
 
-def tracks_available_for_controller(user: AbstractUser, channel: Channel):
-    """Tracks the DJ can load into the channel queue (matches library visibility rules)."""
+
+def tracks_accessible_to_user(user: AbstractUser):
+    """Same visibility rules as TrackViewSet: own tracks (any visibility), public LAN, user/channel shares."""
     return (
         Track.objects.filter(
             Q(owner=user)
             | Q(visibility=Track.Visibility.PUBLIC_LAN)
-            | Q(visibility=Track.Visibility.SHARED_WITH_CHANNELS, share_permissions__channel=channel)
             | Q(visibility=Track.Visibility.SHARED_WITH_USERS, share_permissions__user=user)
+            | Q(
+                visibility=Track.Visibility.SHARED_WITH_CHANNELS,
+                share_permissions__channel__memberships__user=user,
+            )
         )
         .distinct()
         .select_related("owner")
     )
 
 
-def pick_shuffled_tracks(user: AbstractUser, channel: Channel, limit: int = 50) -> list[Track]:
-    qs = tracks_available_for_controller(user, channel)
+def tracks_available_for_controller(user: AbstractUser, _channel: Channel):
+    """Tracks the DJ can load into the channel queue (library-wide access, not only shares to this channel)."""
+    return tracks_accessible_to_user(user)
+
+
+def pick_shuffled_tracks(user: AbstractUser, _channel: Channel, limit: int | None = None) -> list[Track]:
+    """Random order. ``limit`` None or <= 0 = use all accessible tracks (up to MAX_SHUFFLE_TRACKS)."""
+    qs = tracks_accessible_to_user(user)
     ids = list(qs.values_list("id", flat=True))
     if not ids:
         return []
     random.shuffle(ids)
-    chosen = ids[: max(1, min(limit, len(ids)))]
+    if limit is None or limit <= 0:
+        cap = min(len(ids), MAX_SHUFFLE_TRACKS)
+    else:
+        cap = min(int(limit), len(ids), MAX_SHUFFLE_TRACKS)
+    chosen = ids[: max(1, cap)]
     track_map = {t.id: t for t in Track.objects.filter(id__in=chosen)}
     return [track_map[i] for i in chosen if i in track_map]
 

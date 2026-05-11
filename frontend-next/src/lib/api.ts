@@ -631,11 +631,15 @@ export async function playPlaylistInChannel(channelId: string, playlistId: numbe
 }
 
 export async function shufflePlayInChannel(channelId: string, payload?: { limit?: number }) {
+  const body =
+    payload?.limit != null && Number.isFinite(payload.limit) && payload.limit > 0
+      ? { limit: payload.limit }
+      : {};
   const res = await fetch(
     `${getApiBase()}/api/channels/${channelId}/playlists/shuffle`,
     await withAuthHeaders({
       method: "POST",
-      body: JSON.stringify({ limit: payload?.limit ?? 50 }),
+      body: JSON.stringify(body),
     }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot start shuffle playback"));

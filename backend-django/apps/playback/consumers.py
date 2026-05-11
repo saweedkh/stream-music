@@ -9,7 +9,12 @@ from django.contrib.auth.models import User
 from apps.channels.models import Channel, ChannelMembership
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import apply_track_to_session, pick_shuffled_tracks, replace_queue_with_tracks
+from apps.playback.services.channel_queue import (
+    MAX_SHUFFLE_TRACKS,
+    apply_track_to_session,
+    pick_shuffled_tracks,
+    replace_queue_with_tracks,
+)
 from apps.playback.services.state_store import playback_state_store
 from apps.playlists.models import ChannelQueueItem, Playlist
 from apps.tracks.models import Track
@@ -352,11 +357,17 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             if user is None:
                 return {"type": "ERROR", "message": "permission_denied"}
             limit = data.get("limit")
-            try:
-                limit_n = int(limit) if limit is not None else 50
-            except (TypeError, ValueError):
-                limit_n = 50
-            limit_n = max(1, min(limit_n, 200))
+            if limit in (None, ""):
+                limit_n = None
+            else:
+                try:
+                    limit_n = int(limit)
+                except (TypeError, ValueError):
+                    limit_n = None
+                if limit_n is not None and limit_n <= 0:
+                    limit_n = None
+                elif limit_n is not None:
+                    limit_n = min(limit_n, MAX_SHUFFLE_TRACKS)
             tracks = pick_shuffled_tracks(user, channel, limit_n)
             if not tracks:
                 return {"type": "ERROR", "message": "no_tracks"}

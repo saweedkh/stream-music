@@ -204,9 +204,9 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
   async function handleShuffleApi() {
     setShuffling(true);
     try {
-      await shufflePlayInChannel(channelId, { limit: 60 });
+      await shufflePlayInChannel(channelId);
       setStatus("Shuffle queue loaded. Playback starts from the dock.");
-      showToast("Shuffle: random tracks from your library are now in the queue.", "success");
+      showToast("Shuffle: all tracks you can access (your library, LAN, and shares) are queued in random order.", "success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Shuffle failed.";
       setStatus(message);
@@ -217,7 +217,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
   }
 
   function handleShuffleSocket() {
-    const sent = sendSocketMessage?.({ action: "shuffle_play", limit: 60 });
+    const sent = sendSocketMessage?.({ action: "shuffle_play" });
     if (!sent) {
       void handleShuffleApi();
       return;
@@ -317,61 +317,6 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
             <Loader2 className="size-4 animate-spin" />
             Loading playlists…
           </p>
-        ) : null}
-
-        {canManage ? (
-          <section className="rounded-lg border border-zinc-800/80 bg-zinc-950/35 p-4">
-            <p className="mb-3 text-sm font-medium text-zinc-200">Quick upload</p>
-            <p className="mb-3 text-xs text-zinc-500">Uploads stream over the network with progress (multipart).</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`ch-${channelId}-up-title`}>Title</Label>
-                <Input
-                  id={`ch-${channelId}-up-title`}
-                  value={uploadTitle}
-                  valid={Boolean(uploadTitle.trim())}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Track title"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`ch-${channelId}-up-vis`}>Visibility</Label>
-                <Select
-                  id={`ch-${channelId}-up-vis`}
-                  value={uploadVisibility}
-                  valid
-                  onChange={(e) => setUploadVisibility(e.target.value as TrackSummary["visibility"])}
-                >
-                  <option value="private">Private</option>
-                  <option value="shared_with_channels">Shared with channels</option>
-                  <option value="shared_with_users">Shared with users</option>
-                  <option value="public_lan">Public (LAN)</option>
-                </Select>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2">
-              <Label htmlFor={`ch-${channelId}-up-file`}>Audio file</Label>
-              <Input
-                id={`ch-${channelId}-up-file`}
-                type="file"
-                accept="audio/*"
-                className="cursor-pointer"
-                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            {uploadProgress !== null && isUploading ? (
-              <div className="mt-3 space-y-1">
-                <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${uploadProgress}%` }} />
-                </div>
-                <p className="text-xs text-zinc-500">{uploadProgress}%</p>
-              </div>
-            ) : null}
-            <Button type="button" className="mt-3 gap-1.5" disabled={isUploading} onClick={() => void handleUpload()}>
-              <Upload className="size-4" />
-              {isUploading ? "Uploading…" : "Upload track"}
-            </Button>
-          </section>
         ) : null}
 
         {canManage ? (
