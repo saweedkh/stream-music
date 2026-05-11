@@ -16,8 +16,20 @@ from apps.tracks.models import Track
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
-# Hard cap so one shuffle cannot create an unbounded queue / SQL IN clause.
-MAX_SHUFFLE_TRACKS = 15_000
+# Upper bound for one shuffle: larger pools mean huge SQL IN lists, ORM memory, and
+# thousands of queue rows in one request — keep this conservative unless you tune the DB.
+MAX_SHUFFLE_TRACKS = 3_000
+_BULK_CHUNK = 400
+
+
+def _tracks_by_id_map(ids: list[int]) -> dict[int, Track]:
+    """Fetch tracks in chunks to avoid one massive IN clause and row materialization spike."""
+    out: dict[int, Track] = {}
+    for i in range(0, len(ids), _BULK_CHUNK):
+        chunk = ids[i : i + _BULK_CHUNK]
+        for t in Track.objects.filter(id__in=chunk).select_related("owner"):
+            out[t.id] = t
+    return out
 
 
 def tracks_accessible_to_user(user: AbstractUser):
@@ -54,7 +66,7 @@ def pick_shuffled_tracks(user: AbstractUser, _channel: Channel, limit: int | Non
     else:
         cap = min(int(limit), len(ids), MAX_SHUFFLE_TRACKS)
     chosen = ids[: max(1, cap)]
-    track_map = {t.id: t for t in Track.objects.filter(id__in=chosen)}
+    track_map = _tracks_by_id_map(chosen)
     return [track_map[i] for i in chosen if i in track_map]
 
 
@@ -70,7 +82,8 @@ def replace_queue_with_tracks(
     rows = [
         ChannelQueueItem(channel=channel, track=t, position=index, added_by_id=user_id) for index, t in enumerate(tracks)
     ]
-    ChannelQueueItem.objects.bulk_create(rows)
+    for i in range(0, len(rows), _BULK_CHUNK):
+        ChannelQueueItem.objects.bulk_create(rows[i : i + _BULK_CHUNK])
     return list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
 
 
