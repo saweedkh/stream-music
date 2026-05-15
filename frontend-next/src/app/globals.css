@@ -57,15 +57,3 @@ a {
     opacity: 0;
   }
 }
-
-html.theme-oled body {
-  background: #000000;
-  color: #f4f4f5;
-}
-
-html.theme-oled {
-  --bg: #000000;
-  --bg-elevated: #050505;
-  --surface: #0a0a0a;
-  --surface-2: #000000;
-}

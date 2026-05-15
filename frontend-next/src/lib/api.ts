@@ -60,7 +60,6 @@ export type ChannelExperienceSettings = {
   blind_playlist_id?: number | null;
   intro_preview_seconds?: number;
   veto_skip_threshold?: number;
-  oled_hint?: boolean;
 };
 
 export type ChannelStateResponse = {
@@ -488,6 +487,9 @@ export type ChannelChatMessageRow = {
   user_id: number;
   username: string;
   body: string;
+  is_pinned?: boolean;
+  pinned_at?: string | null;
+  pinned_by_username?: string | null;
   created_at: string;
   edited_at?: string | null;
   deleted_at?: string | null;
@@ -505,6 +507,167 @@ export async function listChannelChatMessages(channelId: string, options?: { lim
   });
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load chat"));
   return (await res.json()) as { results: ChannelChatMessageRow[] };
+}
+
+export type ChannelPinnedMessageResponse = { message: ChannelChatMessageRow | null };
+
+export async function getPinnedChannelMessage(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/chat/pin`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load pinned message"));
+  return (await res.json()) as ChannelPinnedMessageResponse;
+}
+
+export async function setPinnedChannelMessage(channelId: string, messageId: number | null) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/chat/pin`,
+    await withAuthHeaders({ method: "PUT", body: JSON.stringify({ message_id: messageId }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update pinned message"));
+  return (await res.json()) as ChannelPinnedMessageResponse;
+}
+
+export type ChannelTrackReactionRow = {
+  id: number;
+  channel: number;
+  track: number;
+  user: number;
+  username: string;
+  emoji: string;
+  created_at: string;
+};
+
+export async function listTrackReactions(channelId: string, trackId?: number) {
+  const q = trackId ? `?track_id=${encodeURIComponent(String(trackId))}` : "";
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/track-reactions${q}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load track reactions"));
+  return (await res.json()) as { results: ChannelTrackReactionRow[] };
+}
+
+export async function addTrackReaction(channelId: string, payload: { track_id: number; emoji: string }) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/track-reactions`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot add track reaction"));
+  return (await res.json()) as ChannelTrackReactionRow;
+}
+
+export type PlaybackHistoryRow = {
+  id: number;
+  channel: number;
+  actor?: number | null;
+  actor_username?: string;
+  track?: number | null;
+  track_title?: string;
+  event_type: string;
+  source?: string;
+  payload?: Record<string, unknown>;
+  emitted_at: string;
+};
+
+export async function listPlaybackHistory(channelId: string, limit = 60) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/history?limit=${encodeURIComponent(String(limit))}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load playback history"));
+  return (await res.json()) as { results: PlaybackHistoryRow[] };
+}
+
+export type ChannelAuditLogRow = {
+  id: number;
+  channel: number;
+  actor?: number | null;
+  actor_username?: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+};
+
+export async function listChannelAuditLog(channelId: string, limit = 80) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/audit-log?limit=${encodeURIComponent(String(limit))}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load audit log"));
+  return (await res.json()) as { results: ChannelAuditLogRow[] };
+}
+
+export type ChannelPlaylistSuggestion = {
+  id: number;
+  channel: number;
+  track: number;
+  track_title?: string;
+  user: number;
+  username?: string;
+  status: "pending" | "approved" | "rejected";
+  note?: string;
+  created_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: number | null;
+};
+
+export async function listChannelSuggestions(channelId: string, status?: ChannelPlaylistSuggestion["status"]) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/suggestions${q}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load suggestions"));
+  return (await res.json()) as { results: ChannelPlaylistSuggestion[] };
+}
+
+export async function createChannelSuggestion(channelId: string, payload: { track_id: number; note?: string }) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/suggestions`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot create suggestion"));
+  return (await res.json()) as ChannelPlaylistSuggestion;
+}
+
+export async function reviewChannelSuggestion(channelId: string, payload: { suggestion_id: number; action: "approve" | "reject" }) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/suggestions`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot review suggestion"));
+  return (await res.json()) as ChannelPlaylistSuggestion;
+}
+
+export type ChannelNotificationPreference = {
+  muted: boolean;
+  notify_room_started: boolean;
+  notify_queue_turn: boolean;
+  notify_skip_threshold: boolean;
+  notify_moderation: boolean;
+  updated_at: string;
+};
+
+export async function getChannelNotificationSettings(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/notification-settings`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load channel notification settings"));
+  return (await res.json()) as ChannelNotificationPreference;
+}
+
+export async function updateChannelNotificationSettings(channelId: string, patch: Partial<ChannelNotificationPreference>) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/notification-settings`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(patch) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update channel notification settings"));
+  return (await res.json()) as ChannelNotificationPreference;
 }
 
 export async function getChannelMembers(channelId: string) {

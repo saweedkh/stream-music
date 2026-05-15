@@ -122,6 +122,12 @@ export function ChannelDashboardTabs(props: Props) {
     playlist_id?: number;
     queue?: QueueItemSummary[];
   } | null>(null);
+  const [rttMs, setRttMs] = useState<number | null>(null);
+  const [jitterMs, setJitterMs] = useState<number | null>(null);
+  const [reconnectCount, setReconnectCount] = useState(0);
+  const rttSamplesRef = useRef<number[]>([]);
+  const offsetSamplesRef = useRef<number[]>([]);
+  const prevSocketStateRef = useRef<string>("connecting");
   const latestSendMessageRef = useRef<((payload: Record<string, unknown>) => boolean) | undefined>(undefined);
   const startedAtText = startedAt == null ? "No active playback session yet" : `${startedAt}`;
   const pausedAtText = pausedAt == null ? (isChannelOnline ? "Not paused" : "No paused position available") : `${pausedAt}s`;
@@ -157,6 +163,20 @@ export function ChannelDashboardTabs(props: Props) {
           const now = Date.now();
           const rtt = Math.max(0, now - clientTs);
           const offsetMs = serverTime * 1000 - (clientTs + rtt / 2);
+          rttSamplesRef.current = [...rttSamplesRef.current.slice(-11), rtt];
+          offsetSamplesRef.current = [...offsetSamplesRef.current.slice(-11), offsetMs];
+          const avgRtt = rttSamplesRef.current.reduce((acc, n) => acc + n, 0) / Math.max(1, rttSamplesRef.current.length);
+          const jitter =
+            offsetSamplesRef.current.length > 1
+              ? Math.round(
+                  offsetSamplesRef.current
+                    .slice(1)
+                    .reduce((acc, val, idx) => acc + Math.abs(val - (offsetSamplesRef.current[idx] ?? val)), 0) /
+                    Math.max(1, offsetSamplesRef.current.length - 1),
+                )
+              : 0;
+          setRttMs(Math.round(avgRtt));
+          setJitterMs(jitter);
           window.dispatchEvent(
             new CustomEvent("channel-clock-sync", { detail: { channelId: String(channelId), offsetMs } }),
           );
@@ -217,6 +237,13 @@ export function ChannelDashboardTabs(props: Props) {
   useEffect(() => {
     latestSendMessageRef.current = sendMessage;
   }, [sendMessage]);
+
+  useEffect(() => {
+    if (prevSocketStateRef.current !== "reconnecting" && socketState === "reconnecting") {
+      setReconnectCount((c) => c + 1);
+    }
+    prevSocketStateRef.current = socketState;
+  }, [socketState]);
 
   useEffect(() => {
     setIsChannelOnline(isPlaying);
@@ -697,6 +724,24 @@ export function ChannelDashboardTabs(props: Props) {
                 <p>
                   <span className="font-medium text-zinc-500">Paused position</span>
                   <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{pausedAtText}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">RTT (rolling avg)</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{rttMs != null ? `${rttMs}ms` : "—"}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">Jitter (offset delta)</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{jitterMs != null ? `${jitterMs}ms` : "—"}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">Reconnect count</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{reconnectCount}</span>
                 </p>
               </div>
             </CardContent>

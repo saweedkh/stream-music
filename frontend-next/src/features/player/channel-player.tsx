@@ -20,6 +20,7 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
 import { expectedTimeSeconds } from "./sync-client";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 
@@ -64,6 +65,13 @@ function formatTime(value: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function getHowlHtml5Audio(howl: Howl | null): HTMLAudioElement | null {
+  if (!howl) return null;
+  const sounds = (howl as unknown as { _sounds?: Array<{ _node?: unknown }> })._sounds;
+  const node = sounds?.[0]?._node;
+  return node instanceof HTMLAudioElement ? node : null;
+}
+
 const ACCENT_PALETTE: Record<string, { ring: string; text: string }> = {
   emerald: {
     ring: "from-emerald-400/95 via-teal-500 to-cyan-500 shadow-[0_20px_50px_-25px_rgba(16,185,129,0.75)]",
@@ -86,57 +94,6 @@ const ACCENT_PALETTE: Record<string, { ring: string; text: string }> = {
     text: "text-sky-100",
   },
 };
-
-function DeckVisualizer({ active, accent }: { active: boolean; accent: string }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  const key = (accent || "emerald").toLowerCase();
-  const stroke =
-    key === "violet"
-      ? "#a78bfa"
-      : key === "rose"
-        ? "#fb7185"
-        : key === "amber"
-          ? "#fbbf24"
-          : key === "sky"
-            ? "#38bdf8"
-            : "#34d399";
-
-  useEffect(() => {
-    let id = 0;
-    const draw = () => {
-      const canvas = ref.current;
-      if (!canvas) {
-        id = window.requestAnimationFrame(draw);
-        return;
-      }
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        id = window.requestAnimationFrame(draw);
-        return;
-      }
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-      if (active) {
-        const bars = 14;
-        for (let i = 0; i < bars; i += 1) {
-          const t = Date.now() / 320 + i * 0.55;
-          const amp = 0.22 + 0.78 * (0.5 + 0.5 * Math.sin(t));
-          const bh = amp * (h - 4);
-          ctx.fillStyle = stroke;
-          ctx.globalAlpha = 0.35 + amp * 0.55;
-          ctx.fillRect((i / bars) * w + 1.5, h - bh - 2, w / bars - 3, bh);
-        }
-        ctx.globalAlpha = 1;
-      }
-      id = window.requestAnimationFrame(draw);
-    };
-    id = window.requestAnimationFrame(draw);
-    return () => window.cancelAnimationFrame(id);
-  }, [active, stroke]);
-
-  return <canvas ref={ref} width={128} height={32} className="h-8 w-32 shrink-0 opacity-90" aria-hidden />;
-}
 
 function ArtworkRing({
   letter,
@@ -217,6 +174,7 @@ export function ChannelPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.75);
   const [queueVersion, setQueueVersion] = useState(0);
+  const [vizAudioEl, setVizAudioEl] = useState<HTMLAudioElement | null>(null);
 
   const trackLabel = activeTrackPath ? decodeURIComponent(activeTrackPath.split("/").pop() ?? "Unknown track") : "No active track";
   const title = useMemo(() => trackLabel.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim(), [trackLabel]);
@@ -225,6 +183,7 @@ export function ChannelPlayer({
   const seekValue = Math.min(position, seekMax);
   const accentKey = (experience?.accent || "emerald").toLowerCase();
   const introCapSec = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
+  const syncDeltaMs = Math.round(offsetMs);
 
   function stopCue() {
     try {
@@ -445,6 +404,7 @@ export function ChannelPlayer({
       stopCue();
       howlRef.current?.unload();
       howlRef.current = null;
+      setVizAudioEl(null);
       setPosition(0);
       setDuration(0);
       return;
@@ -454,7 +414,13 @@ export function ChannelPlayer({
       src: [src],
       html5: true,
       volume,
-      onload: () => setDuration(howl.duration() || 0),
+      onload: () => {
+        setDuration(howl.duration() || 0);
+        setVizAudioEl(getHowlHtml5Audio(howl));
+      },
+      onplay: () => {
+        setVizAudioEl(getHowlHtml5Audio(howl));
+      },
       onplayerror: () => setNeedsUserInteraction(true),
       onloaderror: () => showToast("Cannot load audio source", "error"),
       onend: () => {
@@ -474,6 +440,7 @@ export function ChannelPlayer({
     howlRef.current = howl;
 
     return () => {
+      setVizAudioEl(null);
       howl.unload();
       if (howlRef.current === howl) {
         howlRef.current = null;
@@ -715,6 +682,11 @@ export function ChannelPlayer({
               "max-h-[min(calc(92dvh-2.75rem),880px)]",
             )}
           >
+            <span className="sr-only" aria-live="polite">
+              {isPlaying ? "Playback is active" : "Playback is paused"}.
+              {socketState === "connected" ? " Socket connected." : ` Socket ${socketState}.`}
+              {` Sync delta ${syncDeltaMs} milliseconds.`}
+            </span>
             <DrawerHeader className="space-y-1 border-b border-zinc-800/70 px-0.5 pb-3 pt-0">
               <div className="flex items-center justify-center gap-2 sm:justify-start">
                 <Radio className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden />
@@ -728,8 +700,16 @@ export function ChannelPlayer({
                 <span className="text-slate-500"> · socket </span>
                 <span className={socketState === "connected" ? "text-emerald-400/90" : "text-amber-400/85"}>{socketState}</span>
               </DrawerDescription>
-              <div className="mt-2 flex items-center justify-center gap-3 sm:justify-start">
-                <DeckVisualizer active={Boolean(activeTrackPath && isPlaying)} accent={accentKey} />
+              <div className="mt-3 w-full">
+                <div className="mx-auto h-16 w-full max-w-xl overflow-hidden rounded-xl border border-zinc-800/55 bg-black/45 shadow-inner shadow-black/40 sm:h-[72px]">
+                  <AudioWaveVisualizer
+                    media={vizAudioEl}
+                    isActive={Boolean(activeTrackPath && isPlaying)}
+                    accent={accentKey}
+                    className="h-full w-full"
+                    variant="full"
+                  />
+                </div>
               </div>
             </DrawerHeader>
 
@@ -809,8 +789,9 @@ export function ChannelPlayer({
                         "text-[10px] sm:text-xs",
                         Math.abs(offsetMs) > 240 && "border-amber-500/40 bg-amber-950/50 text-amber-100",
                       )}
+                      title="Difference between local estimated clock and server clock"
                     >
-                      Δ {Math.round(offsetMs)}ms
+                      Δ {syncDeltaMs}ms
                     </Badge>
                     {introCapSec > 0 && !canControl ? (
                       <Badge variant="secondary" className="max-w-[220px] truncate text-[10px] sm:text-xs">
@@ -877,6 +858,15 @@ export function ChannelPlayer({
             </button>
           </div>
           {miniSeekRow}
+          <div className="mt-1.5 h-7 w-full overflow-hidden rounded-lg border border-zinc-800/45 bg-black/35">
+            <AudioWaveVisualizer
+              media={vizAudioEl}
+              isActive={Boolean(activeTrackPath && isPlaying)}
+              accent={accentKey}
+              variant="compact"
+              className="h-full w-full"
+            />
+          </div>
         </div>
 
         {/* sm and up: single compact row */}
@@ -895,8 +885,16 @@ export function ChannelPlayer({
           >
             {title || "No track"}
           </p>
-          <div className="hidden shrink-0 md:flex md:items-center">
-            <DeckVisualizer active={Boolean(activeTrackPath && isPlaying)} accent={accentKey} />
+          <div className="hidden h-9 min-w-[100px] max-w-[200px] shrink-0 md:flex md:items-stretch lg:max-w-[240px]">
+            <div className="h-full w-full overflow-hidden rounded-lg border border-zinc-800/45 bg-black/35">
+              <AudioWaveVisualizer
+                media={vizAudioEl}
+                isActive={Boolean(activeTrackPath && isPlaying)}
+                accent={accentKey}
+                variant="compact"
+                className="h-full w-full"
+              />
+            </div>
           </div>
           <div className="min-w-0 flex-1">{miniSeekRow}</div>
           <div className="flex shrink-0 items-center border-l border-zinc-800/80 pl-2 md:pl-2.5">{playbackControls(true)}</div>

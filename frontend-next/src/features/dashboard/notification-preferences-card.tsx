@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BellOff, Loader2 } from "lucide-react";
+import { Bell, BellOff, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,46 +14,73 @@ import {
   patchNotificationSettings,
   type UserNotificationSettings,
 } from "@/lib/api";
-import { registerWebPushOnDevice, resolveVapidPublicKey } from "@/lib/webpush-client";
+import {
+  getDevCertInstallUrl,
+  getDevHttpsSiteUrl,
+  hasActivePushSubscription,
+  isPushEnvironmentSupported,
+  needsDevCertTrustOnThisDevice,
+  pushEnvironmentIssue,
+  registerWebPushOnDevice,
+  resolveVapidPublicKey,
+} from "@/lib/webpush-client";
+
+const DEFAULT_SETTINGS: UserNotificationSettings = {
+  chat_notify: "all",
+  admin_notify_reactions: true,
+  admin_notify_votes: true,
+  updated_at: "",
+};
 
 export function NotificationPreferencesCard() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
-  const [settings, setSettings] = useState<UserNotificationSettings | null>(null);
+  const [settings, setSettings] = useState<UserNotificationSettings>(DEFAULT_SETTINGS);
   const [vapidPublic, setVapidPublic] = useState<string | null>(null);
-  const [pushEnv, setPushEnv] = useState<string | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [envIssue, setEnvIssue] = useState<string | null>(null);
+  const [showCertHelp, setShowCertHelp] = useState(false);
+  const certInstallUrl = typeof window !== "undefined" ? getDevCertInstallUrl() : null;
+  const httpsSiteUrl = typeof window !== "undefined" ? getDevHttpsSiteUrl() : null;
+
+  const refreshPushState = useCallback(async () => {
+    setEnvIssue(pushEnvironmentIssue());
+    const active = await hasActivePushSubscription();
+    setPushEnabled(active);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const me = await getMe();
       if (!me?.user) {
-        setSettings(null);
+        setSettings(DEFAULT_SETTINGS);
         setVapidPublic(null);
         return;
       }
-      setSettings(me.notification_settings ?? null);
-      setVapidPublic((await resolveVapidPublicKey()) || me.webpush?.vapid_public_key?.trim() || null);
-      setPushEnv(typeof window !== "undefined" ? process.env.NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY?.trim() || null : null);
+      setSettings(me.notification_settings ?? DEFAULT_SETTINGS);
+      const key = me.webpush?.vapid_public_key?.trim() || (await resolveVapidPublicKey());
+      setVapidPublic(key || null);
+      await refreshPushState();
     } catch {
       showToast("Could not load notification settings.", "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [refreshPushState, showToast]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const persistPatch = async (partial: Partial<UserNotificationSettings>) => {
-    if (!settings) return;
     setSaving(true);
     try {
       const next = await patchNotificationSettings(partial);
       setSettings(next);
+      showToast("Notification preferences saved.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed.", "error");
     } finally {
@@ -62,25 +89,40 @@ export function NotificationPreferencesCard() {
   };
 
   async function enablePush() {
-    const key = (pushEnv || vapidPublic || (await resolveVapidPublicKey()) || "").trim();
-    if (!key) {
-      showToast("VAPID public key is not configured on the server.", "error");
+    if (!vapidPublic) {
+      showToast("Server has no VAPID public key. Restart backend after setting WEBPUSH_VAPID_* in env.", "error");
       return;
     }
     setPushBusy(true);
     try {
       const result = await registerWebPushOnDevice({ requestPermission: true });
-      if (result === "ok") {
-        showToast("Browser notifications enabled for this device.", "success");
+      if (result.status === "ok") {
+        setPushEnabled(true);
+        showToast("Push enabled on this device. Send a chat message from another account to test.", "success");
         return;
       }
-      const messages: Record<string, string> = {
-        unsupported: "Push notifications are not supported in this browser.",
-        no_key: "VAPID public key is not configured on the server.",
-        denied: "Notification permission was not granted.",
-        error: "Could not enable push.",
-      };
-      showToast(messages[result] ?? "Could not enable push.", "error");
+      if (result.status === "insecure") {
+        showToast(result.reason, "error");
+        return;
+      }
+      if (result.status === "unsupported") {
+        showToast(result.reason, "error");
+        return;
+      }
+      if (result.status === "no_key") {
+        showToast("VAPID public key missing on server.", "error");
+        return;
+      }
+      if (result.status === "denied") {
+        showToast("Allow notifications in browser settings, then try again.", "error");
+        return;
+      }
+      if (result.status === "ssl_untrusted") {
+        setShowCertHelp(true);
+        showToast("Install and trust the dev CA below, then reload and try again.", "error");
+        return;
+      }
+      showToast(result.message || "Could not enable push.", "error");
     } finally {
       setPushBusy(false);
     }
@@ -94,7 +136,8 @@ export function NotificationPreferencesCard() {
       const endpoint = sub?.endpoint;
       await sub?.unsubscribe();
       await deleteWebPushSubscriptions(endpoint);
-      showToast("Push disabled for this device on the server.", "success");
+      setPushEnabled(false);
+      showToast("Push disabled for this device.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not disable push.", "error");
     } finally {
@@ -113,9 +156,7 @@ export function NotificationPreferencesCard() {
     );
   }
 
-  if (!settings) return null;
-
-  const chatKey = (pushEnv || vapidPublic || "").trim();
+  const canUsePush = isPushEnvironmentSupported() && Boolean(vapidPublic);
 
   return (
     <Card className="border-zinc-800/90 bg-zinc-950/40">
@@ -130,6 +171,54 @@ export function NotificationPreferencesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
+        {envIssue ? (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
+            {envIssue}
+          </p>
+        ) : null}
+
+        {(showCertHelp || needsDevCertTrustOnThisDevice()) && certInstallUrl ? (
+          <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-950/35 px-3 py-3 text-xs leading-relaxed text-amber-50/95">
+            <p className="font-medium text-amber-100">Trust dev HTTPS on this phone (required for push)</p>
+            <ol className="list-decimal space-y-2 ps-4 text-amber-100/90">
+              <li>
+                <a
+                  href={certInstallUrl}
+                  className="font-medium text-emerald-300 underline underline-offset-2"
+                >
+                  Download CA certificate
+                </a>{" "}
+                ({certInstallUrl})
+              </li>
+              <li>
+                <strong>iPhone:</strong> Install profile → Settings → General → About →{" "}
+                <strong>Certificate Trust Settings</strong> → enable <em>Stream Music Dev CA</em>.
+              </li>
+              <li>
+                <strong>Android:</strong> Settings → Security → Install certificate → CA certificate.
+              </li>
+              <li>
+                Force-quit the browser, reopen{" "}
+                {httpsSiteUrl ? (
+                  <a href={httpsSiteUrl} className="text-emerald-300 underline">
+                    {httpsSiteUrl}
+                  </a>
+                ) : (
+                  "this HTTPS site"
+                )}
+                , then tap <strong>Enable push</strong> again.
+              </li>
+            </ol>
+          </div>
+        ) : null}
+
+        {pushEnabled ? (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/25 px-3 py-2 text-sm text-emerald-200">
+            <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+            Push is active on this browser. Chat and moderator alerts will be delivered here when enabled below.
+          </div>
+        ) : null}
+
         <div className="space-y-2">
           <Label className="text-zinc-200">Channel chat (this browser)</Label>
           <Select
@@ -173,22 +262,37 @@ export function NotificationPreferencesCard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" className="gap-2" disabled={pushBusy || !chatKey} onClick={() => void enablePush()}>
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={pushBusy || !canUsePush || pushEnabled}
+            onClick={() => void enablePush()}
+          >
             {pushBusy ? <Loader2 className="size-4 animate-spin" /> : <Bell className="size-4" />}
             Enable push on this device
           </Button>
-          <Button type="button" variant="outline" className="gap-2 border-zinc-700" disabled={pushBusy} onClick={() => void disablePush()}>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 border-zinc-700"
+            disabled={pushBusy || !pushEnabled}
+            onClick={() => void disablePush()}
+          >
             <BellOff className="size-4" />
             Clear push for this device
           </Button>
         </div>
-        {!chatKey ? (
+
+        {!vapidPublic ? (
           <p className="text-xs text-amber-300/90">
-            Restart the backend after setting WEBPUSH_VAPID_* in env, then reload this page.
+            Backend has no VAPID keys. Set WEBPUSH_VAPID_PUBLIC_KEY / WEBPUSH_VAPID_PRIVATE_KEY and restart:{" "}
+            <code className="text-amber-200/80">docker compose restart backend</code>
           </p>
-        ) : (
-          <p className="text-xs text-zinc-600">{saving ? "Saving…" : null}</p>
-        )}
+        ) : !canUsePush && !envIssue ? (
+          <p className="text-xs text-zinc-500">Waiting for a secure browser context…</p>
+        ) : saving ? (
+          <p className="text-xs text-zinc-500">Saving preferences…</p>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -45,6 +45,9 @@ function parseMessage(raw: unknown): ChannelChatMessageRow | null {
     user_id: o.user_id,
     username: o.username,
     body: o.body,
+    is_pinned: Boolean(o.is_pinned),
+    pinned_at: typeof o.pinned_at === "string" ? o.pinned_at : o.pinned_at === null ? null : undefined,
+    pinned_by_username: typeof o.pinned_by_username === "string" ? o.pinned_by_username : o.pinned_by_username === null ? null : undefined,
     created_at: o.created_at,
     edited_at: typeof o.edited_at === "string" ? o.edited_at : o.edited_at === null ? null : undefined,
     deleted_at: typeof o.deleted_at === "string" ? o.deleted_at : o.deleted_at === null ? null : undefined,
@@ -94,6 +97,7 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
   const [editDraft, setEditDraft] = useState("");
   const [openActionsId, setOpenActionsId] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pinnedMessage, setPinnedMessage] = useState<ChannelChatMessageRow | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -159,7 +163,9 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
         const raw = data.messages;
         if (!Array.isArray(raw)) return;
         const rows = raw.map(parseMessage).filter(Boolean) as ChannelChatMessageRow[];
-        setMessages(rows.sort(sortMessages));
+        const sorted = rows.sort(sortMessages);
+        setMessages(sorted);
+        setPinnedMessage(sorted.find((m) => m.is_pinned) ?? null);
         setHydrated(true);
         return;
       }
@@ -178,11 +184,20 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
       }
       if (type === "CHAT_EVENT") {
         const msg = parseMessage(data.message);
-        if (msg) setMessages((prev) => upsertMessages(prev, msg));
+        if (msg) {
+          setMessages((prev) => upsertMessages(prev, msg));
+          if (msg.is_pinned) setPinnedMessage(msg);
+        }
+        return;
+      }
+      if (type === "CHAT_PINNED") {
+        const msg = parseMessage(data.message);
+        setPinnedMessage(msg);
         return;
       }
       if (type === "CHAT_PURGED") {
         setMessages([]);
+        setPinnedMessage(null);
         return;
       }
     },
@@ -261,6 +276,12 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
     )
       return;
     const ok = sendChat({ action: "purge_all" });
+    if (!ok) showToast("Chat offline.", "error");
+  }
+
+  function setPin(messageId: number | null) {
+    if (!connected || !canModerate) return;
+    const ok = sendChat({ action: "pin", message_id: messageId ?? null });
     if (!ok) showToast("Chat offline.", "error");
   }
 
@@ -348,6 +369,12 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
       </div>
 
       <div className={cn("flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4", variant === "listener" && "sm:p-5", isFullscreen && "min-h-0 flex-1")}>
+        {pinnedMessage ? (
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/25 px-3 py-2 text-xs text-emerald-100">
+            <p className="font-semibold uppercase tracking-wide text-emerald-300/90">Pinned message</p>
+            <p className="mt-1 line-clamp-2">{pinnedMessage.body}</p>
+          </div>
+        ) : null}
         {messages.length > 0 ? (
           <Button
             type="button"
@@ -487,6 +514,34 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
                             onClick={() => confirmDelete(m.id)}
                           >
                             <Trash2 className="size-3.5" /> Delete
+                          </Button>
+                        ) : null}
+                        {canModerate && pinnedMessage?.id !== m.id ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 gap-1 text-xs text-emerald-300 hover:text-emerald-200"
+                            onClick={() => {
+                              setPin(m.id);
+                              setOpenActionsId(null);
+                            }}
+                          >
+                            Pin
+                          </Button>
+                        ) : null}
+                        {canModerate && pinnedMessage?.id === m.id ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 gap-1 text-xs text-zinc-300"
+                            onClick={() => {
+                              setPin(null);
+                              setOpenActionsId(null);
+                            }}
+                          >
+                            Unpin
                           </Button>
                         ) : null}
                       </div>

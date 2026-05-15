@@ -4,16 +4,29 @@ import Link from "next/link";
 import { Home, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function ChannelRoomLoading() {
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 py-16">
-      <div
-        className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400"
-        aria-hidden
-      />
-      <p className="text-sm text-zinc-400">Loading your access…</p>
+    <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col gap-5 px-4 py-12 sm:px-6">
+      <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950/55 p-6 sm:p-8">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="mt-4 h-8 w-2/3" />
+        <Skeleton className="mt-3 h-4 w-full" />
+        <Skeleton className="mt-2 h-4 w-4/5" />
+        <div className="mt-5 flex gap-2">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-6 w-14 rounded-full" />
+        </div>
+      </div>
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-5">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-4 h-10 w-full" />
+        <Skeleton className="mt-2 h-4 w-1/2" />
+      </div>
+      <p className="text-center text-sm text-zinc-500">Loading your access…</p>
     </div>
   );
 }

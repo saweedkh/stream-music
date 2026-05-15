@@ -35,14 +35,23 @@ _SKIP_VOTES: dict[tuple[int, int], set[int]] = {}
 
 
 def _touch_presence(channel_id: int, user_id: int) -> None:
+    playback_state_store.touch_presence(channel_id, user_id)
     _PRESENCE[channel_id][user_id] = time.monotonic()
 
 
 def _clear_presence(channel_id: int, user_id: int) -> None:
+    playback_state_store.clear_presence(channel_id, user_id)
     _PRESENCE[channel_id].pop(user_id, None)
 
 
 def _presence_snapshot(channel_id: int) -> tuple[list[dict], int]:
+    redis_uids = playback_state_store.presence_user_ids(channel_id)
+    if redis_uids:
+        names: dict[int, str] = {}
+        for u in User.objects.filter(id__in=redis_uids).only("id", "username"):
+            names[u.id] = u.username
+        members = [{"id": uid, "username": names.get(uid, "?")} for uid in redis_uids]
+        return members, len(redis_uids)
     now = time.monotonic()
     bucket = _PRESENCE.get(channel_id, {})
     stale = [uid for uid, ts in bucket.items() if now - ts > 45]
@@ -297,6 +306,8 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             msg = str(data.get("message") or "").strip()[:40]
             if not msg:
                 return None
+            if not playback_state_store.shout_cooldown_ok(channel_id, user.id, cooldown_sec=30):
+                return {"type": "ERROR", "message": "shout_cooldown"}
             now = time.monotonic()
             last = _SHOUT_COOLDOWN[channel_id].get(user.id, 0)
             if now - last < 30:
@@ -315,6 +326,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             key = (channel_id, tid)
             s = _SKIP_VOTES.setdefault(key, set())
             s.add(user.id)
+            redis_votes = playback_state_store.add_skip_vote(channel_id, tid, user.id) if tid else -1
             ch = Channel.objects.filter(id=channel_id).first()
             threshold = 0
             if ch and isinstance(ch.experience, dict):
@@ -322,7 +334,11 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                     threshold = int(ch.experience.get("veto_skip_threshold") or 0)
                 except (TypeError, ValueError):
                     threshold = 0
-            votes = len(s)
+            votes = redis_votes if redis_votes > 0 else len(s)
+            if threshold > 0 and votes >= max(1, threshold - 1):
+                from apps.common.webpush_service import notify_channel_skip_threshold_near_push
+
+                notify_channel_skip_threshold_near_push(channel_id, votes=votes, threshold=threshold, actor_user_id=user.id)
             out: dict = {
                 "type": "SOCIAL",
                 "action": "vote_skip",
@@ -333,6 +349,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             }
             if threshold > 0 and votes >= threshold and tid:
                 _SKIP_VOTES.pop(key, None)
+                playback_state_store.clear_skip_votes(channel_id, tid)
                 nxt = ChannelPlaybackConsumer._advance_next_sync(channel_id)
                 if nxt:
                     out["_next_playback_payload"] = nxt
@@ -477,6 +494,17 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         if channel is None:
             return {"type": "ERROR", "message": "channel_not_found"}
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+        def record_event(ev: str, payload: dict | None = None):
+            from apps.playback.models import PlaybackEvent
+
+            PlaybackEvent.objects.create(
+                channel=channel,
+                actor_id=user_id,
+                track=playback_session.track,
+                event_type=ev,
+                source="ws",
+                payload=payload or {},
+            )
         position = data.get("position")
         if position is not None:
             position = float(position)
@@ -542,7 +570,22 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                     limit_n = None
                 elif limit_n is not None:
                     limit_n = min(limit_n, MAX_SHUFFLE_TRACKS)
-            tracks = pick_shuffled_tracks(user, channel, limit_n)
+            ex = channel.experience if isinstance(channel.experience, dict) else {}
+            try:
+                anti_repeat_window = max(0, int(ex.get("anti_repeat_window") or 0))
+            except (TypeError, ValueError):
+                anti_repeat_window = 0
+            try:
+                weighted_bias = max(0.0, min(2.0, float(ex.get("weighted_shuffle_bias") or 0.0)))
+            except (TypeError, ValueError):
+                weighted_bias = 0.0
+            tracks = pick_shuffled_tracks(
+                user,
+                channel,
+                limit_n,
+                anti_repeat_window=anti_repeat_window,
+                weighted_bias=weighted_bias,
+            )
             if not tracks:
                 return {"type": "ERROR", "message": "no_tracks"}
             persisted_rows = replace_queue_with_tracks(channel=channel, tracks=tracks, user_id=user_id)
@@ -566,6 +609,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             )
             playback_state_store.save_playback_snapshot(channel.id, payload)
             playback_state_store.save_queue_snapshot(channel.id, self._serialize_queue_rows(persisted_rows))
+            record_event("shuffle_play", {"limit": limit_n})
             return payload
 
         if action == "blind_draw":
@@ -611,6 +655,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             )
             playback_state_store.save_playback_snapshot(channel.id, payload)
             playback_state_store.save_queue_snapshot(channel.id, self._serialize_queue_rows(queue_snapshot_rows))
+            record_event("add_to_queue", {"blind_pick": True, "track_id": new_row.track_id})
             return payload
 
         if action in {"add_to_queue", "enqueue_next"}:
@@ -662,6 +707,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             )
             playback_state_store.save_playback_snapshot(channel.id, payload)
             playback_state_store.save_queue_snapshot(channel.id, self._serialize_queue_rows(queue_snapshot_rows))
+            record_event(action, {"track_id": new_row.track_id})
             return payload
 
         if action == "play":
@@ -702,4 +748,5 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         playback_session.save(update_fields=["is_playing", "started_at_server_time", "paused_at_position", "queue_version", "track", "updated_at"])
         payload = ChannelPlaybackConsumer._build_payload(channel=channel, action=action, playback_session=playback_session, position=position)
         playback_state_store.save_playback_snapshot(channel.id, payload)
+        record_event(action, {"position": position})
         return payload

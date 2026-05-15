@@ -18,6 +18,9 @@ def message_to_dict(msg: ChannelChatMessage) -> dict:
         "user_id": msg.user_id,
         "username": msg.user.username if msg.user_id else "?",
         "body": "" if deleted else (msg.body or ""),
+        "is_pinned": bool(getattr(msg, "is_pinned", False)),
+        "pinned_at": msg.pinned_at.isoformat() if getattr(msg, "pinned_at", None) else None,
+        "pinned_by_username": msg.pinned_by.username if getattr(msg, "pinned_by_id", None) and getattr(msg, "pinned_by", None) else None,
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
         "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
         "deleted_at": msg.deleted_at.isoformat() if msg.deleted_at else None,
@@ -29,7 +32,7 @@ def fetch_chat_history(channel_id: int, *, limit: int = 80, before_id: int | Non
     lim = max(1, min(100, limit))
     qs = (
         ChannelChatMessage.objects.filter(channel_id=channel_id)
-        .select_related("user")
+        .select_related("user", "pinned_by")
         .prefetch_related("reactions__user")
         .order_by("-id")
     )
@@ -66,7 +69,7 @@ def apply_chat_send(channel_id: int, user, body: str) -> tuple[dict | None, str 
     if ch is None or not ch.is_active:
         return None, "channel_closed"
     msg = ChannelChatMessage.objects.create(channel_id=channel_id, user=user, body=raw)
-    msg = ChannelChatMessage.objects.filter(id=msg.id).select_related("user").prefetch_related("reactions__user").first()
+    msg = ChannelChatMessage.objects.filter(id=msg.id).select_related("user", "pinned_by").prefetch_related("reactions__user").first()
     return message_to_dict(msg), None
 
 
@@ -76,7 +79,7 @@ def apply_chat_edit(channel_id: int, user, message_id: int, body: str) -> tuple[
         return None, "invalid_body"
     msg = (
         ChannelChatMessage.objects.filter(id=message_id, channel_id=channel_id)
-        .select_related("user")
+        .select_related("user", "pinned_by")
         .prefetch_related("reactions__user")
         .first()
     )
@@ -93,7 +96,7 @@ def apply_chat_edit(channel_id: int, user, message_id: int, body: str) -> tuple[
 def apply_chat_delete(channel_id: int, user, message_id: int) -> tuple[dict | None, str | None]:
     msg = (
         ChannelChatMessage.objects.filter(id=message_id, channel_id=channel_id)
-        .select_related("user")
+        .select_related("user", "pinned_by")
         .prefetch_related("reactions__user")
         .first()
     )
@@ -106,14 +109,14 @@ def apply_chat_delete(channel_id: int, user, message_id: int) -> tuple[dict | No
     msg.body = ""
     msg.save(update_fields=["deleted_at", "body"])
     ChannelChatMessageReaction.objects.filter(message_id=msg.id).delete()
-    msg = ChannelChatMessage.objects.filter(id=msg.id).select_related("user").prefetch_related("reactions__user").first()
+    msg = ChannelChatMessage.objects.filter(id=msg.id).select_related("user", "pinned_by").prefetch_related("reactions__user").first()
     return message_to_dict(msg), None
 
 
 def apply_chat_react(channel_id: int, user, message_id: int, emoji: str | None) -> tuple[dict | None, str | None]:
     msg = (
         ChannelChatMessage.objects.filter(id=message_id, channel_id=channel_id)
-        .select_related("user")
+        .select_related("user", "pinned_by")
         .prefetch_related("reactions__user")
         .first()
     )
@@ -131,7 +134,7 @@ def apply_chat_react(channel_id: int, user, message_id: int, emoji: str | None) 
             user_id=user.id,
             defaults={"emoji": em},
         )
-    msg = ChannelChatMessage.objects.filter(id=message_id).select_related("user").prefetch_related("reactions__user").first()
+    msg = ChannelChatMessage.objects.filter(id=message_id).select_related("user", "pinned_by").prefetch_related("reactions__user").first()
     return message_to_dict(msg), None
 
 

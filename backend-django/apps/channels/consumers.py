@@ -7,6 +7,7 @@ import json
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from apps.channels.models import ChannelChatMessage, ChannelMembership
 from apps.channels.chat_service import (
     apply_chat_delete,
     apply_chat_edit,
@@ -16,6 +17,7 @@ from apps.channels.chat_service import (
     can_access_chat,
     fetch_chat_history,
 )
+from apps.common.serializers import ChannelChatMessageSerializer
 from apps.common.webpush_service import notify_channel_chat_message_push
 
 
@@ -144,6 +146,50 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(
                 self.group_name,
                 {"type": "chat_fanout", "payload": {"type": "CHAT_PURGED", "channel_id": self.channel_id}},
+            )
+            return
+
+        if action == "pin":
+            try:
+                mid_raw = data.get("message_id")
+                mid = int(mid_raw) if mid_raw not in (None, "", 0) else None
+            except (TypeError, ValueError):
+                await self.send(text_data=json.dumps({"type": "CHAT_ERROR", "code": "invalid_message_id"}))
+                return
+            is_staff = await sync_to_async(
+                lambda: ChannelMembership.objects.filter(
+                    channel_id=self.channel_id,
+                    user_id=user.id,
+                    is_active=True,
+                    role__in=[ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR],
+                ).exists()
+            )()
+            if not is_staff:
+                await self.send(text_data=json.dumps({"type": "CHAT_ERROR", "code": "forbidden"}))
+                return
+
+            @sync_to_async
+            def _pin():
+                ChannelChatMessage.objects.filter(channel_id=self.channel_id, is_pinned=True).update(
+                    is_pinned=False, pinned_at=None, pinned_by=None
+                )
+                if mid is None:
+                    return None
+                m = ChannelChatMessage.objects.filter(channel_id=self.channel_id, id=mid).first()
+                if not m:
+                    return None
+                from django.utils import timezone
+
+                m.is_pinned = True
+                m.pinned_at = timezone.now()
+                m.pinned_by_id = user.id
+                m.save(update_fields=["is_pinned", "pinned_at", "pinned_by"])
+                return ChannelChatMessageSerializer(m, context={"request": None}).data
+
+            msg = await _pin()
+            await self.channel_layer.group_send(
+                self.group_name,
+                {"type": "chat_fanout", "payload": {"type": "CHAT_PINNED", "channel_id": self.channel_id, "message": msg}},
             )
             return
 

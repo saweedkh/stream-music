@@ -37,3 +37,31 @@
 ## Behaviour without certs
 
 If `dev.crt` / `dev.key` are missing, nginx still serves **HTTP on :8080**; HTTPS on **:8443** is omitted until you generate certs and restart nginx.
+
+## Phone: “SSL certificate error” when enabling push
+
+Web Push registers a **Service Worker** (`/sw.js`). Phones are **stricter** than laptops: clicking “Proceed” on the site is **not enough** — the OS must **trust** the self-signed certificate.
+
+1. On the phone (same Wi‑Fi), open **HTTP** (not HTTPS):
+   `http://<LAN-IP>:8080/dev-ssl.crt`
+   Example: `http://172.20.10.2:8080/dev-ssl.crt`
+
+2. Install the downloaded profile/certificate:
+   - **iPhone:** Settings → **Profile Downloaded** (or General → VPN & Device Management) → Install → then **Settings → General → About → Certificate Trust Settings** → enable full trust for *stream-music-dev*.
+   - **Android:** Settings → Security → Encryption & credentials → **Install a certificate** → CA certificate → pick the file.
+
+3. Close Safari/Chrome completely, reopen:
+   `https://<LAN-IP>:8443`
+   Accept any remaining browser warning once.
+
+4. Dashboard → **Enable push** again.
+
+If it still fails, regenerate the cert with your **current** LAN IP and restart nginx:
+
+```bash
+cd infra/nginx
+LAN_IP=$(ipconfig getifaddr en0) ./generate-dev-certs.sh
+docker compose restart nginx
+```
+
+**Alternative (easier long-term):** use [mkcert](https://github.com/FiloSottile/mkcert) on the Mac, copy `rootCA.pem` to the phone and install it, then generate certs with `mkcert 172.20.10.2 localhost 127.0.0.1` into `infra/nginx/ssl/` as `dev.crt` / `dev.key`.

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, ListMusic, Music, Share2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
@@ -68,6 +69,7 @@ export function DashboardWorkspace() {
   const [draggingPlaylistItemId, setDraggingPlaylistItemId] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"channels" | "tracks" | "playlists" | "sharing">(
     tabFromUrl === "channels" || tabFromUrl === "tracks" || tabFromUrl === "playlists" || tabFromUrl === "sharing" ? tabFromUrl : "channels",
   );
@@ -96,6 +98,7 @@ export function DashboardWorkspace() {
   }
 
   async function refreshAll() {
+    setIsLoading(true);
     try {
       const me = await getMe();
       setCurrentUserId(me?.user?.id ?? null);
@@ -109,6 +112,8 @@ export function DashboardWorkspace() {
     } catch {
       setStatus("Cannot load dashboard data. Please login again.");
       showToast("Cannot load dashboard data. Please login again.", "error");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -245,6 +250,26 @@ export function DashboardWorkspace() {
       setStatus("Cannot reorder playlist.");
       showToast("Cannot reorder playlist.", "error");
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-24">
+        <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5 shadow-lg shadow-black/25 backdrop-blur-xl">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="mt-3 h-9 w-56" />
+          <Skeleton className="mt-3 h-4 w-full max-w-xl" />
+          <div className="mt-5 flex gap-2">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-24" />
+          </div>
+        </section>
+        <section className="rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5">
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <Skeleton className="mt-5 h-48 w-full rounded-xl" />
+        </section>
+      </div>
+    );
   }
 
   async function handleTrackSelection(value: string) {

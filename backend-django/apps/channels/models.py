@@ -90,6 +90,23 @@ class UserNotificationSettings(models.Model):
         return f"NotificationSettings({self.user_id})"
 
 
+class ChannelNotificationPreference(models.Model):
+    """Per-user per-channel overrides for targeted push notifications."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_notification_preferences")
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="notification_preferences")
+    muted = models.BooleanField(default=False)
+    notify_room_started = models.BooleanField(default=True)
+    notify_queue_turn = models.BooleanField(default=True)
+    notify_skip_threshold = models.BooleanField(default=True)
+    notify_moderation = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "channel")
+        indexes = [models.Index(fields=["channel", "user"])]
+
+
 class WebPushSubscription(models.Model):
     """Browser push subscription (VAPID). One row per endpoint."""
 
@@ -115,6 +132,15 @@ class ChannelChatMessage(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="chat_messages")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_chat_messages")
     body = models.TextField(max_length=2000)
+    is_pinned = models.BooleanField(default=False)
+    pinned_at = models.DateTimeField(null=True, blank=True)
+    pinned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pinned_channel_chat_messages",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, blank=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -123,6 +149,7 @@ class ChannelChatMessage(models.Model):
         ordering = ["-id"]
         indexes = [
             models.Index(fields=["channel", "id"]),
+            models.Index(fields=["channel", "is_pinned"]),
         ]
 
 
@@ -138,6 +165,60 @@ class ChannelChatMessageReaction(models.Model):
         indexes = [
             models.Index(fields=["message", "id"]),
         ]
+
+
+class ChannelTrackReaction(models.Model):
+    """Realtime + durable reaction attached to the currently playing track in a channel."""
+
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="track_reactions")
+    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="channel_reactions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_track_reactions")
+    emoji = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("channel", "track", "user", "emoji")
+        indexes = [
+            models.Index(fields=["channel", "track", "created_at"]),
+        ]
+
+
+class ChannelAuditLog(models.Model):
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="audit_logs")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="channel_audit_actions")
+    action = models.CharField(max_length=64)
+    target_type = models.CharField(max_length=64, blank=True, default="")
+    target_id = models.CharField(max_length=64, blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["channel", "-created_at"])]
+
+
+class ChannelPlaylistSuggestion(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="playlist_suggestions")
+    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="channel_playlist_suggestions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="playlist_suggestions")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    note = models.CharField(max_length=280, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_playlist_suggestions",
+    )
+
+    class Meta:
+        indexes = [models.Index(fields=["channel", "status", "-created_at"])]
 
 
 class InviteToken(models.Model):

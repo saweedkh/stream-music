@@ -54,13 +54,44 @@ def tracks_available_for_controller(user: AbstractUser, _channel: Channel):
     return tracks_accessible_to_user(user)
 
 
-def pick_shuffled_tracks(user: AbstractUser, _channel: Channel, limit: int | None = None) -> list[Track]:
+def pick_shuffled_tracks(
+    user: AbstractUser,
+    channel: Channel,
+    limit: int | None = None,
+    *,
+    anti_repeat_window: int = 0,
+    weighted_bias: float = 0.0,
+) -> list[Track]:
     """Random order. ``limit`` None or <= 0 = use all accessible tracks (up to MAX_SHUFFLE_TRACKS)."""
     qs = tracks_accessible_to_user(user)
     ids = list(qs.values_list("id", flat=True))
     if not ids:
         return []
-    random.shuffle(ids)
+    if anti_repeat_window > 0:
+        from apps.playback.models import PlaybackEvent
+
+        recent_ids = list(
+            PlaybackEvent.objects.filter(channel=channel, track_id__isnull=False)
+            .exclude(track_id=0)
+            .order_by("-id")
+            .values_list("track_id", flat=True)[:anti_repeat_window]
+        )
+        recent_set = {int(i) for i in recent_ids if i}
+        filtered = [i for i in ids if i not in recent_set]
+        if filtered:
+            ids = filtered
+    if weighted_bias > 0:
+        track_map = _tracks_by_id_map(ids)
+        scored = []
+        for tid in ids:
+            t = track_map.get(tid)
+            tag_count = len(getattr(t, "tags", []) or []) if t else 0
+            weight = 1.0 + max(0.0, weighted_bias) * min(5.0, float(tag_count))
+            scored.append((random.random() * weight, tid))
+        scored.sort(reverse=True, key=lambda x: x[0])
+        ids = [tid for _, tid in scored]
+    else:
+        random.shuffle(ids)
     if limit is None or limit <= 0:
         cap = min(len(ids), MAX_SHUFFLE_TRACKS)
     else:

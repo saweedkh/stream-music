@@ -8,7 +8,7 @@ from apps.playback.consumers import ChannelPlaybackConsumer
 
 class ControlContractTests(SimpleTestCase):
     def test_control_payload_contract_shape(self):
-        session = SimpleNamespace(started_at_server_time=1710000000.0, is_playing=True, queue_version=3)
+        session = SimpleNamespace(started_at_server_time=1710000000.0, is_playing=True, queue_version=3, track=None)
         payload = ChannelControlView._build_control_payload(
             channel_id=7,
             action="play",

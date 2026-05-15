@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from urllib.parse import urlparse
 
 from django.conf import settings
 
@@ -25,6 +26,16 @@ def _vapid_config() -> tuple[str | None, str | None, str]:
 
 def _subscription_dict(row) -> dict:
     return {"endpoint": row.endpoint, "keys": {"p256dh": row.p256dh, "auth": row.auth}}
+
+
+def _vapid_claims_for_endpoint(endpoint: str, subject: str) -> dict:
+    """Push services require `aud` = origin of the subscription endpoint (FCM/Mozilla/Apple)."""
+    parsed = urlparse(endpoint or "")
+    if parsed.scheme and parsed.netloc:
+        aud = f"{parsed.scheme}://{parsed.netloc}"
+    else:
+        aud = "https://localhost"
+    return {"sub": subject, "aud": aud}
 
 
 def send_web_push_to_user(user_id: int, *, title: str, body: str, url: str, tag: str) -> None:
@@ -49,14 +60,18 @@ def send_web_push_to_user(user_id: int, *, title: str, body: str, url: str, tag:
     )
 
     qs = WebPushSubscription.objects.filter(user_id=user_id).order_by("-id")[:8]
+    if not qs:
+        logger.info("webpush: no subscriptions for user_id=%s", user_id)
+        return
     for row in qs:
         info = _subscription_dict(row)
+        claims = _vapid_claims_for_endpoint(row.endpoint, sub)
         try:
             webpush(
                 subscription_info=info,
                 data=payload,
                 vapid_private_key=priv,
-                vapid_claims={"sub": sub},
+                vapid_claims=claims,
                 timeout=10,
             )
         except WebPushException as e:
@@ -65,12 +80,13 @@ def send_web_push_to_user(user_id: int, *, title: str, body: str, url: str, tag:
             if code in (404, 410):
                 WebPushSubscription.objects.filter(pk=row.pk).delete()
             else:
-                logger.debug("webpush failed user=%s: %s", user_id, e)
+                logger.warning("webpush failed user=%s code=%s endpoint=%s: %s", user_id, code, row.endpoint[:48], e)
 
 
 def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict, actor_user_id: int) -> None:
     """Notify channel owner + moderators about reactions / skip votes (if they opted in)."""
-    from apps.channels.models import Channel, ChannelMembership, UserNotificationSettings
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
+    from apps.playback.services.state_store import playback_state_store
 
     action = (action or "").lower()
     if action not in {"reaction", "vote_skip"}:
@@ -92,6 +108,7 @@ def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict
 
     url = channel_tab_url(channel_id)
     tag = f"stream-{channel_id}-{action}"
+    present = set(playback_state_store.presence_user_ids(channel_id))
 
     if action == "reaction":
         emoji = str(payload.get("emoji") or "♪")
@@ -102,6 +119,9 @@ def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict
             if uid == actor_user_id:
                 continue
             prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=uid)
+            ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=uid)
+            if ch_pref.muted or uid in present:
+                continue
             if not prefs.admin_notify_reactions:
                 continue
             send_web_push_to_user(uid, title=title[:60], body=body[:180], url=url, tag=tag)
@@ -116,6 +136,9 @@ def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict
             if uid == actor_user_id:
                 continue
             prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=uid)
+            ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=uid)
+            if ch_pref.muted or uid in present:
+                continue
             if not prefs.admin_notify_votes:
                 continue
             send_web_push_to_user(uid, title=title[:60], body=str(body)[:180], url=url, tag=tag)
@@ -141,7 +164,8 @@ def _user_wants_chat_push(prefs, body: str, recipient_username: str) -> bool:
 
 
 def notify_channel_chat_message_push(channel_id: int, *, author_id: int, author_username: str, body: str) -> None:
-    from apps.channels.models import Channel, ChannelMembership, UserNotificationSettings
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
+    from apps.playback.services.state_store import playback_state_store
 
     channel = Channel.objects.filter(id=channel_id).first()
     if channel is None:
@@ -164,6 +188,61 @@ def notify_channel_chat_message_push(channel_id: int, *, author_id: int, author_
     for m in member_rows:
         user = m.user
         prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=user.id)
+        ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=user.id)
+        if ch_pref.muted:
+            continue
         if not _user_wants_chat_push(prefs, body, user.username):
             continue
+        if user.id in set(playback_state_store.presence_user_ids(channel_id)):
+            continue
         send_web_push_to_user(user.id, title=title[:60], body=text_body[:180], url=url, tag=tag)
+
+
+def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None = None) -> None:
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference
+    from apps.playback.services.state_store import playback_state_store
+
+    channel = Channel.objects.filter(id=channel_id).first()
+    if channel is None:
+        return
+    present = set(playback_state_store.presence_user_ids(channel_id))
+    rows = ChannelMembership.objects.filter(channel_id=channel_id, is_active=True).exclude(user_id=actor_user_id)
+    for row in rows:
+        pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=row.user_id)
+        if pref.muted or not pref.notify_room_started:
+            continue
+        if row.user_id in present:
+            continue
+        send_web_push_to_user(
+            row.user_id,
+            title=f"[#{channel_id}] {channel.name}"[:60],
+            body="Room is now live.",
+            url=channel_tab_url(channel_id),
+            tag=f"stream-room-started-{channel_id}",
+        )
+
+
+def notify_channel_skip_threshold_near_push(channel_id: int, votes: int, threshold: int, actor_user_id: int | None = None) -> None:
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference
+    from apps.playback.services.state_store import playback_state_store
+
+    if threshold <= 0 or votes < max(1, threshold - 1):
+        return
+    channel = Channel.objects.filter(id=channel_id).first()
+    if channel is None:
+        return
+    present = set(playback_state_store.presence_user_ids(channel_id))
+    rows = ChannelMembership.objects.filter(channel_id=channel_id, is_active=True).exclude(user_id=actor_user_id)
+    for row in rows:
+        pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=row.user_id)
+        if pref.muted or not pref.notify_skip_threshold:
+            continue
+        if row.user_id in present:
+            continue
+        send_web_push_to_user(
+            row.user_id,
+            title=f"[#{channel_id}] {channel.name}"[:60],
+            body=f"Skip votes are near threshold ({votes}/{threshold}).",
+            url=channel_tab_url(channel_id),
+            tag=f"stream-skip-near-{channel_id}",
+        )

@@ -3,13 +3,17 @@ from django.contrib.auth.models import User
 
 from apps.channels.models import (
     Channel,
+    ChannelAuditLog,
     ChannelChatMessage,
+    ChannelNotificationPreference,
+    ChannelPlaylistSuggestion,
+    ChannelTrackReaction,
     ChannelJoinRequest,
     ChannelMembership,
     InviteToken,
     UserNotificationSettings,
 )
-from apps.playback.models import PlaybackSession
+from apps.playback.models import PlaybackEvent, PlaybackSession
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
 
@@ -17,7 +21,7 @@ from apps.tracks.models import Track, TrackSharePermission
 class TrackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Track
-        fields = ["id", "title", "artist", "album", "duration_seconds", "file", "visibility", "created_at"]
+        fields = ["id", "title", "artist", "album", "genre", "tags", "duration_seconds", "file", "visibility", "created_at"]
 
 
 class TrackSharePermissionSerializer(serializers.ModelSerializer):
@@ -92,12 +96,26 @@ class MembershipSerializer(serializers.ModelSerializer):
 class ChannelChatMessageSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
+    pinned_by_username = serializers.CharField(source="pinned_by.username", read_only=True)
     reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = ChannelChatMessage
-        fields = ["id", "channel", "user_id", "username", "body", "created_at", "edited_at", "deleted_at", "reactions"]
-        read_only_fields = ["id", "channel", "user_id", "username", "body", "created_at", "edited_at", "deleted_at", "reactions"]
+        fields = [
+            "id",
+            "channel",
+            "user_id",
+            "username",
+            "body",
+            "is_pinned",
+            "pinned_at",
+            "pinned_by_username",
+            "created_at",
+            "edited_at",
+            "deleted_at",
+            "reactions",
+        ]
+        read_only_fields = fields
 
     def get_reactions(self, obj):
         cache = getattr(obj, "_prefetched_objects_cache", {})
@@ -156,6 +174,20 @@ class UserNotificationSettingsSerializer(serializers.ModelSerializer):
         read_only_fields = ["updated_at"]
 
 
+class ChannelNotificationPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChannelNotificationPreference
+        fields = [
+            "muted",
+            "notify_room_started",
+            "notify_queue_turn",
+            "notify_skip_threshold",
+            "notify_moderation",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+
 class AuthUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -175,3 +207,64 @@ class ChannelJoinRequestSerializer(serializers.ModelSerializer):
         model = ChannelJoinRequest
         fields = ["id", "channel", "user", "username", "status", "created_at", "resolved_at", "resolved_by"]
         read_only_fields = ["channel", "user", "status", "created_at", "resolved_at", "resolved_by"]
+
+
+class ChannelTrackReactionSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = ChannelTrackReaction
+        fields = ["id", "channel", "track", "user", "username", "emoji", "created_at"]
+        read_only_fields = ["id", "channel", "track", "user", "username", "created_at"]
+
+
+class ChannelAuditLogSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+
+    class Meta:
+        model = ChannelAuditLog
+        fields = ["id", "channel", "actor", "actor_username", "action", "target_type", "target_id", "metadata", "created_at"]
+        read_only_fields = fields
+
+
+class PlaybackEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+    track_title = serializers.CharField(source="track.title", read_only=True)
+
+    class Meta:
+        model = PlaybackEvent
+        fields = [
+            "id",
+            "channel",
+            "actor",
+            "actor_username",
+            "track",
+            "track_title",
+            "event_type",
+            "source",
+            "payload",
+            "emitted_at",
+        ]
+        read_only_fields = fields
+
+
+class ChannelPlaylistSuggestionSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    track_title = serializers.CharField(source="track.title", read_only=True)
+
+    class Meta:
+        model = ChannelPlaylistSuggestion
+        fields = [
+            "id",
+            "channel",
+            "track",
+            "track_title",
+            "user",
+            "username",
+            "status",
+            "note",
+            "created_at",
+            "reviewed_at",
+            "reviewed_by",
+        ]
+        read_only_fields = ["id", "channel", "track_title", "username", "created_at", "reviewed_at", "reviewed_by"]

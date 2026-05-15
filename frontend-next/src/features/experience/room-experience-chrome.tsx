@@ -21,7 +21,6 @@ export type ChannelExperience = {
   blind_playlist_id?: number | null;
   intro_preview_seconds?: number;
   veto_skip_threshold?: number;
-  oled_hint?: boolean;
 };
 
 type SocialPayload = {

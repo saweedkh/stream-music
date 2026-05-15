@@ -15,6 +15,8 @@ class Track(models.Model):
     title = models.CharField(max_length=255)
     artist = models.CharField(max_length=255, blank=True, default="")
     album = models.CharField(max_length=255, blank=True, default="")
+    genre = models.CharField(max_length=120, blank=True, default="")
+    tags = models.JSONField(default=list, blank=True)
     duration_seconds = models.FloatField(default=0)
     file = models.FileField(upload_to="audio/")
     visibility = models.CharField(max_length=32, choices=Visibility.choices, default=Visibility.PRIVATE)

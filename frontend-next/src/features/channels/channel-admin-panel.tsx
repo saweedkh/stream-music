@@ -164,7 +164,6 @@ export function ChannelAdminPanel({
   const [expBlindPlaylistId, setExpBlindPlaylistId] = useState("");
   const [expIntro, setExpIntro] = useState("0");
   const [expVeto, setExpVeto] = useState("0");
-  const [expOled, setExpOled] = useState(false);
 
   const privateJoinUrl = inviteToken && typeof window !== "undefined" ? buildPrivateInviteJoinUrl(inviteToken) : null;
   const publicJoinUrl =
@@ -214,7 +213,6 @@ export function ChannelAdminPanel({
     setExpBlindPlaylistId(b != null && b !== "" ? String(b) : "");
     setExpIntro(raw.intro_preview_seconds != null ? String(raw.intro_preview_seconds) : "0");
     setExpVeto(raw.veto_skip_threshold != null ? String(raw.veto_skip_threshold) : "0");
-    setExpOled(Boolean(raw.oled_hint));
   }, [initialExperience]);
 
   useEffect(() => {
@@ -315,7 +313,6 @@ export function ChannelAdminPanel({
           blind_playlist_id: blindNum != null && Number.isFinite(blindNum) ? blindNum : null,
           intro_preview_seconds: intro,
           veto_skip_threshold: veto,
-          oled_hint: expOled,
         },
       });
       showToast("Room experience saved.", "success");
@@ -587,13 +584,6 @@ export function ChannelAdminPanel({
                     className="border-zinc-800 bg-zinc-900/80"
                   />
                   <p className="text-xs text-zinc-500">0 = tally only. When reached, the room auto-advances like “next”.</p>
-                </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-100">Suggest OLED theme</p>
-                    <p className="text-xs text-zinc-500">Shows a hint in the app shell toggle for true-black backgrounds.</p>
-                  </div>
-                  <Switch checked={expOled} onCheckedChange={setExpOled} id={`ch-exp-oled-${channelId}`} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor={`ch-brand-logo-${channelId}`}>Brand logo</Label>
