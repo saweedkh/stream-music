@@ -12,20 +12,9 @@ import {
   deleteWebPushSubscriptions,
   getMe,
   patchNotificationSettings,
-  registerWebPushSubscription,
   type UserNotificationSettings,
 } from "@/lib/api";
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+import { registerWebPushOnDevice, resolveVapidPublicKey } from "@/lib/webpush-client";
 
 export function NotificationPreferencesCard() {
   const { showToast } = useToast();
@@ -46,7 +35,7 @@ export function NotificationPreferencesCard() {
         return;
       }
       setSettings(me.notification_settings ?? null);
-      setVapidPublic(me.webpush?.vapid_public_key?.trim() || null);
+      setVapidPublic((await resolveVapidPublicKey()) || me.webpush?.vapid_public_key?.trim() || null);
       setPushEnv(typeof window !== "undefined" ? process.env.NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY?.trim() || null : null);
     } catch {
       showToast("Could not load notification settings.", "error");
@@ -73,39 +62,25 @@ export function NotificationPreferencesCard() {
   };
 
   async function enablePush() {
-    const key = (pushEnv || vapidPublic || "").trim();
+    const key = (pushEnv || vapidPublic || (await resolveVapidPublicKey()) || "").trim();
     if (!key) {
-      showToast("VAPID public key is not configured (server or NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY).", "error");
-      return;
-    }
-    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-      showToast("Push notifications are not supported in this browser.", "error");
+      showToast("VAPID public key is not configured on the server.", "error");
       return;
     }
     setPushBusy(true);
     try {
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        showToast("Notification permission was not granted.", "error");
+      const result = await registerWebPushOnDevice({ requestPermission: true });
+      if (result === "ok") {
+        showToast("Browser notifications enabled for this device.", "success");
         return;
       }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
-      });
-      const json = sub.toJSON();
-      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-        showToast("Invalid subscription from browser.", "error");
-        return;
-      }
-      await registerWebPushSubscription({
-        endpoint: json.endpoint,
-        keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-      });
-      showToast("Browser notifications enabled for this device.", "success");
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Could not enable push.", "error");
+      const messages: Record<string, string> = {
+        unsupported: "Push notifications are not supported in this browser.",
+        no_key: "VAPID public key is not configured on the server.",
+        denied: "Notification permission was not granted.",
+        error: "Could not enable push.",
+      };
+      showToast(messages[result] ?? "Could not enable push.", "error");
     } finally {
       setPushBusy(false);
     }
@@ -209,8 +184,7 @@ export function NotificationPreferencesCard() {
         </div>
         {!chatKey ? (
           <p className="text-xs text-amber-300/90">
-            Set WEBPUSH_VAPID_PUBLIC_KEY in Django and the same value in NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY for the
-            browser subscription step.
+            Restart the backend after setting WEBPUSH_VAPID_* in env, then reload this page.
           </p>
         ) : (
           <p className="text-xs text-zinc-600">{saving ? "Saving…" : null}</p>

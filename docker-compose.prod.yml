@@ -49,6 +49,8 @@ services:
     build:
       context: ./frontend-next
       dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY:-BD-yFmmlVLYRgW8U60CnOFCIHQ1YlBw2G7t-obUl4TnG5wttznz5jpmEZT9lx_aA4To7AcniJ7JSLtPZdBZyfD0}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -56,6 +58,7 @@ services:
       INTERNAL_WS_BASE_URL: ws://backend:8000
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
+      NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY:-BD-yFmmlVLYRgW8U60CnOFCIHQ1YlBw2G7t-obUl4TnG5wttznz5jpmEZT9lx_aA4To7AcniJ7JSLtPZdBZyfD0}
     depends_on:
       - backend
 

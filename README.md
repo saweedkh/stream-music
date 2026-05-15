@@ -19,13 +19,29 @@ docker compose exec backend python manage.py import_audio /path/inside/container
 
 ## Run
 
-1. Copy backend env:
+1. Copy env files (includes **Web Push VAPID** keys for dev):
    - `cp backend-django/.env.example backend-django/.env`
+   - `cp frontend-next/.env.example frontend-next/.env.local` *(optional for local `npm run dev`; Docker reads `.env.example` automatically)*
 2. Start stack:
    - `docker compose up --build`
 3. Apply migrations:
    - `docker compose exec backend python manage.py migrate`
    - if tables already exist from prior sync mode: `docker compose exec backend python manage.py migrate --fake-initial`
+4. Open **http://localhost:8080** (nginx), log in, go to **Dashboard → Notifications → Enable push on this device**.
+
+### Web Push (free, built-in)
+
+Uses **Web Push + VAPID** (no Firebase/OneSignal required). Keys are pre-filled in `backend-django/.env.example`.
+
+| Variable | Where |
+|----------|--------|
+| `WEBPUSH_VAPID_PUBLIC_KEY` / `WEBPUSH_VAPID_PRIVATE_KEY` | Django (`backend-django/.env` or `.env.example`) |
+| `NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY` | Next (`frontend-next/.env.local` or `.env.example`) |
+| `FRONTEND_BASE_URL` | Django — base URL for notification click links (`http://localhost:8080` in Docker) |
+
+Rotate keys: `bash scripts/generate-vapid-keys.sh` then restart backend + frontend.
+
+Production: set the same variables in `.env.production` (see `deploy/env.production.example`); `deploy/up.sh` sets `FRONTEND_BASE_URL` from your host/IP.
 
 ## Production (central server, Docker + TLS)
 

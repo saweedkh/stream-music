@@ -4,6 +4,9 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+ARG NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY}
+
 COPY package.json package-lock.json ./
 # Production builds default to the public npm registry (override regional mirrors).
 RUN npm config set registry https://registry.npmjs.org/ \

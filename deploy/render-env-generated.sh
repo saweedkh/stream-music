@@ -31,4 +31,9 @@ fi
   echo "CORS_EXTRA_ORIGINS=${ORIGINS}"
   # LAN regex keeps phones / mixed networks workable when using raw IPs.
   echo "TRUST_LAN_CSRF=1"
+  if [[ -n "$SITE_DOMAIN" ]]; then
+    echo "FRONTEND_BASE_URL=https://${SITE_DOMAIN}"
+  else
+    echo "FRONTEND_BASE_URL=https://${PRIMARY_IP}:8443"
+  fi
 }

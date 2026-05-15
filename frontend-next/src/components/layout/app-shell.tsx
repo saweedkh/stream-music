@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, logoutUser, type AuthUser } from "@/lib/api";
+import { registerWebPushOnDevice } from "@/lib/webpush-client";
 
 const GlobalChannelPlayerDock = dynamic(
   () => import("@/features/player/global-channel-player-dock").then((m) => ({ default: m.GlobalChannelPlayerDock })),
@@ -19,7 +20,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [oled, setOled] = useState(false);
 
   useEffect(() => {
-    getMe().then((res) => setMe(res?.user ?? null)).catch(() => setMe(null));
+    getMe()
+      .then((res) => {
+        setMe(res?.user ?? null);
+        if (res?.user && typeof window !== "undefined" && Notification.permission === "granted") {
+          void registerWebPushOnDevice({ requestPermission: false });
+        }
+      })
+      .catch(() => setMe(null));
   }, []);
 
   useEffect(() => {

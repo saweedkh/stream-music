@@ -42,6 +42,8 @@ services:
     build:
       context: ./frontend-next
       dockerfile: Dockerfile
+    env_file:
+      - ./frontend-next/.env.example
     environment:
       # Client-side API/WS use the browser origin (phone on LAN). SSR calls Django directly:
       INTERNAL_API_BASE_URL: http://backend:8000
