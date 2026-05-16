@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from django.utils import timezone
 
+import time
+
 from apps.channels.models import Channel, ChannelChatMessage, ChannelChatMessageReaction, ChannelMembership
+
+_CHAT_SEND_TS: dict[tuple[int, int], list[float]] = {}
+_CHAT_SEND_WINDOW = 12
+_CHAT_SEND_MAX = 8
 
 
 def message_to_dict(msg: ChannelChatMessage) -> dict:
@@ -61,10 +67,24 @@ def is_channel_staff(channel_id: int, user_id: int) -> bool:
     return row.role in (ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR)
 
 
+def _chat_rate_ok(channel_id: int, user_id: int) -> bool:
+    now = time.time()
+    key = (channel_id, user_id)
+    hits = [t for t in _CHAT_SEND_TS.get(key, []) if now - t < _CHAT_SEND_WINDOW]
+    if len(hits) >= _CHAT_SEND_MAX:
+        _CHAT_SEND_TS[key] = hits
+        return False
+    hits.append(now)
+    _CHAT_SEND_TS[key] = hits
+    return True
+
+
 def apply_chat_send(channel_id: int, user, body: str) -> tuple[dict | None, str | None]:
     raw = (body or "").strip()
     if not raw or len(raw) > 2000:
         return None, "invalid_body"
+    if not _chat_rate_ok(channel_id, user.id):
+        return None, "rate_limited"
     ch = Channel.objects.filter(id=channel_id).only("id", "is_active").first()
     if ch is None or not ch.is_active:
         return None, "channel_closed"

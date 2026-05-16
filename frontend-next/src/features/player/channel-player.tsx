@@ -39,6 +39,11 @@ export type ChannelPlaybackEventPayload = {
   position?: number | null;
   track_file?: string | null;
   queue_version?: number;
+  playlist_id?: number;
+  playlist_name?: string;
+  queue_index?: number;
+  queue_length?: number;
+  start_index?: number;
   /** Unix seconds — refine client clock vs server on sync messages */
   server_time?: number;
 };
@@ -158,6 +163,7 @@ export function ChannelPlayer({
   const controlRequestInFlightRef = useRef(false);
   const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
   const lastAppliedEventSeqRef = useRef(0);
+  const autoNextEventRef = useRef(0);
   const isDraggingSeekRef = useRef(false);
   const isPlayingRef = useRef(initialIsPlaying);
   const socketConnectedRef = useRef(socketState === "connected");
@@ -175,6 +181,12 @@ export function ChannelPlayer({
   const [volume, setVolume] = useState(0.75);
   const [queueVersion, setQueueVersion] = useState(0);
   const [vizAudioEl, setVizAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [queueMeta, setQueueMeta] = useState<{
+    playlistName?: string;
+    queueIndex?: number;
+    queueLength?: number;
+  }>({});
 
   const trackLabel = activeTrackPath ? decodeURIComponent(activeTrackPath.split("/").pop() ?? "Unknown track") : "No active track";
   const title = useMemo(() => trackLabel.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim(), [trackLabel]);
@@ -184,6 +196,12 @@ export function ChannelPlayer({
   const accentKey = (experience?.accent || "emerald").toLowerCase();
   const introCapSec = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
   const syncDeltaMs = Math.round(offsetMs);
+  const rehearsalLiftActive = Boolean(
+    experience?.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now(),
+  );
+  const rehearsalMuted = Boolean(experience?.rehearsal_mode && !canControl && !rehearsalLiftActive);
+  const introRemainingSec =
+    !canControl && introCapSec > 0 && position < introCapSec ? Math.max(0, Math.ceil(introCapSec - position)) : null;
 
   function stopCue() {
     try {
@@ -249,6 +267,13 @@ export function ChannelPlayer({
     if ("position" in payload && typeof payload.position === "number") setSyncPausedAt(Math.max(0, payload.position));
     if ("track_file" in payload) setActiveTrackPath(payload.track_file ?? undefined);
     if (typeof payload.queue_version === "number") setQueueVersion(payload.queue_version);
+    if (typeof payload.queue_index === "number" || typeof payload.queue_length === "number" || payload.playlist_name) {
+      setQueueMeta({
+        playlistName: typeof payload.playlist_name === "string" ? payload.playlist_name : undefined,
+        queueIndex: typeof payload.queue_index === "number" ? payload.queue_index : undefined,
+        queueLength: typeof payload.queue_length === "number" ? payload.queue_length : undefined,
+      });
+    }
     setLastSyncAt(Date.now());
   }
 
@@ -407,28 +432,43 @@ export function ChannelPlayer({
       setVizAudioEl(null);
       setPosition(0);
       setDuration(0);
+      setIsBuffering(false);
       return;
     }
 
+    setIsBuffering(true);
     const howl = new Howl({
       src: [src],
       html5: true,
       volume,
       onload: () => {
+        setIsBuffering(false);
         setDuration(howl.duration() || 0);
         setVizAudioEl(getHowlHtml5Audio(howl));
       },
       onplay: () => {
+        setIsBuffering(false);
         setVizAudioEl(getHowlHtml5Audio(howl));
       },
-      onplayerror: () => setNeedsUserInteraction(true),
-      onloaderror: () => showToast("Cannot load audio source", "error"),
+      onplayerror: () => {
+        setIsBuffering(false);
+        setNeedsUserInteraction(true);
+      },
+      onloaderror: () => {
+        setIsBuffering(false);
+        showToast("Cannot load audio source", "error");
+      },
       onend: () => {
         if (!isPlayingRef.current || !socketConnectedRef.current) return;
         const send = sendSocketMessageRef.current;
         const clientDurationSec =
           typeof howl.duration === "function" ? Number(howl.duration()) || 0 : 0;
-        const payload = { action: "auto_next" as const, client_duration_sec: clientDurationSec };
+        autoNextEventRef.current += 1;
+        const payload = {
+          action: "auto_next" as const,
+          client_duration_sec: clientDurationSec,
+          client_event_id: `${channelId}:${activeTrackPath ?? "none"}:${autoNextEventRef.current}`,
+        };
         const ok = send?.(payload);
         if (!ok) {
           pendingSocketCommandRef.current = payload;
@@ -489,7 +529,10 @@ export function ChannelPlayer({
       const posNow = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
       const introCap = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
       const introGate = !canControl && introCap > 0 && posNow >= introCap;
-      const rehearsalMute = Boolean(experience?.rehearsal_mode && !canControl);
+      const liftActive = Boolean(
+        experience?.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now(),
+      );
+      const rehearsalMute = Boolean(experience?.rehearsal_mode && !canControl && !liftActive);
       howl.volume(rehearsalMute || introGate ? 0 : volume);
 
       rafRef.current = window.requestAnimationFrame(tick);
@@ -731,6 +774,11 @@ export function ChannelPlayer({
                   <div className="w-full text-center md:w-auto md:text-left">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400/90 sm:text-[11px] sm:tracking-[0.25em]">Now playing</p>
                     <p className="mt-0.5 line-clamp-2 text-lg font-semibold text-white sm:text-xl">{title || "No active track"}</p>
+                    {queueMeta.playlistName && queueMeta.queueLength != null && queueMeta.queueIndex != null ? (
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {queueMeta.playlistName} · {queueMeta.queueIndex + 1} / {queueMeta.queueLength}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -747,8 +795,10 @@ export function ChannelPlayer({
                         <Label className="text-xs text-zinc-400">Volume</Label>
                         {volumeRow}
                       </div>
-                      {experience?.rehearsal_mode && !canControl ? (
+                      {rehearsalMuted ? (
                         <p className="text-xs text-amber-200/90">Soundcheck mode — main mix is muted for listeners.</p>
+                      ) : rehearsalLiftActive ? (
+                        <p className="text-xs text-emerald-200/90">Temporary soundcheck lift — listeners can hear the mix.</p>
                       ) : null}
                       {canControl && activeTrackPath ? (
                         <div className="flex flex-wrap gap-2">
@@ -783,6 +833,11 @@ export function ChannelPlayer({
 
                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <Badge variant={isPlaying ? "success" : "warning"}>{isPlaying ? "Playing" : "Paused"}</Badge>
+                    {isBuffering ? (
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                        Buffering…
+                      </Badge>
+                    ) : null}
                     <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
                     <Badge
                       className={cn(
@@ -793,9 +848,13 @@ export function ChannelPlayer({
                     >
                       Δ {syncDeltaMs}ms
                     </Badge>
-                    {introCapSec > 0 && !canControl ? (
+                    {introRemainingSec != null ? (
                       <Badge variant="secondary" className="max-w-[220px] truncate text-[10px] sm:text-xs">
-                        Intro {introCapSec}s — muted after
+                        Intro {introRemainingSec}s left
+                      </Badge>
+                    ) : introCapSec > 0 && !canControl ? (
+                      <Badge variant="secondary" className="max-w-[220px] truncate text-[10px] sm:text-xs">
+                        Intro ended — muted
                       </Badge>
                     ) : null}
                     <Badge className="hidden max-w-full truncate sm:inline-flex sm:max-w-none">

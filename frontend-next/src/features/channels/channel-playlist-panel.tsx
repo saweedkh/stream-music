@@ -4,8 +4,10 @@ import {
   GripVertical,
   Library,
   ListMusic,
+  ListPlus,
   Loader2,
   Play,
+  PlayCircle,
   Plus,
   Search,
   Shuffle,
@@ -42,6 +44,7 @@ import {
   type PlaylistSummary,
   type TrackSummary,
 } from "@/lib/api";
+import { uploadTrackResumable } from "@/lib/resumable-upload";
 import { cn } from "@/lib/utils";
 
 const LIBRARY_SEARCH_LIMIT = 200;
@@ -306,11 +309,11 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
     }
   }
 
-  async function startPlaylist(playlistId: number, playlistName?: string) {
-    const sent = sendSocketMessage?.({ action: "play_playlist", playlist_id: playlistId });
+  async function startPlaylist(playlistId: number, playlistName?: string, startIndex = 0) {
+    const sent = sendSocketMessage?.({ action: "play_playlist", playlist_id: playlistId, start_index: startIndex });
     if (!sent) {
       try {
-        await playPlaylistInChannel(channelId, playlistId);
+        await playPlaylistInChannel(channelId, playlistId, startIndex);
         setStatus(`Queued "${playlistName ?? "playlist"}" for playback.`);
         showToast(`Playing "${playlistName ?? "playlist"}".`, "success");
       } catch (error) {
@@ -323,12 +326,31 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
     showToast(`Playing "${playlistName ?? "playlist"}".`, "success");
   }
 
-  async function handlePlayTrackOnChannel(track: TrackSummary) {
-    setPlayingTrackId(track.id);
+  async function playPlaylistFromIndex(startIndex: number, title?: string) {
+    if (!selectedPlaylistId) {
+      showToast("Select a playlist first.", "error");
+      return;
+    }
+    setPlayingTrackId(items[startIndex]?.track ?? null);
     try {
-      await playTrackInChannel(channelId, track.id);
-      setStatus(`Now playing: ${track.title}`);
-      showToast(`Playing "${track.title}" on the channel.`, "success");
+      await startPlaylist(Number(selectedPlaylistId), selectedPlaylist?.name, startIndex);
+      const label = title?.trim() || `track ${startIndex + 1}`;
+      setStatus(`Playing from playlist: ${label}`);
+      showToast(`Playlist continues after "${label}".`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Cannot play from playlist.", "error");
+    } finally {
+      setPlayingTrackId(null);
+    }
+  }
+
+  async function handlePlayTrackOnly(trackId: number, title?: string) {
+    setPlayingTrackId(trackId);
+    try {
+      await playTrackInChannel(channelId, trackId);
+      const label = title?.trim() ? title.trim() : `Track #${trackId}`;
+      setStatus(`Now playing: ${label}`);
+      showToast(`Playing only "${label}" (no playlist queue).`, "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Cannot play track.", "error");
     } finally {
@@ -336,18 +358,31 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
     }
   }
 
-  async function handlePlayTrackOnChannelById(trackId: number, title?: string) {
-    setPlayingTrackId(trackId);
-    try {
-      await playTrackInChannel(channelId, trackId);
-      const label = title?.trim() ? title.trim() : `Track #${trackId}`;
-      setStatus(`Now playing: ${label}`);
-      showToast(`Playing "${label}" on the channel.`, "success");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Cannot play track.", "error");
-    } finally {
-      setPlayingTrackId(null);
+  function enqueueTrack(trackId: number, next = false) {
+    const action = next ? "enqueue_next" : "add_to_queue";
+    const ok = sendSocketMessage?.({ action, track_id: trackId });
+    if (ok) {
+      showToast(next ? "Queued to play next." : "Added to channel queue.", "success");
+      return;
     }
+    showToast("Connect to the channel to queue tracks.", "error");
+  }
+
+  async function handlePlayTrackOnChannel(track: TrackSummary) {
+    const idx = items.findIndex((i) => i.track === track.id);
+    if (selectedPlaylistId && idx >= 0) {
+      await playPlaylistFromIndex(idx, track.title);
+      return;
+    }
+    await handlePlayTrackOnly(track.id, track.title);
+  }
+
+  async function handlePlayTrackOnChannelById(trackId: number, title?: string, itemIndex?: number) {
+    if (selectedPlaylistId && itemIndex != null && itemIndex >= 0) {
+      await playPlaylistFromIndex(itemIndex, title);
+      return;
+    }
+    await handlePlayTrackOnly(trackId, title);
   }
 
   async function handleShuffleApi() {
@@ -386,7 +421,8 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      await uploadTrackChunked(
+      await uploadTrackResumable(
+        uploadTrackChunked,
         { title: uploadTitle.trim(), visibility: uploadVisibility, file: uploadFile },
         { onProgress: (p) => setUploadProgress(p) },
       );
@@ -846,16 +882,38 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 shrink-0"
-                                  title="Play this track on channel"
+                                  title="Play from here — playlist continues"
                                   disabled={playingTrackId === trackId}
                                   onClick={() =>
                                     void handlePlayTrackOnChannelById(
                                       trackId,
                                       item.track_detail?.title,
+                                      index,
                                     )
                                   }
                                 >
                                   {playingTrackId === trackId ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  title="Play only this track"
+                                  disabled={playingTrackId === trackId}
+                                  onClick={() => void handlePlayTrackOnly(trackId, item.track_detail?.title)}
+                                >
+                                  <PlayCircle className="size-4 opacity-80" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  title="Add to queue"
+                                  onClick={() => enqueueTrack(trackId, false)}
+                                >
+                                  <ListPlus className="size-4" />
                                 </Button>
                                 <Button
                                   type="button"

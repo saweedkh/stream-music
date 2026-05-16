@@ -12,9 +12,17 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def channel_tab_url(channel_id: int) -> str:
+def channel_tab_url(
+    channel_id: int,
+    *,
+    tab: str = "chat",
+    message_id: int | None = None,
+) -> str:
     base = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
-    return f"{base}/channel/{channel_id}?tab=chat"
+    url = f"{base}/channel/{channel_id}?tab={tab}"
+    if message_id is not None:
+        url += f"&message={int(message_id)}"
+    return url
 
 
 def _vapid_config() -> tuple[str | None, str | None, str]:
@@ -38,9 +46,45 @@ def _vapid_claims_for_endpoint(endpoint: str, subject: str) -> dict:
     return {"sub": subject, "aud": aud}
 
 
-def send_web_push_to_user(user_id: int, *, title: str, body: str, url: str, tag: str) -> None:
+def _in_quiet_hours(prefs) -> bool:
+    start = getattr(prefs, "push_quiet_hours_start", None)
+    end = getattr(prefs, "push_quiet_hours_end", None)
+    if start is None or end is None:
+        return False
+    from datetime import datetime
+
+    hour = datetime.now().hour
+    start, end = int(start), int(end)
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
+def send_web_push_to_user(
+    user_id: int,
+    *,
+    title: str,
+    body: str,
+    url: str,
+    tag: str,
+    category: str = "chat",
+) -> None:
     pub, priv, sub = _vapid_config()
     if not pub or not priv:
+        return
+    from apps.channels.models import UserNotificationSettings
+
+    prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=user_id)
+    if _in_quiet_hours(prefs):
+        return
+    cat = (category or "chat").lower()
+    if cat == "chat" and not prefs.push_category_chat:
+        return
+    if cat == "playback" and not prefs.push_category_playback:
+        return
+    if cat in ("moderation", "reaction", "vote") and not prefs.push_category_moderation:
         return
     try:
         from pywebpush import WebPushException, webpush
@@ -56,6 +100,7 @@ def send_web_push_to_user(user_id: int, *, title: str, body: str, url: str, tag:
             "body": body,
             "url": url,
             "tag": tag,
+            "category": cat,
         }
     )
 
@@ -124,7 +169,7 @@ def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict
                 continue
             if not prefs.admin_notify_reactions:
                 continue
-            send_web_push_to_user(uid, title=title[:60], body=body[:180], url=url, tag=tag)
+            send_web_push_to_user(uid, title=title[:60], body=body[:180], url=url, tag=tag, category="moderation")
         return
 
     if action == "vote_skip":
@@ -141,7 +186,7 @@ def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict
                 continue
             if not prefs.admin_notify_votes:
                 continue
-            send_web_push_to_user(uid, title=title[:60], body=str(body)[:180], url=url, tag=tag)
+            send_web_push_to_user(uid, title=title[:60], body=str(body)[:180], url=url, tag=tag, category="moderation")
 
 
 _MENTION_RE = re.compile(r"@([\w-]{1,64})", re.UNICODE)
@@ -163,7 +208,53 @@ def _user_wants_chat_push(prefs, body: str, recipient_username: str) -> bool:
     return False
 
 
-def notify_channel_chat_message_push(channel_id: int, *, author_id: int, author_username: str, body: str) -> None:
+def notify_channel_track_changed_push(
+    channel_id: int,
+    *,
+    track_title: str,
+    actor_user_id: int | None = None,
+    action: str = "next",
+) -> None:
+    """Notify members when the now-playing track changes (next, playlist, auto_next, etc.)."""
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
+    from apps.playback.services.state_store import playback_state_store
+
+    act = (action or "").lower()
+    if act not in {"next", "prev", "play", "play_playlist", "shuffle_play", "auto_next"}:
+        return
+
+    channel = Channel.objects.filter(id=channel_id).first()
+    if channel is None:
+        return
+
+    label = (track_title or "").strip() or "New track"
+    present = set(playback_state_store.presence_user_ids(channel_id))
+    rows = ChannelMembership.objects.filter(channel_id=channel_id, is_active=True).exclude(user_id=actor_user_id)
+    url = channel_tab_url(channel_id, tab="player")
+    tag = f"stream-track-{channel_id}-{label[:32]}"
+    title = f"[#{channel_id}] {channel.name}"
+    body = f"Now playing: {label}"[:180]
+
+    for row in rows:
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=row.user_id)
+        if not prefs.push_category_playback:
+            continue
+        ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=row.user_id)
+        if ch_pref.muted or not ch_pref.notify_queue_turn:
+            continue
+        if row.user_id in present:
+            continue
+        send_web_push_to_user(row.user_id, title=title[:60], body=body, url=url, tag=tag, category="playback")
+
+
+def notify_channel_chat_message_push(
+    channel_id: int,
+    *,
+    author_id: int,
+    author_username: str,
+    body: str,
+    message_id: int | None = None,
+) -> None:
     from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
     from apps.playback.services.state_store import playback_state_store
 
@@ -177,8 +268,8 @@ def notify_channel_chat_message_push(channel_id: int, *, author_id: int, author_
     if not member_rows:
         return
 
-    url = channel_tab_url(channel_id)
-    tag = f"stream-chat-{channel_id}"
+    url = channel_tab_url(channel_id, tab="chat", message_id=message_id)
+    tag = f"stream-chat-{channel_id}-{message_id or 'msg'}"
     title = f"[#{channel_id}] {channel.name}"
     preview = body.strip().replace("\n", " ")
     if len(preview) > 140:
@@ -195,7 +286,7 @@ def notify_channel_chat_message_push(channel_id: int, *, author_id: int, author_
             continue
         if user.id in set(playback_state_store.presence_user_ids(channel_id)):
             continue
-        send_web_push_to_user(user.id, title=title[:60], body=text_body[:180], url=url, tag=tag)
+        send_web_push_to_user(user.id, title=title[:60], body=text_body[:180], url=url, tag=tag, category="chat")
 
 
 def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None = None) -> None:
@@ -219,6 +310,7 @@ def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None 
             body="Room is now live.",
             url=channel_tab_url(channel_id),
             tag=f"stream-room-started-{channel_id}",
+            category="playback",
         )
 
 
@@ -245,4 +337,5 @@ def notify_channel_skip_threshold_near_push(channel_id: int, votes: int, thresho
             body=f"Skip votes are near threshold ({votes}/{threshold}).",
             url=channel_tab_url(channel_id),
             tag=f"stream-skip-near-{channel_id}",
+            category="playback",
         )

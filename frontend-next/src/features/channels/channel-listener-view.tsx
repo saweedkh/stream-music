@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Home, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
+import { Home, LogOut, Radio, Share2, Wifi, WifiOff } from "lucide-react";
+import { NowPlayingHero } from "@/components/room/now-playing-hero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -144,6 +145,13 @@ export function ChannelListenerView({
         </div>
       </header>
 
+      {experience?.room_rules?.trim() ? (
+        <section className="rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-4 sm:p-5">
+          <h2 className="text-sm font-medium text-zinc-400">Room rules</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{experience.room_rules.trim()}</p>
+        </section>
+      ) : null}
+
       <section
         className={cn(
           "rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-5 shadow-inner backdrop-blur-sm sm:p-7",
@@ -160,7 +168,7 @@ export function ChannelListenerView({
         </div>
         <div className="mt-5 rounded-xl border border-zinc-800/90 bg-black/40 px-4 py-5 sm:px-6 sm:py-6">
           {nowPlayingLabel ? (
-            <p className="text-lg font-medium leading-snug text-zinc-100 sm:text-xl">{nowPlayingLabel}</p>
+            <NowPlayingHero title={nowPlayingLabel} accent={accent} size="md" />
           ) : (
             <p className="text-sm text-zinc-500 sm:text-base">Nothing playing yet.</p>
           )}

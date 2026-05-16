@@ -14,7 +14,7 @@ from apps.channels.models import (
     UserNotificationSettings,
 )
 from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
+from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
 
 
@@ -144,9 +144,40 @@ class PlaylistItemSerializer(serializers.ModelSerializer):
 
 
 class QueueItemSerializer(serializers.ModelSerializer):
+    upvote_count = serializers.SerializerMethodField()
+    user_upvoted = serializers.SerializerMethodField()
+    added_by_username = serializers.SerializerMethodField()
+
     class Meta:
         model = ChannelQueueItem
-        fields = ["id", "channel", "track", "position", "added_by", "created_at"]
+        fields = [
+            "id",
+            "channel",
+            "track",
+            "position",
+            "added_by",
+            "added_by_username",
+            "created_at",
+            "upvote_count",
+            "user_upvoted",
+        ]
+
+    def get_upvote_count(self, obj):
+        counts = self.context.get("upvote_counts") or {}
+        return int(counts.get(obj.id, 0))
+
+    def get_user_upvoted(self, obj):
+        voted = self.context.get("user_upvoted_ids") or set()
+        return obj.id in voted
+
+    def get_added_by_username(self, obj):
+        if not obj.added_by_id:
+            return None
+        names = self.context.get("added_by_names") or {}
+        if obj.added_by_id in names:
+            return names[obj.added_by_id]
+        user = getattr(obj, "added_by", None)
+        return getattr(user, "username", None) if user else None
 
 
 class PlaybackSessionSerializer(serializers.ModelSerializer):
@@ -170,7 +201,17 @@ class PlaybackSessionSerializer(serializers.ModelSerializer):
 class UserNotificationSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserNotificationSettings
-        fields = ["chat_notify", "admin_notify_reactions", "admin_notify_votes", "updated_at"]
+        fields = [
+            "chat_notify",
+            "admin_notify_reactions",
+            "admin_notify_votes",
+            "push_quiet_hours_start",
+            "push_quiet_hours_end",
+            "push_category_playback",
+            "push_category_chat",
+            "push_category_moderation",
+            "updated_at",
+        ]
         read_only_fields = ["updated_at"]
 
 

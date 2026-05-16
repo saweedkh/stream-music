@@ -46,6 +46,9 @@ export function useReconnectingChannelSocket({ channelId, onMessage, enabled = t
       ws.onopen = () => {
         setSocketState("connected");
         if (debugSocket) console.debug("[channel-socket] connected", { channelId });
+        if (attempt > 0) {
+          ws.send(JSON.stringify({ action: "resync" }));
+        }
         if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
         heartbeatTimerRef.current = setInterval(() => {
           if (!ws || ws.readyState !== WebSocket.OPEN) return;

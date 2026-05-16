@@ -1,3 +1,4 @@
+import hashlib
 import os
 
 from django.core.files import File
@@ -6,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.serializers import TrackSerializer
-from apps.tracks.chunk_upload import append_chunk, cleanup_files, finalize_path, init_session
+from apps.tracks.chunk_upload import append_chunk, cleanup_files, finalize_path, get_session, init_session
 from apps.tracks.models import Track
 
 
@@ -43,7 +44,27 @@ class TrackUploadInitView(APIView):
             if str(e) == "invalid_size":
                 return Response({"detail": "invalid_size"}, status=status.HTTP_400_BAD_REQUEST)
             raise
-        return Response({"upload_id": upload_id})
+        return Response({"upload_id": upload_id, "written": 0, "size": size})
+
+
+class TrackUploadStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, upload_id: str):
+        meta = get_session(upload_id)
+        if not meta or meta.get("user_id") != request.user.id:
+            return Response({"detail": "invalid_session"}, status=status.HTTP_404_NOT_FOUND)
+        written = int(meta.get("written") or 0)
+        return Response(
+            {
+                "upload_id": str(upload_id),
+                "written": written,
+                "size": int(meta.get("size") or 0),
+                "filename": meta.get("filename"),
+                "title": meta.get("title"),
+                "visibility": meta.get("visibility"),
+            }
+        )
 
 
 class TrackUploadChunkView(APIView):
@@ -82,7 +103,22 @@ class TrackUploadFinalizeView(APIView):
 
         path = meta["path"]
         django_name = meta["filename"]
+        digest = hashlib.sha256()
         try:
+            with open(path, "rb") as fh:
+                while True:
+                    chunk = fh.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+            file_hash = digest.hexdigest()
+            existing = Track.objects.filter(owner=request.user, file_hash=file_hash).first()
+            if existing:
+                cleanup_files(upload_id)
+                return Response(
+                    {**TrackSerializer(existing).data, "duplicate": True},
+                    status=status.HTTP_200_OK,
+                )
             with open(path, "rb") as fh:
                 django_file = File(fh, name=os.path.basename(django_name))
                 track = Track.objects.create(
@@ -91,6 +127,7 @@ class TrackUploadFinalizeView(APIView):
                     artist=meta.get("artist") or "",
                     album=meta.get("album") or "",
                     visibility=meta["visibility"],
+                    file_hash=file_hash,
                     file=django_file,
                 )
         finally:

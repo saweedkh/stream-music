@@ -50,6 +50,7 @@ import {
   type PlaylistSummary,
   type TrackSummary,
 } from "@/lib/api";
+import { uploadTrackResumable } from "@/lib/resumable-upload";
 
 const CHUNK = 50;
 const DEBOUNCE_MS = 300;
@@ -396,7 +397,11 @@ export function PlaylistManager() {
     setUploading(true);
     setUploadProgress(0);
     try {
-      await uploadTrackChunked({ title: uploadTitle.trim(), visibility: uploadVisibility, file: uploadFile }, { onProgress: setUploadProgress });
+      await uploadTrackResumable(
+        uploadTrackChunked,
+        { title: uploadTitle.trim(), visibility: uploadVisibility, file: uploadFile },
+        { onProgress: setUploadProgress },
+      );
       showToast("Track uploaded", "success");
       setUploadTitle("");
       setUploadFile(null);

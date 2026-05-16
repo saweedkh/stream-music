@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HelpCircle, Send, Sparkles } from "lucide-react";
+import { HelpCircle, Send, Share2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,10 @@ export type ChannelExperience = {
   blind_playlist_id?: number | null;
   intro_preview_seconds?: number;
   veto_skip_threshold?: number;
+  rehearsal_lift_until?: string | null;
+  listening_party_only?: boolean;
+  room_rules?: string;
+  scheduled_start_at?: string | null;
 };
 
 type SocialPayload = {
@@ -54,7 +58,12 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
   const [floaters, setFloaters] = useState<Array<{ id: number; emoji: string; x: number }>>([]);
   const [shoutDraft, setShoutDraft] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
+  const [skipVotes, setSkipVotes] = useState(0);
+  const [skipThreshold, setSkipThreshold] = useState(0);
   const floaterId = useRef(0);
+  const liftActive =
+    experience.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now();
+  const rehearsalMuted = Boolean(experience.rehearsal_mode && !canControl && !liftActive);
 
   const accentRing = useMemo(() => {
     const a = (experience.accent || "emerald").toLowerCase();
@@ -93,7 +102,11 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       if (action === "vote_skip") {
         const v = typeof p.votes === "number" ? p.votes : 0;
         const thr = typeof p.threshold === "number" ? p.threshold : 0;
-        showToast(thr > 0 ? `Skip votes: ${v} / ${thr}` : `Skip votes: ${v}`, "info");
+        setSkipVotes(v);
+        setSkipThreshold(thr);
+        if (thr > 0 && v >= thr) {
+          showToast("Skip threshold reached — advancing track.", "success");
+        }
       }
     },
     [channelId, showToast],
@@ -103,6 +116,30 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
     window.addEventListener("channel-social", onSocial as EventListener);
     return () => window.removeEventListener("channel-social", onSocial as EventListener);
   }, [onSocial]);
+
+  useEffect(() => {
+    const onHelp = () => setHelpOpen(true);
+    window.addEventListener("channel-room-help", onHelp);
+    return () => window.removeEventListener("channel-room-help", onHelp);
+  }, []);
+
+  function playDjTone(freq: number) {
+    if (typeof window === "undefined" || !canControl) return;
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+      window.setTimeout(() => void ctx.close(), 200);
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     if (socketState !== "connected") return;
@@ -174,7 +211,28 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
             </Button>
           ))}
         </div>
-        <Button type="button" variant="ghost" size="sm" className="ml-auto gap-1 text-zinc-400" onClick={() => setHelpOpen(true)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="ml-auto gap-1 text-zinc-400"
+          onClick={async () => {
+            const url = `${window.location.origin}/channel/${channelId}`;
+            try {
+              if (navigator.share) await navigator.share({ title: "Stream Music room", url });
+              else {
+                await navigator.clipboard.writeText(url);
+                showToast("Room link copied.", "success");
+              }
+            } catch {
+              /* cancelled */
+            }
+          }}
+        >
+          <Share2 className="h-4 w-4" />
+          Share
+        </Button>
+        <Button type="button" variant="ghost" size="sm" className="gap-1 text-zinc-400" onClick={() => setHelpOpen(true)}>
           <HelpCircle className="h-4 w-4" />
           Hotkeys
         </Button>
@@ -201,11 +259,56 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
           Vote skip ({experience.veto_skip_threshold ? `≥${experience.veto_skip_threshold}` : "tally"})
         </Button>
       </div>
-      {experience.rehearsal_mode && !canControl ? (
+      {canControl ? (
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
+          <span className="w-full text-[10px] font-medium uppercase tracking-wide text-zinc-500">DJ cues (local)</span>
+          {[
+            { label: "Airhorn", freq: 880 },
+            { label: "Drop", freq: 220 },
+            { label: "Tick", freq: 1200 },
+          ].map((c) => (
+            <Button key={c.label} type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => playDjTone(c.freq)}>
+              {c.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {experience.veto_skip_threshold && experience.veto_skip_threshold > 0 ? (
+        <div className="mt-3">
+          <div className="mb-1 flex justify-between text-xs text-zinc-500">
+            <span>Skip votes</span>
+            <span>
+              {skipVotes} / {skipThreshold || experience.veto_skip_threshold}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+            <div               className="h-full bg-amber-500/90 transition-all duration-300"
+              style={{
+                width: `${Math.min(100, (skipVotes / Math.max(1, skipThreshold || experience.veto_skip_threshold)) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+      {experience.room_rules?.trim() ? (
+        <div className="mt-3 rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-300">
+          <p className="font-medium text-zinc-400">Room rules</p>
+          <p className="mt-1 whitespace-pre-wrap">{experience.room_rules.trim()}</p>
+        </div>
+      ) : null}
+      {experience.scheduled_start_at && Date.parse(experience.scheduled_start_at) > Date.now() ? (
+        <p className="mt-2 text-xs text-sky-300/90">
+          Scheduled start: {new Date(experience.scheduled_start_at).toLocaleString()}
+        </p>
+      ) : null}
+      {rehearsalMuted ? (
         <p className="mt-2 flex items-center gap-2 text-xs text-amber-200/90">
           <Sparkles className="h-3.5 w-3.5 shrink-0" />
           Soundcheck mode — playback is muted for listeners until DJs go live.
         </p>
+      ) : null}
+      {experience.listening_party_only && !canControl ? (
+        <p className="mt-1 text-xs text-zinc-500">Listening party — only DJs control playback; you can vote and suggest tracks.</p>
       ) : null}
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
         {floaters.map((f) => (

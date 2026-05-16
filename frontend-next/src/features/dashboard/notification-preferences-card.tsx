@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -12,8 +13,10 @@ import {
   deleteWebPushSubscriptions,
   getMe,
   patchNotificationSettings,
+  sendPushTest,
   type UserNotificationSettings,
 } from "@/lib/api";
+import { useNotificationStore } from "@/lib/notifications/store";
 import {
   getDevCertInstallUrl,
   getDevHttpsSiteUrl,
@@ -29,11 +32,15 @@ const DEFAULT_SETTINGS: UserNotificationSettings = {
   chat_notify: "all",
   admin_notify_reactions: true,
   admin_notify_votes: true,
+  push_category_playback: true,
+  push_category_chat: true,
+  push_category_moderation: true,
   updated_at: "",
 };
 
 export function NotificationPreferencesCard() {
   const { showToast } = useToast();
+  const setNotificationPrefs = useNotificationStore((s) => s.setPrefs);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -80,6 +87,7 @@ export function NotificationPreferencesCard() {
     try {
       const next = await patchNotificationSettings(partial);
       setSettings(next);
+      setNotificationPrefs(next);
       showToast("Notification preferences saved.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed.", "error");
@@ -261,6 +269,61 @@ export function NotificationPreferencesCard() {
           </div>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-zinc-400">Quiet hours start (0–23, optional)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={23}
+              placeholder="e.g. 23"
+              className="border-zinc-800 bg-zinc-900/80"
+              value={settings.push_quiet_hours_start ?? ""}
+              onChange={(e) =>
+                void persistPatch({
+                  push_quiet_hours_start: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-zinc-400">Quiet hours end (0–23)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={23}
+              placeholder="e.g. 7"
+              className="border-zinc-800 bg-zinc-900/80"
+              value={settings.push_quiet_hours_end ?? ""}
+              onChange={(e) =>
+                void persistPatch({
+                  push_quiet_hours_end: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-4">
+          <p className="text-sm font-medium text-zinc-200">Push categories</p>
+          {(
+            [
+              ["push_category_chat", "Chat"],
+              ["push_category_playback", "Playback / room live"],
+              ["push_category_moderation", "Moderation (reactions, votes)"],
+            ] as const
+          ).map(([key, label]) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <Label className="text-sm text-zinc-400">{label}</Label>
+              <Switch
+                checked={Boolean(settings[key])}
+                disabled={saving}
+                onCheckedChange={(on) => void persistPatch({ [key]: on })}
+              />
+            </div>
+          ))}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -280,6 +343,24 @@ export function NotificationPreferencesCard() {
           >
             <BellOff className="size-4" />
             Clear push for this device
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pushBusy || !pushEnabled}
+            onClick={async () => {
+              setPushBusy(true);
+              try {
+                await sendPushTest();
+                showToast("Test notification sent.", "success");
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : "Test failed.", "error");
+              } finally {
+                setPushBusy(false);
+              }
+            }}
+          >
+            Send test push
           </Button>
         </div>
 

@@ -5,7 +5,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: "#7c3aed",
+        brand: {
+          DEFAULT: "#22c55e",
+          strong: "#16a34a",
+          muted: "#34d399",
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

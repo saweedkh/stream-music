@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, logoutUser, type AuthUser } from "@/lib/api";
+import { ConnectivityBanner } from "@/components/connectivity-banner";
+import { NotificationCenter } from "@/components/notifications/notification-center";
+import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 
 const GlobalChannelPlayerDock = dynamic(
@@ -39,6 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <ToastProvider>
+      <NotificationProvider>
       <GlobalChannelPlayerProvider>
         <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 pb-36 sm:px-6">
           <header className="mb-6 flex items-center justify-between rounded-2xl border border-slate-800/80 bg-slate-900/55 px-5 py-3 backdrop-blur">
@@ -49,6 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link href="/dashboard" className="hover:text-white">
                 Dashboard
               </Link>
+              {me ? <NotificationCenter /> : null}
               {me ? (
                 <>
                   <span className="text-xs text-slate-400">@{me.username}</span>
@@ -63,10 +68,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               )}
             </nav>
           </header>
+          <ConnectivityBanner />
           {children}
         </div>
         <GlobalChannelPlayerDock />
       </GlobalChannelPlayerProvider>
+      </NotificationProvider>
     </ToastProvider>
   );
 }

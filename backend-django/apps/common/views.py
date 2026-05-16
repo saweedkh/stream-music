@@ -45,6 +45,7 @@ _ALLOWED_EXPERIENCE_KEYS = frozenset(
     {
         "accent",
         "rehearsal_mode",
+        "rehearsal_lift_until",
         "queue_locked",
         "blind_playlist_id",
         "intro_preview_seconds",
@@ -52,6 +53,14 @@ _ALLOWED_EXPERIENCE_KEYS = frozenset(
         "anti_repeat_window",
         "weighted_shuffle_bias",
         "suggestions_enabled",
+        "dj_rotation_enabled",
+        "dj_rotation_every_n",
+        "current_dj_user_id",
+        "listening_party_only",
+        "radio_mode",
+        "scheduled_start_at",
+        "queue_end_mode",
+        "room_rules",
     },
 )
 
@@ -133,13 +142,54 @@ from apps.playback.services.channel_queue import (
     replace_queue_with_tracks,
     tracks_accessible_to_user,
 )
+from apps.playback.services.queue_advance import (
+    apply_queue_advance,
+    clear_active_playlist,
+    playback_queue_meta,
+    scheduled_start_blocks_playback,
+    set_active_playlist,
+    set_playback_source,
+)
 from apps.playback.services.state_store import playback_state_store
 from apps.tracks.filesystem_import import import_audio_files_under_media
-from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
+from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
 
 # Per-request cap for playlist bulk-add (client may send smaller chunks).
 PLAYLIST_BULK_ADD_MAX = 150
+
+
+def _queue_serialize_context(channel_id: int, user_id: int | None, item_ids: list[int]) -> dict:
+    from django.db.models import Count
+
+    if not item_ids:
+        return {"upvote_counts": {}, "user_upvoted_ids": set(), "added_by_names": {}}
+    rows = (
+        ChannelQueueUpvote.objects.filter(queue_item_id__in=item_ids)
+        .values("queue_item_id")
+        .annotate(c=Count("id"))
+    )
+    upvote_counts = {r["queue_item_id"]: r["c"] for r in rows}
+    user_upvoted_ids = set()
+    if user_id:
+        user_upvoted_ids = set(
+            ChannelQueueUpvote.objects.filter(queue_item_id__in=item_ids, user_id=user_id).values_list(
+                "queue_item_id", flat=True
+            )
+        )
+    items = ChannelQueueItem.objects.filter(id__in=item_ids).select_related("added_by")
+    added_by_names = {i.added_by_id: i.added_by.username for i in items if i.added_by_id}
+    return {
+        "upvote_counts": upvote_counts,
+        "user_upvoted_ids": user_upvoted_ids,
+        "added_by_names": added_by_names,
+    }
+
+
+def _serialize_queue(channel_id: int, user_id: int | None = None):
+    queue = list(ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id"))
+    ctx = _queue_serialize_context(channel_id, user_id, [q.id for q in queue])
+    return QueueItemSerializer(queue, many=True, context=ctx).data
 
 
 def _log_channel_audit(channel_id: int, action: str, actor_id: int | None, *, target_type: str = "", target_id: str = "", metadata=None) -> None:
@@ -566,8 +616,16 @@ class ChannelControlView(APIView):
         return action.upper()
 
     @staticmethod
-    def _build_control_payload(channel_id: int, action: str, playback_session: PlaybackSession, position: float | None):
-        return {
+    def _build_control_payload(
+        channel_id: int,
+        action: str,
+        playback_session: PlaybackSession,
+        position: float | None,
+        channel: Channel | None = None,
+    ):
+        if channel is None:
+            channel = Channel.objects.filter(id=channel_id).first()
+        payload = {
             "type": ChannelControlView._event_type(action),
             "action": action,
             "event_seq": playback_state_store.next_event_seq(channel_id),
@@ -579,6 +637,9 @@ class ChannelControlView(APIView):
             "queue_version": playback_session.queue_version,
             "track_file": playback_session.track.file.url if playback_session.track and playback_session.track.file else None,
         }
+        if channel is not None:
+            payload.update(playback_queue_meta(channel, playback_session))
+        return payload
 
     def post(self, request, channel_id: int):
         if not can_control_channel(request.user, channel_id):
@@ -587,8 +648,11 @@ class ChannelControlView(APIView):
         channel = get_object_or_404(Channel, id=channel_id)
         if not channel.is_active:
             return _channel_closed_response()
+        blocked, _scheduled_at = scheduled_start_blocks_playback(channel)
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
         action = request.data.get("action")
+        if blocked and action == "play":
+            return Response({"detail": "scheduled_not_started"}, status=status.HTTP_403_FORBIDDEN)
         if action not in {"play", "pause", "seek", "next", "prev"}:
             return Response({"detail": "invalid_action"}, status=status.HTTP_400_BAD_REQUEST)
         position = request.data.get("position")
@@ -615,19 +679,12 @@ class ChannelControlView(APIView):
         elif action in {"next", "prev"}:
             queue = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position"))
             if queue:
-                current_index = 0
-                if playback_session.track_id is not None:
-                    for idx, row in enumerate(queue):
-                        if row.track_id == playback_session.track_id:
-                            current_index = idx
-                            break
-                target_index = (current_index + 1) % len(queue) if action == "next" else (current_index - 1) % len(queue)
-                playback_session.track = queue[target_index].track
-                playback_session.is_playing = True
-                playback_session.started_at_server_time = time.time()
-                playback_session.paused_at_position = 0
+                direction = "next" if action == "next" else "prev"
+                target_index = apply_queue_advance(channel, playback_session, queue, direction)
+                if target_index is None:
+                    action = "pause"
             playback_session.queue_version += 1
-        playback_session.save(update_fields=["is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"])
+        playback_session.save(update_fields=["is_playing", "started_at_server_time", "paused_at_position", "queue_version", "track", "updated_at"])
         _record_playback_event(
             channel.id,
             action,
@@ -647,7 +704,13 @@ class ChannelControlView(APIView):
         if action == "play":
             notify_channel_room_started_push(channel.id, actor_user_id=request.user.id)
 
-        payload = self._build_control_payload(channel_id=channel.id, action=action, playback_session=playback_session, position=position)
+        payload = self._build_control_payload(
+            channel_id=channel.id,
+            action=action,
+            playback_session=playback_session,
+            position=position,
+            channel=channel,
+        )
         channel_layer = get_channel_layer()
         if channel_layer is not None:
             async_to_sync(channel_layer.group_send)(f"channel_{channel.id}", {"type": "broadcast_event", "payload": payload})
@@ -672,15 +735,25 @@ class ChannelPlayPlaylistView(APIView):
         if not items:
             return Response({"detail": "playlist_empty"}, status=status.HTTP_400_BAD_REQUEST)
 
+        raw_start = request.data.get("start_index")
+        start_index = 0
+        if raw_start is not None and raw_start != "":
+            try:
+                start_index = max(0, min(int(raw_start), len(items) - 1))
+            except (TypeError, ValueError):
+                start_index = 0
+
         ChannelQueueItem.objects.filter(channel=channel).delete()
         queue_rows = [
             ChannelQueueItem(channel=channel, track=item.track, position=index, added_by=request.user)
             for index, item in enumerate(items)
         ]
         ChannelQueueItem.objects.bulk_create(queue_rows)
+        set_active_playlist(channel, playlist.id, playlist.name)
+        set_playback_source(channel, "playlist")
 
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
-        playback_session.track = items[0].track
+        playback_session.track = items[start_index].track
         playback_session.is_playing = True
         playback_session.started_at_server_time = time.time()
         playback_session.paused_at_position = 0
@@ -701,7 +774,7 @@ class ChannelPlayPlaylistView(APIView):
             actor_id=request.user.id,
             track=playback_session.track,
             source="playlist",
-            payload={"playlist_id": playlist.id},
+            payload={"playlist_id": playlist.id, "start_index": start_index},
         )
         _log_channel_audit(
             channel.id,
@@ -717,9 +790,11 @@ class ChannelPlayPlaylistView(APIView):
             action="play",
             playback_session=playback_session,
             position=0.0,
+            channel=channel,
         )
         payload["track_file"] = playback_session.track.file.url if playback_session.track and playback_session.track.file else None
         payload["playlist_id"] = playlist.id
+        payload["start_index"] = start_index
         payload["track"] = {
             "id": playback_session.track.id,
             "title": playback_session.track.title,
@@ -757,6 +832,8 @@ class ChannelPlayTrackView(APIView):
         if not track.file:
             return Response({"detail": "track_no_file"}, status=status.HTTP_400_BAD_REQUEST)
 
+        clear_active_playlist(channel)
+        set_playback_source(channel, "manual")
         replace_queue_with_tracks(channel=channel, tracks=[track], user_id=request.user.id)
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
         apply_track_to_session(playback_session, track)
@@ -792,6 +869,7 @@ class ChannelPlayTrackView(APIView):
             action="play",
             playback_session=playback_session,
             position=0.0,
+            channel=channel,
         )
         payload["track_file"] = playback_session.track.file.url if playback_session.track and playback_session.track.file else None
         payload["track"] = {
@@ -857,6 +935,8 @@ class ChannelShufflePlayView(APIView):
         if not tracks:
             return Response({"detail": "no_tracks"}, status=status.HTTP_400_BAD_REQUEST)
 
+        clear_active_playlist(channel)
+        set_playback_source(channel, "shuffle")
         persisted_rows = replace_queue_with_tracks(channel=channel, tracks=tracks, user_id=request.user.id)
         playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
         apply_track_to_session(playback_session, tracks[0])
@@ -893,6 +973,7 @@ class ChannelShufflePlayView(APIView):
             action="play",
             playback_session=playback_session,
             position=0.0,
+            channel=channel,
         )
         payload["track_file"] = playback_session.track.file.url if playback_session.track and playback_session.track.file else None
         payload["shuffle"] = True
@@ -927,11 +1008,7 @@ class ChannelQueueView(APIView):
         channel = get_object_or_404(Channel, id=channel_id)
         if not channel.is_active:
             return _channel_closed_response()
-        queue_snapshot = playback_state_store.get_queue_snapshot(channel_id)
-        if queue_snapshot is not None:
-            return Response({"results": queue_snapshot})
-        queue = ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id")
-        serialized = QueueItemSerializer(queue, many=True).data
+        serialized = _serialize_queue(channel_id, request.user.id)
         playback_state_store.save_queue_snapshot(channel_id, list(serialized))
         return Response({"results": serialized})
 
@@ -960,9 +1037,10 @@ class ChannelQueueItemManageView(APIView):
         session, _ = PlaybackSession.objects.get_or_create(channel_id=channel_id)
         session.queue_version += 1
         session.save(update_fields=["queue_version", "updated_at"])
-        queue = ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id")
-        playback_state_store.save_queue_snapshot(channel_id, list(QueueItemSerializer(queue, many=True).data))
-        return Response(QueueItemSerializer(item).data)
+        serialized = _serialize_queue(channel_id, request.user.id)
+        ctx = _queue_serialize_context(channel_id, request.user.id, [item.id])
+        playback_state_store.save_queue_snapshot(channel_id, serialized)
+        return Response(QueueItemSerializer(item, context=ctx).data)
 
     def delete(self, request, channel_id: int, item_id: int):
         if not can_control_channel(request.user, channel_id):
@@ -980,8 +1058,61 @@ class ChannelQueueItemManageView(APIView):
         session, _ = PlaybackSession.objects.get_or_create(channel_id=channel_id)
         session.queue_version += 1
         session.save(update_fields=["queue_version", "updated_at"])
-        queue = ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id")
-        playback_state_store.save_queue_snapshot(channel_id, list(QueueItemSerializer(queue, many=True).data))
+        serialized = _serialize_queue(channel_id, request.user.id)
+        playback_state_store.save_queue_snapshot(channel_id, serialized)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChannelQueueUpvoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_id: int, item_id: int):
+        if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
+        item = get_object_or_404(ChannelQueueItem, id=item_id, channel_id=channel_id)
+        ChannelQueueUpvote.objects.get_or_create(queue_item=item, user=request.user)
+        serialized = _serialize_queue(channel_id, request.user.id)
+        playback_state_store.save_queue_snapshot(channel_id, serialized)
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"channel_{channel_id}",
+                {
+                    "type": "broadcast_event",
+                    "payload": {
+                        "type": "QUEUE_UPDATED",
+                        "action": "queue_updated",
+                        "channel_id": channel_id,
+                        "queue": serialized,
+                    },
+                },
+            )
+        ctx = _queue_serialize_context(channel_id, request.user.id, [item.id])
+        return Response(QueueItemSerializer(item, context=ctx).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, channel_id: int, item_id: int):
+        if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        ChannelQueueUpvote.objects.filter(queue_item_id=item_id, queue_item__channel_id=channel_id, user=request.user).delete()
+        serialized = _serialize_queue(channel_id, request.user.id)
+        playback_state_store.save_queue_snapshot(channel_id, serialized)
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"channel_{channel_id}",
+                {
+                    "type": "broadcast_event",
+                    "payload": {
+                        "type": "QUEUE_UPDATED",
+                        "action": "queue_updated",
+                        "channel_id": channel_id,
+                        "queue": serialized,
+                    },
+                },
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -1803,3 +1934,79 @@ class ChannelMemberManageView(APIView):
         membership.save(update_fields=["is_active"])
         _log_channel_audit(channel_id, "membership.removed", request.user.id, target_type="membership", target_id=membership.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class WebPushTestView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from apps.common.webpush_service import send_web_push_to_user
+
+        send_web_push_to_user(
+            request.user.id,
+            title="Stream Music test",
+            body="Push notifications are working on this device.",
+            url=getattr(django_settings, "FRONTEND_BASE_URL", "/").rstrip("/") + "/dashboard",
+            tag="stream-test",
+            category="moderation",
+        )
+        return Response({"detail": "sent"})
+
+
+class ChannelAuditExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, channel_id: int):
+        if not _can_manage_channel(request.user, channel_id):
+            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        import csv
+        from django.http import HttpResponse
+
+        limit = min(500, max(1, int(request.query_params.get("limit", 200) or 200)))
+        rows = ChannelAuditLog.objects.filter(channel_id=channel_id).select_related("actor").order_by("-id")[:limit]
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="channel-{channel_id}-audit.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["id", "action", "actor", "target_type", "target_id", "created_at"])
+        for row in rows:
+            writer.writerow(
+                [
+                    row.id,
+                    row.action,
+                    row.actor.username if row.actor_id else "",
+                    row.target_type,
+                    row.target_id,
+                    row.created_at.isoformat() if row.created_at else "",
+                ]
+            )
+        return response
+
+
+class ChannelPartyRecapView(APIView):
+    """Public read-only recap for post-party pages (public/unlisted channels)."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        if channel.privacy == Channel.Privacy.PRIVATE:
+            return Response({"detail": "private"}, status=status.HTTP_403_FORBIDDEN)
+        from apps.common.party_recap import build_party_recap
+
+        return Response(build_party_recap(channel))
+
+
+class ChannelPartyRecapView(APIView):
+    """Public read-only recap for post-party pages (public/unlisted channels)."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, channel_id: int):
+        channel = get_object_or_404(Channel, id=channel_id)
+        if channel.privacy == Channel.Privacy.PRIVATE:
+            return Response({"detail": "private"}, status=status.HTTP_403_FORBIDDEN)
+        from apps.common.party_recap import build_party_recap
+
+        return Response(build_party_recap(channel))

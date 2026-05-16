@@ -78,6 +78,7 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
                 user.id,
                 getattr(user, "username", "") or "?",
                 result.get("body") or "",
+                int(result.get("id")) if result.get("id") is not None else None,
             )
             return
 
@@ -203,7 +204,19 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event["payload"]))
 
 
-def _maybe_push_chat(channel_id: int, author_id: int, author_username: str, body: str) -> None:
+def _maybe_push_chat(
+    channel_id: int,
+    author_id: int,
+    author_username: str,
+    body: str,
+    message_id: int | None = None,
+) -> None:
     if not (body or "").strip():
         return
-    notify_channel_chat_message_push(channel_id, author_id=author_id, author_username=author_username, body=body)
+    notify_channel_chat_message_push(
+        channel_id,
+        author_id=author_id,
+        author_username=author_username,
+        body=body,
+        message_id=message_id,
+    )

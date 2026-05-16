@@ -37,6 +37,10 @@ class PlaybackStateStore:
         return f"channel:{channel_id}:auto_next_lock"
 
     @staticmethod
+    def _auto_next_idem_key(channel_id: int, client_event_id: str) -> str:
+        return f"channel:{channel_id}:auto_next_idem:{client_event_id}"
+
+    @staticmethod
     def _presence_key(channel_id: int) -> str:
         return f"channel:{channel_id}:presence"
 
@@ -112,6 +116,19 @@ class PlaybackStateStore:
             return True
         try:
             return bool(self._client.set(self._auto_next_lock_key(channel_id), "1", nx=True, ex=ttl_sec))
+        except Exception:
+            return True
+
+    def try_auto_next_idempotency(self, channel_id: int, client_event_id: str, ttl_sec: int = 120) -> bool:
+        """Ignore duplicate auto_next from the same client event id."""
+        if not client_event_id:
+            return True
+        if self._client is None:
+            return True
+        try:
+            return bool(
+                self._client.set(self._auto_next_idem_key(channel_id, client_event_id), "1", nx=True, ex=ttl_sec)
+            )
         except Exception:
             return True
 

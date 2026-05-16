@@ -29,3 +29,15 @@ class ChannelQueueItem(models.Model):
     position = models.PositiveIntegerField(default=0)
     added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ChannelQueueUpvote(models.Model):
+    """Per-user upvote on a queue item (one per user per item)."""
+
+    queue_item = models.ForeignKey(ChannelQueueItem, on_delete=models.CASCADE, related_name="upvotes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="queue_upvotes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("queue_item", "user")
+        indexes = [models.Index(fields=["queue_item", "id"])]

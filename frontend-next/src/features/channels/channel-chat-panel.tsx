@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Eraser,
   Loader2,
@@ -8,6 +9,8 @@ import {
   MessageCircle,
   Minimize2,
   MoreHorizontal,
+  Music,
+  Pin,
   Pencil,
   Send,
   Trash2,
@@ -17,7 +20,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/toast-provider";
 import { useReconnectingChannelChatSocket } from "@/hooks/use-reconnecting-channel-chat-socket";
-import { getMe, type ChannelChatMessageRow, type ChannelChatReaction } from "@/lib/api";
+import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatReaction } from "@/lib/api";
+import { renderMessageWithMentions } from "@/lib/render-mentions";
+import { channelChatHref, useNotificationStore } from "@/lib/notifications/store";
 import { cn } from "@/lib/utils";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎵"] as const;
@@ -83,27 +88,74 @@ type Props = {
   variant: "admin" | "listener";
   /** Owner or moderator — can delete any message. */
   canModerate: boolean;
+  /** Shown for "share now playing" shortcut. */
+  nowPlayingLabel?: string | null;
+  channelName?: string;
+  /** When set, in-app chat alerts fire only if this tab is not active (or the tab is hidden). */
+  roomActiveTab?: string | null;
 };
 
-export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, variant, canModerate }: Props) {
+export function ChannelChatPanel({
+  channelId,
+  channelIsActive,
+  connectEnabled,
+  variant,
+  canModerate,
+  nowPlayingLabel = null,
+  channelName,
+  roomActiveTab = null,
+}: Props) {
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const pushNotification = useNotificationStore((s) => s.push);
   const [messages, setMessages] = useState<ChannelChatMessageRow[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [myUsername, setMyUsername] = useState("");
+  const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [openActionsId, setOpenActionsId] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [pinnedMessage, setPinnedMessage] = useState<ChannelChatMessageRow | null>(null);
+  const [showPinsOnly, setShowPinsOnly] = useState(false);
+  const [roomMembers, setRoomMembers] = useState<Array<{ id: number; username: string }>>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const draftInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    void getMe().then((res) => setMyUserId(res?.user?.id ?? null));
+    void getMe().then((res) => {
+      setMyUserId(res?.user?.id ?? null);
+      setMyUsername(res?.user?.username ?? "");
+    });
   }, []);
+
+  useEffect(() => {
+    const raw = searchParams.get("message");
+    if (!raw) return;
+    const id = Number.parseInt(raw, 10);
+    if (Number.isFinite(id)) setHighlightMessageId(id);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!connectEnabled) return;
+    void getChannelMembers(channelId)
+      .then((data) =>
+        setRoomMembers(
+          data.results
+            .filter((m) => m.is_active)
+            .map((m) => ({ id: m.user_id, username: m.username })),
+        ),
+      )
+      .catch(() => setRoomMembers([]));
+  }, [channelId, connectEnabled]);
 
   useEffect(() => {
     const onFs = () => {
@@ -155,6 +207,7 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
           not_found: "Message not found.",
           invalid_emoji: "Invalid reaction.",
           auth: "Please sign in again.",
+          rate_limited: "You are sending messages too fast. Please wait a moment.",
         };
         showToast(human[code] ?? `Chat: ${code}`, "error");
         return;
@@ -187,6 +240,23 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
         if (msg) {
           setMessages((prev) => upsertMessages(prev, msg));
           if (msg.is_pinned) setPinnedMessage(msg);
+          if (myUserId != null && msg.user_id !== myUserId && !msg.deleted_at) {
+            const onChatTab = roomActiveTab === "chat" || roomActiveTab == null;
+            const shouldNotify = document.hidden || !onChatTab;
+            if (shouldNotify) {
+              const preview = msg.body.trim().replace(/\n/g, " ");
+              pushNotification({
+                category: "chat",
+                title: channelName ? `${channelName}` : `Room #${channelId}`,
+                body: `${msg.username}: ${preview.slice(0, 140)}`,
+                href: channelChatHref(channelId, msg.id),
+                channelId,
+                messageId: msg.id,
+                chatBody: msg.body,
+                myUsername,
+              });
+            }
+          }
         }
         return;
       }
@@ -201,7 +271,7 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
         return;
       }
     },
-    [showToast],
+    [channelId, channelName, myUserId, myUsername, pushNotification, roomActiveTab, showToast],
   );
 
   const { chatSocketState, sendChat } = useReconnectingChannelChatSocket({
@@ -214,7 +284,44 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, hydrated]);
 
+  useEffect(() => {
+    if (highlightMessageId == null || !hydrated) return;
+    const frame = window.requestAnimationFrame(() => {
+      const el = document.getElementById(`chat-msg-${highlightMessageId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => setHighlightMessageId(null), 4500);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [highlightMessageId, hydrated, messages]);
+
   const connected = chatSocketState === "connected";
+
+  const mentionCandidates = roomMembers.filter((m) => {
+    if (myUserId != null && m.id === myUserId) return false;
+    const q = mentionQuery.toLowerCase();
+    return !q || m.username.toLowerCase().includes(q);
+  });
+
+  const visibleMessages = showPinsOnly ? messages.filter((m) => m.is_pinned && !m.deleted_at) : messages;
+
+  function insertMention(username: string) {
+    const at = draft.lastIndexOf("@");
+    const prefix = at >= 0 ? draft.slice(0, at) : draft;
+    setDraft(`${prefix}@${username} `);
+    setMentionOpen(false);
+    setMentionQuery("");
+    draftInputRef.current?.focus();
+  }
+
+  function shareNowPlayingInChat() {
+    if (!nowPlayingLabel?.trim() || !channelIsActive) return;
+    const text = `🎵 Now playing: ${nowPlayingLabel.trim()}`;
+    setDraft((d) => (d.trim() ? `${d} ${text}` : text));
+    draftInputRef.current?.focus();
+  }
 
   const requestOlder = useCallback(() => {
     if (!messages.length || loadingOlder || !connected) return;
@@ -352,6 +459,30 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
           >
             {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </Button>
+          <Button
+            type="button"
+            variant={showPinsOnly ? "secondary" : "ghost"}
+            size="sm"
+            className="h-9 gap-1 text-xs"
+            onClick={() => setShowPinsOnly((v) => !v)}
+            title="Show pinned messages only"
+          >
+            <Pin className="size-3.5" />
+            <span className="hidden sm:inline">Pins</span>
+          </Button>
+          {nowPlayingLabel ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1 text-xs text-emerald-300/90"
+              disabled={!channelIsActive}
+              onClick={() => shareNowPlayingInChat()}
+            >
+              <Music className="size-3.5" />
+              <span className="hidden sm:inline">Now playing</span>
+            </Button>
+          ) : null}
           {canModerate ? (
             <Button
               type="button"
@@ -395,10 +526,10 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
                 <Loader2 className="size-8 animate-spin text-emerald-500/60" />
                 <span>Joining chat…</span>
               </div>
-            ) : messages.length === 0 ? (
+            ) : visibleMessages.length === 0 ? (
               <p className="py-16 text-center text-sm text-zinc-500">No messages yet — say hi to the room.</p>
             ) : (
-              messages.map((m) => {
+              visibleMessages.map((m) => {
                 const mine = myUserId != null && m.user_id === myUserId;
                 const deleted = Boolean(m.deleted_at);
                 const canEdit = mine && !deleted && channelIsActive;
@@ -407,7 +538,14 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
                 const showActions = openActionsId === m.id;
 
                 return (
-                  <div key={m.id} className="group relative">
+                  <div
+                    key={m.id}
+                    id={`chat-msg-${m.id}`}
+                    className={cn(
+                      "group relative scroll-mt-24 rounded-lg transition-colors",
+                      highlightMessageId === m.id && "ring-2 ring-emerald-400/70 ring-offset-2 ring-offset-zinc-950",
+                    )}
+                  >
                     <div className={cn("flex gap-2", mine ? "justify-end" : "justify-start")}>
                       <div
                         className={cn(
@@ -443,7 +581,7 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
                         ) : deleted ? (
                           <p className="italic text-zinc-500">This message was deleted.</p>
                         ) : (
-                          <p className="whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
+                          <p className="whitespace-pre-wrap break-words leading-relaxed">{renderMessageWithMentions(m.body)}</p>
                         )}
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums text-zinc-500">
                           <span>{new Date(m.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
@@ -575,24 +713,82 @@ export function ChannelChatPanel({ channelId, channelIsActive, connectEnabled, v
           </div>
         </ScrollArea>
 
-        <div className="flex gap-2">
+        <div className="relative flex gap-2">
           <Input
+            ref={draftInputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDraft(v);
+              const at = v.lastIndexOf("@");
+              if (at >= 0 && (at === 0 || /\s/.test(v[at - 1] ?? ""))) {
+                const q = v.slice(at + 1);
+                if (!q.includes(" ")) {
+                  setMentionQuery(q);
+                  setMentionOpen(true);
+                  setMentionIndex(0);
+                  return;
+                }
+              }
+              setMentionOpen(false);
+              setMentionQuery("");
+            }}
             maxLength={2000}
-            placeholder={channelIsActive ? "Message the channel…" : "Room is closed — chat is read-only."}
+            placeholder={channelIsActive ? "Message the channel… (@ to mention)" : "Room is closed — chat is read-only."}
             disabled={!channelIsActive || sending || !connected}
             className={cn(
               "border text-sm",
               variant === "listener" ? "border-white/10 bg-black/30 text-zinc-100 placeholder:text-zinc-600" : "border-zinc-800 bg-zinc-900/80",
             )}
             onKeyDown={(e) => {
+              if (mentionOpen && mentionCandidates.length > 0) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i + 1) % mentionCandidates.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
+                  return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  const pick = mentionCandidates[mentionIndex];
+                  if (pick) insertMention(pick.username);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  setMentionOpen(false);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 void submitSend();
               }
             }}
           />
+          {mentionOpen && mentionCandidates.length > 0 ? (
+            <div className="absolute bottom-full left-0 z-20 mb-1 max-h-40 w-full overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 py-1 shadow-xl">
+              {mentionCandidates.slice(0, 8).map((m, i) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={cn(
+                    "block w-full px-3 py-1.5 text-left text-sm",
+                    i === mentionIndex ? "bg-emerald-900/50 text-emerald-100" : "text-zinc-300 hover:bg-zinc-800",
+                  )}
+                  onMouseDown={(ev) => {
+                    ev.preventDefault();
+                    insertMention(m.username);
+                  }}
+                >
+                  @{m.username}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <Button
             type="button"
             className="shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-500"

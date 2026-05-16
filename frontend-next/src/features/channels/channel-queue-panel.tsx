@@ -1,7 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Play, RefreshCw, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Play, RefreshCw, ThumbsUp, Trash2 } from "lucide-react";
+import { useContext, useEffect, useState } from "react";
+import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
+import { UpNextStrip } from "@/components/room/up-next-strip";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,13 +16,16 @@ import {
   listChannelQueue,
   listTracks,
   removeChannelQueueItem,
+  removeQueueUpvote,
   reorderChannelQueueItem,
+  upvoteChannelQueueItem,
   type QueueItemSummary,
   type TrackSummary,
 } from "@/lib/api";
 
 export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: string; readOnly?: boolean }) {
   const { showToast } = useToast();
+  const queueCtx = useContext(ChannelQueueContext);
   const [queue, setQueue] = useState<QueueItemSummary[]>([]);
   const [trackMap, setTrackMap] = useState<Record<number, TrackSummary>>({});
   const [status, setStatus] = useState<string | null>(null);
@@ -48,6 +54,10 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
   }
 
   useEffect(() => {
+    if (queueCtx?.queue) setQueue(queueCtx.queue);
+  }, [queueCtx?.queue]);
+
+  useEffect(() => {
     void refresh();
   }, [channelId, readOnly]);
 
@@ -62,8 +72,15 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
           Refresh
         </Button>
       </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="h-[min(420px,50vh)]">
+      <CardContent className="space-y-3 p-4">
+        <UpNextStrip
+          items={queue.slice(0, 3).map((q) => ({
+            id: q.id,
+            title: trackMap[q.track]?.title ?? q.track_detail?.title ?? `Track #${q.track}`,
+            artist: trackMap[q.track]?.artist ?? q.track_detail?.artist,
+          }))}
+        />
+        <ScrollArea className="h-[min(380px,45vh)]">
           <div className="space-y-2 p-5 pr-3">
             {readOnly ? (
               <p className="py-6 text-center text-sm text-zinc-500">Reopen the channel to load or edit the queue.</p>
@@ -92,9 +109,33 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
                   </span>
                   <span className="truncate text-sm font-medium text-zinc-100">
                     {trackMap[item.track]?.title ?? `Track ${item.track}`}
+                    {item.added_by_username ? (
+                      <span className="ml-2 text-xs font-normal text-zinc-500">· {item.added_by_username}</span>
+                    ) : null}
                   </span>
+                  {(item.upvote_count ?? 0) > 0 ? (
+                    <span className="text-xs text-zinc-500">{item.upvote_count} up</span>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                  <Button
+                    variant={item.user_upvoted ? "default" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Upvote"
+                    onClick={async () => {
+                      try {
+                        if (item.user_upvoted) await removeQueueUpvote(channelId, item.id);
+                        else await upvoteChannelQueueItem(channelId, item.id);
+                        await refresh();
+                        await queueCtx?.refreshQueue();
+                      } catch (error) {
+                        showToast(error instanceof Error ? error.message : "Upvote failed.", "error");
+                      }
+                    }}
+                  >
+                    <ThumbsUp className="size-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

@@ -35,6 +35,11 @@ export type UserNotificationSettings = {
   chat_notify: "muted" | "mentions" | "all";
   admin_notify_reactions: boolean;
   admin_notify_votes: boolean;
+  push_quiet_hours_start?: number | null;
+  push_quiet_hours_end?: number | null;
+  push_category_playback?: boolean;
+  push_category_chat?: boolean;
+  push_category_moderation?: boolean;
   updated_at: string;
 };
 
@@ -56,10 +61,22 @@ export type PlaybackState = {
 export type ChannelExperienceSettings = {
   accent?: string;
   rehearsal_mode?: boolean;
+  rehearsal_lift_until?: string | null;
   queue_locked?: boolean;
   blind_playlist_id?: number | null;
   intro_preview_seconds?: number;
   veto_skip_threshold?: number;
+  anti_repeat_window?: number;
+  weighted_shuffle_bias?: number;
+  suggestions_enabled?: boolean;
+  dj_rotation_enabled?: boolean;
+  dj_rotation_every_n?: number;
+  current_dj_user_id?: number | null;
+  listening_party_only?: boolean;
+  radio_mode?: boolean;
+  scheduled_start_at?: string | null;
+  queue_end_mode?: "loop" | "stop" | "repeat_one";
+  room_rules?: string;
 };
 
 export type ChannelStateResponse = {
@@ -173,7 +190,10 @@ export type QueueItemSummary = {
   track: number;
   position: number;
   added_by: number | null;
+  added_by_username?: string | null;
   created_at: string;
+  upvote_count?: number;
+  user_upvoted?: boolean;
 };
 export type TrackSharePermission = {
   id: number;
@@ -397,9 +417,18 @@ export async function getMe(): Promise<MeBootstrap | null> {
   return (await res.json()) as MeBootstrap;
 }
 
-export async function patchNotificationSettings(
-  payload: Partial<Pick<UserNotificationSettings, "chat_notify" | "admin_notify_reactions" | "admin_notify_votes">>,
-): Promise<UserNotificationSettings> {
+export async function checkApiHealth(): Promise<{ status: string; db: boolean; redis: boolean }> {
+  const res = await fetch(`${getApiBase()}/api/health`, { cache: "no-store" });
+  const data = (await res.json()) as { status: string; db: boolean; redis: boolean };
+  return data;
+}
+
+export async function sendPushTest(): Promise<void> {
+  const res = await fetch(`${getApiBase()}/api/auth/me/push-test`, await withAuthHeaders({ method: "POST", body: "{}" }));
+  if (!res.ok) throw new Error(await extractApiError(res, "Push test failed"));
+}
+
+export async function patchNotificationSettings(payload: Partial<UserNotificationSettings>): Promise<UserNotificationSettings> {
   const res = await fetch(
     `${getApiBase()}/api/auth/me/notification-settings`,
     await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
@@ -755,9 +784,30 @@ export async function listTracks(options?: { search?: string; limit?: number }) 
 const CHUNK_UPLOAD_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const CHUNK_UPLOAD_PART_SIZE = 4 * 1024 * 1024;
 
+export async function getChunkUploadStatus(uploadId: string) {
+  const res = await fetch(`${getApiBase()}/api/tracks/upload/${encodeURIComponent(uploadId)}/status`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot read upload status"));
+  return (await res.json()) as {
+    upload_id: string;
+    written: number;
+    size: number;
+    filename?: string;
+    title?: string;
+    visibility?: string;
+  };
+}
+
 export async function uploadTrackChunked(
   payload: { title: string; artist?: string; album?: string; visibility: TrackSummary["visibility"]; file: File },
-  options?: { onProgress?: (percent: number) => void },
+  options?: {
+    onProgress?: (percent: number) => void;
+    resumeUploadId?: string;
+    startOffset?: number;
+    onCheckpoint?: (info: { uploadId: string; written: number }) => void;
+  },
 ): Promise<TrackSummary> {
   const { file } = payload;
   if (file.size <= CHUNK_UPLOAD_THRESHOLD_BYTES) {
@@ -765,26 +815,43 @@ export async function uploadTrackChunked(
   }
   await ensureCsrfCookie();
   const csrfToken = readCookie("csrftoken") ?? "";
-  const initRes = await fetch(`${getApiBase()}/api/tracks/upload/init`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": csrfToken,
-    },
-    body: JSON.stringify({
-      filename: file.name,
-      size: file.size,
-      title: payload.title,
-      artist: payload.artist ?? "",
-      album: payload.album ?? "",
-      visibility: payload.visibility,
-    }),
-  });
-  if (!initRes.ok) throw new Error(await extractApiError(initRes, "Cannot start upload"));
-  const { upload_id } = (await initRes.json()) as { upload_id: string };
+  let upload_id = options?.resumeUploadId ?? "";
+  let uploaded = options?.startOffset ?? 0;
 
-  let uploaded = 0;
+  if (upload_id) {
+    try {
+      const st = await getChunkUploadStatus(upload_id);
+      uploaded = Math.min(file.size, st.written);
+    } catch {
+      upload_id = "";
+      uploaded = 0;
+    }
+  }
+
+  if (!upload_id) {
+    const initRes = await fetch(`${getApiBase()}/api/tracks/upload/init`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        size: file.size,
+        title: payload.title,
+        artist: payload.artist ?? "",
+        album: payload.album ?? "",
+        visibility: payload.visibility,
+      }),
+    });
+    if (!initRes.ok) throw new Error(await extractApiError(initRes, "Cannot start upload"));
+    const initBody = (await initRes.json()) as { upload_id: string; written?: number };
+    upload_id = initBody.upload_id;
+    uploaded = initBody.written ?? 0;
+    options?.onCheckpoint?.({ uploadId: upload_id, written: uploaded });
+  }
+
   while (uploaded < file.size) {
     const end = Math.min(uploaded + CHUNK_UPLOAD_PART_SIZE, file.size);
     const slice = file.slice(uploaded, end);
@@ -801,6 +868,7 @@ export async function uploadTrackChunked(
     if (!putRes.ok) throw new Error(await extractApiError(putRes, "Chunk upload failed"));
     const body = (await putRes.json()) as { written: number };
     uploaded = body.written;
+    options?.onCheckpoint?.({ uploadId: upload_id, written: uploaded });
     options?.onProgress?.(Math.min(99, Math.round((uploaded / file.size) * 100)));
   }
 
@@ -814,7 +882,36 @@ export async function uploadTrackChunked(
   });
   if (!finRes.ok) throw new Error(await extractApiError(finRes, "Cannot finalize upload"));
   options?.onProgress?.(100);
-  return (await finRes.json()) as TrackSummary;
+  const track = (await finRes.json()) as TrackSummary;
+  return track;
+}
+
+export async function getPartyRecap(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/party-recap`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load party recap"));
+  return (await res.json()) as {
+    channel_id: number;
+    channel_name: string;
+    description: string;
+    total_events: number;
+    top_tracks: Array<{ id: number; title: string; artist: string; play_count: number }>;
+    timeline: Array<{ track_id: number | null; title: string | null; event_type: string; at: string }>;
+  };
+}
+
+export async function getApiMetrics() {
+  const res = await fetch(`${getApiBase()}/api/metrics`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Cannot load metrics");
+  return (await res.json()) as {
+    server_time: number;
+    channels_active: number;
+    channels_playing: number;
+    memberships_active: number;
+    tracks_total: number;
+    users_active: number;
+  };
 }
 
 export async function uploadTrack(
@@ -926,10 +1023,10 @@ export async function reorderPlaylistItem(itemId: number, position: number) {
   return (await res.json()) as PlaylistItemSummary;
 }
 
-export async function playPlaylistInChannel(channelId: string, playlistId: number) {
+export async function playPlaylistInChannel(channelId: string, playlistId: number, startIndex = 0) {
   const res = await fetch(
     `${getApiBase()}/api/channels/${channelId}/playlists/${playlistId}/play`,
-    await withAuthHeaders({ method: "POST", body: JSON.stringify({}) }),
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ start_index: startIndex }) }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot play playlist in channel"));
   return res.json();
@@ -1018,6 +1115,26 @@ export async function removeChannelQueueItem(channelId: string, itemId: number) 
 export async function jumpToChannelQueueItem(channelId: string, itemId: number) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/queue/${itemId}/jump`, await withAuthHeaders({ method: "POST", body: JSON.stringify({}) }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot jump queue item"));
+}
+
+export async function upvoteChannelQueueItem(channelId: string, itemId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/queue/${itemId}/upvote`,
+    await withAuthHeaders({ method: "POST", body: "{}" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot upvote"));
+}
+
+export async function removeQueueUpvote(channelId: string, itemId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/queue/${itemId}/upvote`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove upvote"));
+}
+
+export function getAuditLogExportUrl(channelId: string) {
+  return `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/audit-log/export`;
 }
 
 export async function listUsers() {

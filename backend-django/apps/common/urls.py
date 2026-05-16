@@ -1,14 +1,23 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.tracks.upload_views import TrackUploadChunkView, TrackUploadFinalizeView, TrackUploadInitView
+from apps.tracks.upload_views import (
+    TrackUploadChunkView,
+    TrackUploadFinalizeView,
+    TrackUploadInitView,
+    TrackUploadStatusView,
+)
 
+from apps.common.health import HealthView
+from apps.common.metrics import MetricsView
+from apps.common.openapi_schema import OpenApiSchemaView
 from apps.common.views import (
     LoginView,
     LogoutView,
     MeView,
     UserNotificationSettingsView,
     WebPushSubscriptionView,
+    WebPushTestView,
     UsersListView,
     RegisterView,
     ChannelControlView,
@@ -20,7 +29,9 @@ from apps.common.views import (
     ChannelJoinRequestRejectView,
     ChannelJoinView,
     ChannelNotificationPreferenceView,
+    ChannelPartyRecapView,
     ChannelPlaybackHistoryView,
+    ChannelAuditExportView,
     ChannelAuditLogView,
     ChannelPlaylistSuggestionView,
     ChannelChatPinView,
@@ -35,6 +46,7 @@ from apps.common.views import (
     ChannelShufflePlayView,
     ChannelQueueItemManageView,
     ChannelQueueJumpView,
+    ChannelQueueUpvoteView,
     ChannelQueueView,
     ChannelPublicLinkRotateView,
     ChannelSettingsView,
@@ -57,6 +69,9 @@ router.register("playlists", PlaylistViewSet, basename="playlist")
 router.register("playlist-items", PlaylistItemViewSet, basename="playlist-item")
 
 urlpatterns = [
+    path("health", HealthView.as_view()),
+    path("metrics", MetricsView.as_view()),
+    path("schema", OpenApiSchemaView.as_view()),
     path("time", api_time),
     path("auth/csrf", auth_csrf),
     path("auth/register", RegisterView.as_view()),
@@ -65,6 +80,7 @@ urlpatterns = [
     path("auth/me", MeView.as_view()),
     path("auth/me/notification-settings", UserNotificationSettingsView.as_view()),
     path("auth/me/push-subscription", WebPushSubscriptionView.as_view()),
+    path("auth/me/push-test", WebPushTestView.as_view()),
     path("auth/users", UsersListView.as_view()),
     path("channels/<int:channel_id>/state", ChannelStateView.as_view()),
     path("channels/<int:channel_id>/control", ChannelControlView.as_view()),
@@ -83,8 +99,10 @@ urlpatterns = [
     path("channels/<int:channel_id>/chat", ChannelChatView.as_view()),
     path("channels/<int:channel_id>/chat/pin", ChannelChatPinView.as_view()),
     path("channels/<int:channel_id>/track-reactions", ChannelTrackReactionView.as_view()),
+    path("channels/<int:channel_id>/party-recap", ChannelPartyRecapView.as_view()),
     path("channels/<int:channel_id>/history", ChannelPlaybackHistoryView.as_view()),
     path("channels/<int:channel_id>/audit-log", ChannelAuditLogView.as_view()),
+    path("channels/<int:channel_id>/audit-log/export", ChannelAuditExportView.as_view()),
     path("channels/<int:channel_id>/suggestions", ChannelPlaylistSuggestionView.as_view()),
     path("channels/<int:channel_id>/notification-settings", ChannelNotificationPreferenceView.as_view()),
     path("channels/<int:channel_id>/settings", ChannelSettingsView.as_view()),
@@ -96,7 +114,9 @@ urlpatterns = [
     path("channels/<int:channel_id>/queue", ChannelQueueView.as_view()),
     path("channels/<int:channel_id>/queue/<int:item_id>", ChannelQueueItemManageView.as_view()),
     path("channels/<int:channel_id>/queue/<int:item_id>/jump", ChannelQueueJumpView.as_view()),
+    path("channels/<int:channel_id>/queue/<int:item_id>/upvote", ChannelQueueUpvoteView.as_view()),
     path("tracks/upload/init", TrackUploadInitView.as_view()),
+    path("tracks/upload/<uuid:upload_id>/status", TrackUploadStatusView.as_view()),
     path("tracks/upload/<uuid:upload_id>/chunk", TrackUploadChunkView.as_view()),
     path("tracks/upload/<uuid:upload_id>/finalize", TrackUploadFinalizeView.as_view()),
     path("tracks/<int:track_id>/share-permissions", TrackSharePermissionsView.as_view()),

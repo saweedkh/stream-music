@@ -18,6 +18,7 @@ class Track(models.Model):
     genre = models.CharField(max_length=120, blank=True, default="")
     tags = models.JSONField(default=list, blank=True)
     duration_seconds = models.FloatField(default=0)
+    file_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
     file = models.FileField(upload_to="audio/")
     visibility = models.CharField(max_length=32, choices=Visibility.choices, default=Visibility.PRIVATE)
     created_at = models.DateTimeField(auto_now_add=True)

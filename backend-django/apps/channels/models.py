@@ -84,6 +84,11 @@ class UserNotificationSettings(models.Model):
     chat_notify = models.CharField(max_length=16, choices=ChatNotify.choices, default=ChatNotify.ALL)
     admin_notify_reactions = models.BooleanField(default=True)
     admin_notify_votes = models.BooleanField(default=True)
+    push_quiet_hours_start = models.PositiveSmallIntegerField(null=True, blank=True)
+    push_quiet_hours_end = models.PositiveSmallIntegerField(null=True, blank=True)
+    push_category_playback = models.BooleanField(default=True)
+    push_category_chat = models.BooleanField(default=True)
+    push_category_moderation = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

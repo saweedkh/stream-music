@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, ListMusic, Music, Share2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +35,9 @@ import {
   type TrackSharePermission,
   type TrackSummary,
 } from "@/lib/api";
+import { parseAudioFileMetadata } from "@/lib/audio-metadata";
+import { loadPendingUpload, type PendingChunkUpload } from "@/lib/resumable-upload";
+import { uploadTrackResumable } from "@/lib/resumable-upload";
 import { createChannelSchema, createPlaylistSchema, uploadTrackSchema } from "@/lib/validation";
 
 export function DashboardWorkspace() {
@@ -58,6 +62,7 @@ export function DashboardWorkspace() {
   const [trackFile, setTrackFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<PendingChunkUpload | null>(null);
 
   const [playlistName, setPlaylistName] = useState("");
   const [playlistChannel, setPlaylistChannel] = useState<string>("none");
@@ -91,6 +96,9 @@ export function DashboardWorkspace() {
     setTrackFile(file);
     if (!file) return;
     setTrackTitle((current) => (current.trim() ? current : deriveTitleFromFile(file)));
+    void parseAudioFileMetadata(file).then((meta) => {
+      if (meta.title) setTrackTitle((current) => (current.trim() ? current : meta.title!));
+    });
     setFieldErrors((prev) => {
       const { trackFile: _trackFile, trackTitle: _trackTitle, ...rest } = prev;
       return rest;
@@ -119,6 +127,10 @@ export function DashboardWorkspace() {
 
   useEffect(() => {
     refreshAll();
+  }, []);
+
+  useEffect(() => {
+    setPendingUpload(loadPendingUpload());
   }, []);
 
   useEffect(() => {
@@ -182,7 +194,11 @@ export function DashboardWorkspace() {
       setIsUploading(true);
       setUploadProgress(0);
       setTrackTitle(normalizedTitle);
-      await uploadTrackChunked({ title: normalizedTitle, visibility: trackVisibility, file: trackFile }, { onProgress: setUploadProgress });
+      await uploadTrackResumable(
+        uploadTrackChunked,
+        { title: normalizedTitle, visibility: trackVisibility, file: trackFile },
+        { onProgress: setUploadProgress },
+      );
       setStatus("Track uploaded.");
       showToast("Track uploaded.", "success");
       setTrackTitle("");
@@ -342,6 +358,27 @@ export function DashboardWorkspace() {
       </section>
 
       <NotificationPreferencesCard />
+
+      {pendingUpload ? (
+        <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm">
+            Interrupted upload: <strong>{pendingUpload.fileName}</strong> (
+            {Math.round((pendingUpload.written / Math.max(1, pendingUpload.fileSize)) * 100)}% done)
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setTrackTitle(pendingUpload.title);
+              setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
+              setActiveTab("tracks");
+              showToast("Select the same file again to resume upload.", "info");
+            }}
+          >
+            Resume upload
+          </Button>
+        </Alert>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full animate-in fade-in duration-500">
         <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">

@@ -1,6 +1,17 @@
 "use client";
 
-import { Activity, DoorClosed, HeartPulse, LogOut, MessageSquare, Radio, Settings2, Sparkles } from "lucide-react";
+import {
+  Activity,
+  DoorClosed,
+  Headphones,
+  HeartPulse,
+  Lightbulb,
+  LogOut,
+  MessageSquare,
+  Radio,
+  Settings2,
+  Sparkles,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -21,21 +32,28 @@ import { ChannelChatPanel } from "@/features/channels/channel-chat-panel";
 import { ChannelListenerView, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
+import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
+import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
+import { DjBoothPanel } from "@/features/channels/dj-booth-panel";
+import { RoomOnboarding } from "@/components/room/room-onboarding";
+import { useRoomHotkeys } from "@/hooks/use-room-hotkeys";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import { RoomExperienceChrome, type ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import {
   closeChannel,
   getChannelMembers,
+  getApiMetrics,
   getMe,
   joinChannel,
   leaveChannel,
   reopenChannel,
   type QueueItemSummary,
 } from "@/lib/api";
+import { channelChatHref, channelPlayerHref, useNotificationStore } from "@/lib/notifications/store";
 import { cn } from "@/lib/utils";
 
-const TAB_IDS = ["chat", "player", "queue", "admin", "health"] as const;
+const TAB_IDS = ["chat", "player", "queue", "insights", "dj-booth", "admin", "health"] as const;
 
 type TabId = (typeof TAB_IDS)[number];
 
@@ -125,7 +143,13 @@ export function ChannelDashboardTabs(props: Props) {
   const [rttMs, setRttMs] = useState<number | null>(null);
   const [jitterMs, setJitterMs] = useState<number | null>(null);
   const [reconnectCount, setReconnectCount] = useState(0);
+  const [clockOffsetMs, setClockOffsetMs] = useState<number | null>(null);
+  const [apiMetrics, setApiMetrics] = useState<Awaited<ReturnType<typeof getApiMetrics>> | null>(null);
+  const [wsQueue, setWsQueue] = useState<QueueItemSummary[] | null>(null);
+  const [chatTabUnread, setChatTabUnread] = useState(0);
+  const pushNotification = useNotificationStore((s) => s.push);
   const rttSamplesRef = useRef<number[]>([]);
+  const lastTrackKeyRef = useRef<string | null>(null);
   const offsetSamplesRef = useRef<number[]>([]);
   const prevSocketStateRef = useRef<string>("connecting");
   const latestSendMessageRef = useRef<((payload: Record<string, unknown>) => boolean) | undefined>(undefined);
@@ -177,6 +201,7 @@ export function ChannelDashboardTabs(props: Props) {
               : 0;
           setRttMs(Math.round(avgRtt));
           setJitterMs(jitter);
+          setClockOffsetMs(Math.round(offsetMs));
           window.dispatchEvent(
             new CustomEvent("channel-clock-sync", { detail: { channelId: String(channelId), offsetMs } }),
           );
@@ -200,6 +225,9 @@ export function ChannelDashboardTabs(props: Props) {
           permission_denied: "You do not have permission for this action.",
           shout_cooldown: "Wait a few seconds before shouting again.",
           queue_locked: "Queue is locked — only the room owner can add tracks.",
+          listening_party_only: "Listening party — only DJs can add to the queue.",
+          rate_limited: "You are sending messages too fast. Slow down.",
+          scheduled_not_started: "Playback is scheduled for later — wait until start time.",
         };
         const key = String(data.message ?? "invalid_state");
         showToast(map[key] ?? `Playback error: ${key}`, "error");
@@ -217,12 +245,37 @@ export function ChannelDashboardTabs(props: Props) {
       if (typeof data.is_playing === "boolean") setIsChannelOnline(data.is_playing);
       if (action === "play") setIsChannelOnline(true);
       if (action === "pause") setIsChannelOnline(false);
-      if (["initial_sync", "play", "pause", "seek", "next", "prev", "add_to_queue", "enqueue_next"].includes(action)) {
+      if (action === "queue_updated" && Array.isArray(data.queue)) {
+        setWsQueue(data.queue as QueueItemSummary[]);
+      }
+      if (["initial_sync", "play", "pause", "seek", "next", "prev", "add_to_queue", "enqueue_next", "queue_updated"].includes(action)) {
+        if (Array.isArray(data.queue)) setWsQueue(data.queue as QueueItemSummary[]);
         setLatestPlaybackPayload(data);
         window.dispatchEvent(new CustomEvent("channel-playback-updated", { detail: { channelId, payload: data } }));
+
+        const trackPayload = data as { track?: { title?: string | null; id?: number } | null; track_file?: string | null };
+        const trackTitle =
+          trackPayload.track?.title?.trim() ||
+          deriveNowPlayingLabel(trackPath, { track_file: trackPayload.track_file }) ||
+          null;
+        const trackKey = `${trackPayload.track?.id ?? ""}:${trackPayload.track_file ?? ""}:${trackTitle ?? ""}`;
+        const trackActions = new Set(["next", "prev", "play", "play_playlist", "shuffle_play", "auto_next"]);
+        if (trackActions.has(action) && trackTitle && trackKey !== lastTrackKeyRef.current) {
+          lastTrackKeyRef.current = trackKey;
+          const onPlayerTab = activeTab === "player";
+          if (document.hidden || !onPlayerTab) {
+            pushNotification({
+              category: "playback",
+              title: channelName,
+              body: `Now playing: ${trackTitle}`,
+              href: channelPlayerHref(channelId),
+              channelId,
+            });
+          }
+        }
       }
     },
-    [channelId, showToast],
+    [activeTab, channelId, channelName, pushNotification, showToast, trackPath],
   );
 
   const { socketState, sendMessage } = useReconnectingChannelSocket({
@@ -237,6 +290,13 @@ export function ChannelDashboardTabs(props: Props) {
   useEffect(() => {
     latestSendMessageRef.current = sendMessage;
   }, [sendMessage]);
+
+  useRoomHotkeys({
+    enabled: membershipLoaded,
+    canControl: canManageChannel,
+    onHelp: () => window.dispatchEvent(new CustomEvent("channel-room-help")),
+    onTogglePlay: () => sendMessage({ action: isChannelOnline ? "pause" : "play" }),
+  });
 
   useEffect(() => {
     if (prevSocketStateRef.current !== "reconnecting" && socketState === "reconnecting") {
@@ -261,7 +321,12 @@ export function ChannelDashboardTabs(props: Props) {
   useEffect(() => {
     const next = tabFromSearchValue(searchParams.get("tab"));
     if (next) setActiveTab(next);
+    if (searchParams.get("message")) setActiveTab("chat");
   }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab === "chat") setChatTabUnread(0);
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== "chat" || !membershipLoaded) return;
@@ -272,6 +337,55 @@ export function ChannelDashboardTabs(props: Props) {
   }, [activeTab, membershipLoaded]);
 
   useEffect(() => {
+    const onSocial = (event: Event) => {
+      const detail = (event as CustomEvent<{ channelId?: string; payload?: Record<string, unknown> }>).detail;
+      if (String(detail?.channelId) !== String(channelId)) return;
+      const p = detail.payload ?? {};
+      const act = String(p.action ?? "").toLowerCase();
+      if (act === "reaction") {
+        const emoji = String(p.emoji ?? "♪");
+        const who = String(p.username ?? "?");
+        pushNotification({
+          category: "moderation",
+          title: channelName,
+          body: `Reaction ${emoji} — ${who}`,
+          href: channelChatHref(channelId),
+          channelId,
+        });
+      } else if (act === "vote_skip") {
+        const votes = typeof p.votes === "number" ? p.votes : 0;
+        const thr = typeof p.threshold === "number" ? p.threshold : 0;
+        pushNotification({
+          category: "moderation",
+          title: channelName,
+          body: thr > 0 ? `Skip votes: ${votes}/${thr}` : `Skip votes: ${votes}`,
+          href: channelPlayerHref(channelId),
+          channelId,
+        });
+      }
+    };
+    window.addEventListener("channel-social", onSocial);
+    return () => window.removeEventListener("channel-social", onSocial);
+  }, [channelId, channelName, pushNotification]);
+
+  useEffect(() => {
+    const onInApp = (event: Event) => {
+      const item = (event as CustomEvent<{ category?: string; channelId?: string }>).detail;
+      if (item?.category !== "chat" || String(item.channelId) !== String(channelId)) return;
+      if (activeTab !== "chat") setChatTabUnread((c) => c + 1);
+    };
+    window.addEventListener("stream-in-app-notification", onInApp);
+    return () => window.removeEventListener("stream-in-app-notification", onInApp);
+  }, [activeTab, channelId]);
+
+  useEffect(() => {
+    if (activeTab !== "health") return;
+    void getApiMetrics()
+      .then((m) => setApiMetrics(m))
+      .catch(() => setApiMetrics(null));
+  }, [activeTab]);
+
+  useEffect(() => {
     let cancelled = false;
     setMembershipLoaded(false);
 
@@ -280,7 +394,8 @@ export function ChannelDashboardTabs(props: Props) {
         const out = await joinChannel(channelId);
         if (cancelled) return;
         if (out.status === "pending") {
-          showToast("Your join request is pending moderator approval.", "info");
+          router.push(`/join/pending?channel=${encodeURIComponent(channelId)}`);
+          return;
         }
       } catch (error) {
         if (!cancelled) {
@@ -529,6 +644,9 @@ export function ChannelDashboardTabs(props: Props) {
             connectEnabled={membershipLoaded && currentUserId !== null}
             variant="listener"
             canModerate={canManageChannel}
+            nowPlayingLabel={nowPlayingLabel}
+            channelName={channelName}
+            roomActiveTab="chat"
           />
         </div>
         {leaveDialog}
@@ -536,7 +654,14 @@ export function ChannelDashboardTabs(props: Props) {
     );
   }
 
+  const currentTrackId =
+    latestPlaybackPayload && typeof (latestPlaybackPayload as { track?: { id?: number } }).track?.id === "number"
+      ? (latestPlaybackPayload as { track?: { id?: number } }).track!.id!
+      : null;
+
   return (
+    <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
+    <RoomOnboarding channelId={channelId} />
     <div className="space-y-6 pb-28">
       <RoomExperienceChrome
         channelId={channelId}
@@ -631,6 +756,11 @@ export function ChannelDashboardTabs(props: Props) {
             <TabsTrigger value="chat" className="gap-1.5">
               <MessageSquare className="h-4 w-4 opacity-80" aria-hidden />
               Chat
+              {chatTabUnread > 0 ? (
+                <span className="ml-1 rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-slate-950">
+                  {chatTabUnread > 9 ? "9+" : chatTabUnread}
+                </span>
+              ) : null}
             </TabsTrigger>
             <TabsTrigger value="player" className="gap-1.5">
               <Radio className="h-4 w-4 opacity-80" aria-hidden />
@@ -640,6 +770,16 @@ export function ChannelDashboardTabs(props: Props) {
               <Sparkles className="h-4 w-4 opacity-80" aria-hidden />
               Queue
             </TabsTrigger>
+            <TabsTrigger value="insights" className="gap-1.5">
+              <Lightbulb className="h-4 w-4 opacity-80" aria-hidden />
+              Insights
+            </TabsTrigger>
+            {canManageChannel ? (
+              <TabsTrigger value="dj-booth" className="gap-1.5">
+                <Headphones className="h-4 w-4 opacity-80" aria-hidden />
+                DJ booth
+              </TabsTrigger>
+            ) : null}
             {canManageChannel ? (
               <TabsTrigger value="admin" className="gap-1.5">
                 <Settings2 className="h-4 w-4 opacity-80" aria-hidden />
@@ -660,6 +800,9 @@ export function ChannelDashboardTabs(props: Props) {
             connectEnabled={membershipLoaded && currentUserId !== null}
             variant="admin"
             canModerate={canManageChannel}
+            nowPlayingLabel={nowPlayingLabel}
+            channelName={channelName}
+            roomActiveTab={activeTab}
           />
         </TabsContent>
 
@@ -683,6 +826,21 @@ export function ChannelDashboardTabs(props: Props) {
         <TabsContent value="queue" className="mt-5">
           <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />
         </TabsContent>
+
+        <TabsContent value="insights" className="mt-5">
+          <ChannelRoomInsights channelId={channelId} canManage={canManageChannel} currentTrackId={currentTrackId} />
+        </TabsContent>
+
+        {canManageChannel ? (
+          <TabsContent value="dj-booth" className="mt-5">
+            <DjBoothPanel
+              channelId={channelId}
+              canManage={canManageChannel && channelIsActive}
+              sendSocketMessage={sendMessage}
+              nowPlayingLabel={nowPlayingLabel}
+            />
+          </TabsContent>
+        ) : null}
 
         {canManageChannel ? (
           <TabsContent value="admin" className="mt-5">
@@ -744,6 +902,26 @@ export function ChannelDashboardTabs(props: Props) {
                   <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">{reconnectCount}</span>
                 </p>
               </div>
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                <p>
+                  <span className="font-medium text-zinc-500">Clock offset (client vs server)</span>
+                  <span className="mt-1 block font-mono text-xs text-zinc-300 sm:text-sm">
+                    {clockOffsetMs != null ? `${clockOffsetMs}ms` : "—"}
+                  </span>
+                </p>
+              </div>
+              {apiMetrics ? (
+                <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
+                  <p className="font-medium text-zinc-500">Server metrics</p>
+                  <ul className="mt-2 space-y-1 font-mono text-xs text-zinc-300">
+                    <li>Active channels: {apiMetrics.channels_active}</li>
+                    <li>Playing: {apiMetrics.channels_playing}</li>
+                    <li>Tracks: {apiMetrics.tracks_total}</li>
+                    <li>Active users: {apiMetrics.users_active}</li>
+                    <li>Memberships: {apiMetrics.memberships_active}</li>
+                  </ul>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -752,5 +930,6 @@ export function ChannelDashboardTabs(props: Props) {
       {closeChannelDialog}
       {leaveDialog}
     </div>
+    </ChannelQueueProvider>
   );
 }

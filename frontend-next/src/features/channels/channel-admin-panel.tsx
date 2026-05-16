@@ -164,6 +164,16 @@ export function ChannelAdminPanel({
   const [expBlindPlaylistId, setExpBlindPlaylistId] = useState("");
   const [expIntro, setExpIntro] = useState("0");
   const [expVeto, setExpVeto] = useState("0");
+  const [expAntiRepeat, setExpAntiRepeat] = useState("0");
+  const [expShuffleBias, setExpShuffleBias] = useState("0");
+  const [expSuggestions, setExpSuggestions] = useState(true);
+  const [expDjRotation, setExpDjRotation] = useState(false);
+  const [expDjEvery, setExpDjEvery] = useState("1");
+  const [expListeningParty, setExpListeningParty] = useState(false);
+  const [expRadio, setExpRadio] = useState(false);
+  const [expQueueEndMode, setExpQueueEndMode] = useState<"loop" | "stop" | "repeat_one">("loop");
+  const [expRoomRules, setExpRoomRules] = useState("");
+  const [expScheduledStart, setExpScheduledStart] = useState("");
 
   const privateJoinUrl = inviteToken && typeof window !== "undefined" ? buildPrivateInviteJoinUrl(inviteToken) : null;
   const publicJoinUrl =
@@ -213,6 +223,17 @@ export function ChannelAdminPanel({
     setExpBlindPlaylistId(b != null && b !== "" ? String(b) : "");
     setExpIntro(raw.intro_preview_seconds != null ? String(raw.intro_preview_seconds) : "0");
     setExpVeto(raw.veto_skip_threshold != null ? String(raw.veto_skip_threshold) : "0");
+    setExpAntiRepeat(raw.anti_repeat_window != null ? String(raw.anti_repeat_window) : "0");
+    setExpShuffleBias(raw.weighted_shuffle_bias != null ? String(raw.weighted_shuffle_bias) : "0");
+    setExpSuggestions(raw.suggestions_enabled !== false);
+    setExpDjRotation(Boolean(raw.dj_rotation_enabled));
+    setExpDjEvery(raw.dj_rotation_every_n != null ? String(raw.dj_rotation_every_n) : "1");
+    setExpListeningParty(Boolean(raw.listening_party_only));
+    setExpRadio(Boolean(raw.radio_mode));
+    const mode = raw.queue_end_mode;
+    setExpQueueEndMode(mode === "stop" || mode === "repeat_one" ? mode : "loop");
+    setExpRoomRules(typeof raw.room_rules === "string" ? raw.room_rules : "");
+    setExpScheduledStart(typeof raw.scheduled_start_at === "string" ? raw.scheduled_start_at : "");
   }, [initialExperience]);
 
   useEffect(() => {
@@ -298,6 +319,35 @@ export function ChannelAdminPanel({
     }
   }
 
+  async function handoffDj(userId: number, username: string) {
+    setBusy(`dj-${userId}`);
+    try {
+      await updateChannelSettings(channelId, { experience: { current_dj_user_id: userId } });
+      showToast(`${username} is the active DJ for rotation.`, "success");
+      router.refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "DJ handoff failed.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function liftRehearsalMix() {
+    setBusy("lift");
+    const until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    try {
+      await updateChannelSettings(channelId, {
+        experience: { rehearsal_lift_until: until },
+      });
+      showToast("Listeners can hear the mix for 15 minutes.", "success");
+      router.refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not lift soundcheck.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveExperience() {
     setBusy("experience");
     const intro = Math.max(0, Math.min(120, Number(expIntro) || 0));
@@ -313,6 +363,16 @@ export function ChannelAdminPanel({
           blind_playlist_id: blindNum != null && Number.isFinite(blindNum) ? blindNum : null,
           intro_preview_seconds: intro,
           veto_skip_threshold: veto,
+          anti_repeat_window: Math.max(0, Number(expAntiRepeat) || 0),
+          weighted_shuffle_bias: Math.max(0, Math.min(2, Number(expShuffleBias) || 0)),
+          suggestions_enabled: expSuggestions,
+          dj_rotation_enabled: expDjRotation,
+          dj_rotation_every_n: Math.max(1, Number(expDjEvery) || 1),
+          listening_party_only: expListeningParty,
+          radio_mode: expRadio,
+          queue_end_mode: expQueueEndMode,
+          room_rules: expRoomRules.trim() || undefined,
+          scheduled_start_at: expScheduledStart.trim() ? expScheduledStart.trim() : null,
         },
       });
       showToast("Room experience saved.", "success");
@@ -552,6 +612,20 @@ export function ChannelAdminPanel({
                   </div>
                   <Switch checked={expRehearsal} onCheckedChange={setExpRehearsal} id={`ch-exp-reh-${channelId}`} />
                 </div>
+                {expRehearsal ? (
+                  <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy === "lift"}
+                      onClick={() => void liftRehearsalMix()}
+                    >
+                      Lift soundcheck 15 min
+                    </Button>
+                    <p className="text-xs text-zinc-500">Listeners hear the main mix until the lift expires.</p>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
                   <div>
                     <p className="text-sm font-medium text-zinc-100">Lock queue adds</p>
@@ -584,6 +658,70 @@ export function ChannelAdminPanel({
                     className="border-zinc-800 bg-zinc-900/80"
                   />
                   <p className="text-xs text-zinc-500">0 = tally only. When reached, the room auto-advances like “next”.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-anti-${channelId}`}>Anti-repeat window</Label>
+                  <Input id={`ch-exp-anti-${channelId}`} type="number" min={0} value={expAntiRepeat} onChange={(e) => setExpAntiRepeat(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-bias-${channelId}`}>Shuffle bias (0–2)</Label>
+                  <Input id={`ch-exp-bias-${channelId}`} type="number" min={0} max={2} step={0.1} value={expShuffleBias} onChange={(e) => setExpShuffleBias(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-zinc-100">Track suggestions</p>
+                  <Switch checked={expSuggestions} onCheckedChange={setExpSuggestions} />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3">
+                  <p className="text-sm font-medium text-zinc-100">DJ rotation</p>
+                  <Switch checked={expDjRotation} onCheckedChange={setExpDjRotation} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rotate every N tracks</Label>
+                  <Input type="number" min={1} value={expDjEvery} onChange={(e) => setExpDjEvery(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-zinc-100">Listening party</p>
+                  <Switch checked={expListeningParty} onCheckedChange={setExpListeningParty} />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-zinc-100">Radio mode</p>
+                  <Switch checked={expRadio} onCheckedChange={setExpRadio} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-queue-end-${channelId}`}>When queue ends</Label>
+                  <Select
+                    id={`ch-exp-queue-end-${channelId}`}
+                    value={expQueueEndMode}
+                    onChange={(e) => setExpQueueEndMode(e.target.value as "loop" | "stop" | "repeat_one")}
+                    className="border-zinc-800 bg-zinc-900/80"
+                  >
+                    <option value="loop">Loop playlist</option>
+                    <option value="stop">Stop at last track</option>
+                    <option value="repeat_one">Repeat current track</option>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-rules-${channelId}`}>Room rules (shown to listeners)</Label>
+                  <textarea
+                    id={`ch-exp-rules-${channelId}`}
+                    value={expRoomRules}
+                    onChange={(e) => setExpRoomRules(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    className="w-full rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+                    placeholder="Be kind, no spoilers, request in chat…"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-scheduled-${channelId}`}>Scheduled start (ISO, optional)</Label>
+                  <Input
+                    id={`ch-exp-scheduled-${channelId}`}
+                    value={expScheduledStart}
+                    onChange={(e) => setExpScheduledStart(e.target.value)}
+                    placeholder="2026-05-16T21:00:00Z"
+                    className="border-zinc-800 bg-zinc-900/80"
+                  />
+                  <p className="text-xs text-zinc-500">Blocks play/shuffle until this time (UTC ISO string).</p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor={`ch-brand-logo-${channelId}`}>Brand logo</Label>
@@ -849,6 +987,15 @@ export function ChannelAdminPanel({
                         }}
                       >
                         Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="md:justify-self-end"
+                        disabled={busy === `dj-${member.user_id}`}
+                        onClick={() => void handoffDj(member.user_id, member.username)}
+                      >
+                        DJ
                       </Button>
                       <Button
                         variant="destructive"
