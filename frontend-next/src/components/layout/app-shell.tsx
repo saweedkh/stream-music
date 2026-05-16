@@ -1,16 +1,28 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
+import { ChevronDown, LayoutDashboard, LogOut, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { ChannelCommandMenu } from "@/components/room/channel-command-menu";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, logoutUser, type AuthUser } from "@/lib/api";
 import { ConnectivityBanner } from "@/components/connectivity-banner";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const GlobalChannelPlayerDock = dynamic(
   () => import("@/features/player/global-channel-player-dock").then((m) => ({ default: m.GlobalChannelPlayerDock })),
@@ -18,7 +30,13 @@ const GlobalChannelPlayerDock = dynamic(
 );
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [me, setMe] = useState<AuthUser | null>(null);
+
+  const channelId = useMemo(() => {
+    const m = pathname?.match(/^\/channel\/([^/]+)/);
+    return m?.[1] ?? undefined;
+  }, [pathname]);
 
   useEffect(() => {
     getMe()
@@ -43,36 +61,60 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
       <NotificationProvider>
-      <GlobalChannelPlayerProvider>
-        <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 pb-36 sm:px-6">
-          <header className="mb-6 flex items-center justify-between rounded-2xl border border-slate-800/80 bg-slate-900/55 px-5 py-3 backdrop-blur">
-            <Link href={me ? "/dashboard" : "/login"} className="text-lg font-semibold tracking-tight text-slate-100">
-              Stream Music
-            </Link>
-            <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-sm text-slate-300">
-              <Link href="/dashboard" className="hover:text-white">
-                Dashboard
+        <GlobalChannelPlayerProvider>
+          <ChannelCommandMenu channelId={channelId} canManage={Boolean(channelId)} />
+          <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 pb-36 sm:px-6">
+            <header className="mb-6 flex items-center justify-between rounded-2xl border border-zinc-800/80 bg-card/55 px-5 py-3 backdrop-blur-md">
+              <Link href={me ? "/dashboard" : "/login"} className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand/30 bg-brand/10 text-brand">
+                  <Radio className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="font-display text-lg font-semibold tracking-tight text-foreground">Stream Music</span>
               </Link>
-              {me ? <NotificationCenter /> : null}
-              {me ? (
-                <>
-                  <span className="text-xs text-slate-400">@{me.username}</span>
-                  <Button variant="ghost" className="px-2 py-1 text-xs" onClick={handleLogout}>
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <Link href="/login" className="hover:text-white">
-                  Login
+              <nav className="flex flex-wrap items-center justify-end gap-x-2 gap-y-2 text-sm text-zinc-300">
+                <Link href="/dashboard" className="hidden rounded-lg px-2.5 py-1.5 hover:bg-zinc-800/80 hover:text-white sm:inline">
+                  Dashboard
                 </Link>
-              )}
-            </nav>
-          </header>
-          <ConnectivityBanner />
-          {children}
-        </div>
-        <GlobalChannelPlayerDock />
-      </GlobalChannelPlayerProvider>
+                {me ? <NotificationCenter /> : null}
+                {me ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="gap-2 px-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>{(me.username || "?").slice(0, 1)}</AvatarFallback>
+                        </Avatar>
+                        <span className="hidden max-w-[8rem] truncate text-sm sm:inline">@{me.username}</span>
+                        <ChevronDown className="h-4 w-4 text-zinc-500" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard" className="flex cursor-pointer items-center gap-2">
+                          <LayoutDashboard className="h-4 w-4" />
+                          Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-red-300 focus:text-red-200" onClick={() => void handleLogout()}>
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Link href="/login" className="rounded-lg px-2.5 py-1.5 hover:bg-zinc-800/80 hover:text-white">
+                    Login
+                  </Link>
+                )}
+              </nav>
+            </header>
+            <ConnectivityBanner />
+            {children}
+          </div>
+          <GlobalChannelPlayerDock />
+        </GlobalChannelPlayerProvider>
       </NotificationProvider>
     </ToastProvider>
   );

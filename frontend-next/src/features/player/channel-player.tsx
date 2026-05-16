@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Howl } from "howler";
-import { ChevronUp, Headphones, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { ChevronUp, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast-provider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
@@ -158,8 +159,14 @@ export function ChannelPlayer({
   const { showToast } = useToast();
 
   const howlRef = useRef<Howl | null>(null);
-  const cueHowlRef = useRef<Howl | null>(null);
+  const loadGenerationRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  const lastTransportRef = useRef({
+    playing: initialIsPlaying,
+    track: trackPath as string | undefined,
+    started: startedAt,
+    paused: pausedAt,
+  });
   const controlRequestInFlightRef = useRef(false);
   const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
   const lastAppliedEventSeqRef = useRef(0);
@@ -203,44 +210,33 @@ export function ChannelPlayer({
   const introRemainingSec =
     !canControl && introCapSec > 0 && position < introCapSec ? Math.max(0, Math.ceil(introCapSec - position)) : null;
 
-  function stopCue() {
+  function teardownMainHowl() {
+    const prev = howlRef.current;
+    if (!prev) {
+      setVizAudioEl(null);
+      return;
+    }
     try {
-      cueHowlRef.current?.stop();
-      cueHowlRef.current?.unload();
+      prev.stop();
+      prev.unload();
     } catch {
       /* ignore */
     }
-    cueHowlRef.current = null;
+    howlRef.current = null;
+    setVizAudioEl(null);
   }
 
-  function playCue() {
-    if (!canControl || !activeTrackPath) return;
-    stopCue();
-    const src = `${getApiBase()}${activeTrackPath}`;
-    const h = new Howl({
-      src: [src],
-      html5: true,
-      volume: 0.34,
-      onload: () => {
-        h.seek(0);
-        h.play();
-      },
-      onloaderror: () => showToast("Cannot load cue preview.", "error"),
+  function startHowlTransport(howl: Howl) {
+    const expected = expectedTimeSeconds({
+      startedAt: syncStartedAt,
+      pausedAt: syncPausedAt,
+      offsetMs,
+      isPlaying: true,
     });
-    cueHowlRef.current = h;
+    if (typeof howl.rate === "function") howl.rate(1);
+    howl.seek(Math.max(0, expected));
+    if (!howl.playing()) howl.play();
   }
-
-  useEffect(() => {
-    return () => {
-      try {
-        cueHowlRef.current?.stop();
-        cueHowlRef.current?.unload();
-      } catch {
-        /* ignore */
-      }
-      cueHowlRef.current = null;
-    };
-  }, []);
 
   async function refreshChannelPlaybackState(options?: { silent?: boolean }) {
     try {
@@ -385,6 +381,16 @@ export function ChannelPlayer({
   useEffect(() => {
     lastAppliedEventSeqRef.current = 0;
     setQueueVersion(0);
+    teardownMainHowl();
+    setPosition(0);
+    setDuration(0);
+    setIsBuffering(false);
+    lastTransportRef.current = {
+      playing: initialIsPlaying,
+      track: trackPath,
+      started: startedAt,
+      paused: pausedAt,
+    };
   }, [channelId]);
 
   useEffect(() => {
@@ -424,41 +430,46 @@ export function ChannelPlayer({
 
   useEffect(() => {
     const src = activeTrackPath ? `${getApiBase()}${activeTrackPath}` : null;
+    const loadGen = ++loadGenerationRef.current;
 
     if (!src) {
-      stopCue();
-      howlRef.current?.unload();
-      howlRef.current = null;
-      setVizAudioEl(null);
+      teardownMainHowl();
       setPosition(0);
       setDuration(0);
       setIsBuffering(false);
       return;
     }
 
+    teardownMainHowl();
     setIsBuffering(true);
     const howl = new Howl({
       src: [src],
       html5: true,
       volume,
       onload: () => {
+        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
         setIsBuffering(false);
         setDuration(howl.duration() || 0);
         setVizAudioEl(getHowlHtml5Audio(howl));
+        if (isPlayingRef.current) startHowlTransport(howl);
       },
       onplay: () => {
+        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
         setIsBuffering(false);
         setVizAudioEl(getHowlHtml5Audio(howl));
       },
       onplayerror: () => {
+        if (loadGen !== loadGenerationRef.current) return;
         setIsBuffering(false);
         setNeedsUserInteraction(true);
       },
       onloaderror: () => {
+        if (loadGen !== loadGenerationRef.current) return;
         setIsBuffering(false);
         showToast("Cannot load audio source", "error");
       },
       onend: () => {
+        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
         if (!isPlayingRef.current || !socketConnectedRef.current) return;
         const send = sendSocketMessageRef.current;
         const clientDurationSec =
@@ -476,17 +487,22 @@ export function ChannelPlayer({
       },
     });
 
-    howlRef.current?.unload();
     howlRef.current = howl;
 
     return () => {
-      setVizAudioEl(null);
-      howl.unload();
+      if (loadGen !== loadGenerationRef.current) return;
+      try {
+        howl.stop();
+        howl.unload();
+      } catch {
+        /* ignore */
+      }
       if (howlRef.current === howl) {
         howlRef.current = null;
       }
+      setVizAudioEl(null);
     };
-  }, [activeTrackPath, queueVersion]);
+  }, [activeTrackPath]);
 
   useEffect(() => {
     const tick = () => {
@@ -551,97 +567,120 @@ export function ChannelPlayer({
     const howl = howlRef.current;
     if (!howl) return;
 
+    const prev = lastTransportRef.current;
+    const next = {
+      playing: isPlaying,
+      track: activeTrackPath,
+      started: syncStartedAt,
+      paused: syncPausedAt,
+    };
+    const sameTransport =
+      prev.playing === next.playing &&
+      prev.track === next.track &&
+      prev.started === next.started &&
+      prev.paused === next.paused;
+    lastTransportRef.current = next;
+
     if (isPlaying) {
-      const expected = expectedTimeSeconds({
-        startedAt: syncStartedAt,
-        pausedAt: syncPausedAt,
-        offsetMs,
-        isPlaying,
-      });
-      if (typeof howl.rate === "function") howl.rate(1);
-      howl.seek(Math.max(0, expected));
-      howl.play();
+      if (sameTransport && howl.playing()) return;
+      startHowlTransport(howl);
       return;
     }
 
+    if (sameTransport && !howl.playing()) return;
     if (typeof howl.rate === "function") howl.rate(1);
-    howl.pause();
+    if (howl.playing()) howl.pause();
     if (typeof syncPausedAt === "number") {
       howl.seek(Math.max(0, syncPausedAt));
       setPosition(Math.max(0, syncPausedAt));
     }
-  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs]);
+  }, [isPlaying, syncStartedAt, syncPausedAt, activeTrackPath]);
 
   type DockSize = "narrow" | "touch";
 
   const playbackControls = (compact: boolean, dock?: DockSize) => {
     const touch = dock === "touch";
+    const tip = (label: string, control: ReactNode) => (
+      <Tooltip>
+        <TooltipTrigger asChild>{control}</TooltipTrigger>
+        <TooltipContent side="top">{label}</TooltipContent>
+      </Tooltip>
+    );
     return (
       <div className={cn("flex items-center justify-center", compact ? (touch ? "gap-1" : "gap-0.5") : "gap-3")}>
-        <Button
-          type="button"
-          variant="secondary"
-          className={cn(
-            compact
-              ? touch
-                ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
-                : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
-              : "h-12 w-12 rounded-full p-0",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            void applyControl("prev");
-          }}
-          disabled={!canControl}
-        >
-          <SkipBack className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
-        </Button>
-        <Button
-          type="button"
-          className={cn(
-            compact
-              ? touch
-                ? "h-10 w-10 rounded-full border border-emerald-400/40 bg-gradient-to-br from-emerald-500/95 to-teal-600/95 p-0 shadow-[0_8px_20px_-8px_rgba(16,185,129,0.7)] hover:from-emerald-400 hover:to-teal-500 active:scale-95"
-                : "h-8 w-8 rounded-full border border-emerald-400/35 bg-gradient-to-br from-emerald-500/90 to-teal-600/90 p-0 shadow-[0_6px_16px_-6px_rgba(16,185,129,0.65)] hover:from-emerald-400 hover:to-teal-500"
-              : "h-16 w-16 rounded-full border border-emerald-300/50 p-0 shadow-[0_20px_40px_-18px_rgba(16,185,129,0.85)]",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            const howl = howlRef.current;
-            if (!howl) return;
-            if (isPlaying) {
-              void applyControl("pause", { position: howl.seek() as number });
-            } else {
-              const at = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-              void applyControl("play", { position: at });
-            }
-          }}
-          disabled={!canControl}
-        >
-          {isPlaying ? (
-            <Pause className={compact ? (touch ? "h-[18px] w-[18px]" : "h-4 w-4") : "h-7 w-7"} />
-          ) : (
-            <Play className={compact ? (touch ? "h-[18px] w-[18px] fill-current" : "h-4 w-4 fill-current") : "h-7 w-7 fill-current"} />
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          className={cn(
-            compact
-              ? touch
-                ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
-                : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
-              : "h-12 w-12 rounded-full p-0",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            void applyControl("next");
-          }}
-          disabled={!canControl}
-        >
-          <SkipForward className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
-        </Button>
+        {tip(
+          "Previous track",
+          <Button
+            type="button"
+            variant="secondary"
+            className={cn(
+              compact
+                ? touch
+                  ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
+                  : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
+                : "h-12 w-12 rounded-full p-0",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              void applyControl("prev");
+            }}
+            disabled={!canControl}
+          >
+            <SkipBack className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
+          </Button>,
+        )}
+        {tip(
+          isPlaying ? "Pause" : "Play",
+          <Button
+            type="button"
+            className={cn(
+              compact
+                ? touch
+                  ? "h-10 w-10 rounded-full border border-emerald-400/40 bg-gradient-to-br from-emerald-500/95 to-teal-600/95 p-0 shadow-[0_8px_20px_-8px_rgba(16,185,129,0.7)] hover:from-emerald-400 hover:to-teal-500 active:scale-95"
+                  : "h-8 w-8 rounded-full border border-emerald-400/35 bg-gradient-to-br from-emerald-500/90 to-teal-600/90 p-0 shadow-[0_6px_16px_-6px_rgba(16,185,129,0.65)] hover:from-emerald-400 hover:to-teal-500"
+                : "h-16 w-16 rounded-full border border-emerald-300/50 p-0 shadow-[0_20px_40px_-18px_rgba(16,185,129,0.85)]",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              const howl = howlRef.current;
+              if (!howl) return;
+              if (isPlaying) {
+                void applyControl("pause", { position: howl.seek() as number });
+              } else {
+                const at = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
+                void applyControl("play", { position: at });
+              }
+            }}
+            disabled={!canControl}
+          >
+            {isPlaying ? (
+              <Pause className={compact ? (touch ? "h-[18px] w-[18px]" : "h-4 w-4") : "h-7 w-7"} />
+            ) : (
+              <Play className={compact ? (touch ? "h-[18px] w-[18px] fill-current" : "h-4 w-4 fill-current") : "h-7 w-7 fill-current"} />
+            )}
+          </Button>,
+        )}
+        {tip(
+          "Next track",
+          <Button
+            type="button"
+            variant="secondary"
+            className={cn(
+              compact
+                ? touch
+                  ? "h-9 w-9 rounded-full border-zinc-700/80 bg-zinc-900/70 p-0 hover:bg-zinc-800 active:scale-95"
+                  : "h-7 w-7 rounded-full border-zinc-700/70 bg-zinc-900/60 p-0 hover:bg-zinc-800/90"
+                : "h-12 w-12 rounded-full p-0",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              void applyControl("next");
+            }}
+            disabled={!canControl}
+          >
+            <SkipForward className={compact ? (touch ? "h-4 w-4" : "h-3.5 w-3.5") : "h-6 w-6"} />
+          </Button>,
+        )}
       </div>
     );
   };
@@ -799,17 +838,6 @@ export function ChannelPlayer({
                         <p className="text-xs text-amber-200/90">Soundcheck mode — main mix is muted for listeners.</p>
                       ) : rehearsalLiftActive ? (
                         <p className="text-xs text-emerald-200/90">Temporary soundcheck lift — listeners can hear the mix.</p>
-                      ) : null}
-                      {canControl && activeTrackPath ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="secondary" className="gap-1.5" onClick={() => playCue()}>
-                            <Headphones className="h-4 w-4" />
-                            Cue preview (local)
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" className="text-zinc-400" onClick={() => stopCue()}>
-                            Stop cue
-                          </Button>
-                        </div>
                       ) : null}
                     </CardContent>
                   </Card>

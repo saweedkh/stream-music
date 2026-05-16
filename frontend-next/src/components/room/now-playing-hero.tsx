@@ -36,7 +36,11 @@ export function NowPlayingHero({
     size === "lg" ? "rounded-[20px] text-4xl" : size === "sm" ? "rounded-[10px] text-lg" : "rounded-[14px] text-3xl";
 
   return (
-    <div className={cn("flex animate-track-enter items-center gap-4", className)}>
+    <div
+      className={cn("flex animate-track-enter items-center gap-4", className)}
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <div className={cn("shrink-0 overflow-hidden bg-gradient-to-br p-[2px]", outer, ring)}>
         <div className={cn("flex h-full w-full items-center justify-center bg-black/70 font-bold text-emerald-100", inner)}>
           {letter}

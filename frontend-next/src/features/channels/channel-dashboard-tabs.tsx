@@ -2,15 +2,14 @@
 
 import {
   Activity,
-  DoorClosed,
   Headphones,
   HeartPulse,
   Lightbulb,
-  LogOut,
   MessageSquare,
   Radio,
   Settings2,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -24,21 +23,36 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
 import { ChannelChatPanel } from "@/features/channels/channel-chat-panel";
-import { ChannelListenerView, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
+import {
+  ChannelListenerMeta,
+  ChannelListenerView,
+  ChannelRoomLoading,
+} from "@/features/channels/channel-listener-view";
+import { ChannelListenersPanel } from "@/features/channels/channel-listeners-panel";
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
 import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
 import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
 import { DjBoothPanel } from "@/features/channels/dj-booth-panel";
+import { ChannelMobileBar } from "@/components/room/channel-mobile-bar";
+import { ChannelRoomHeader } from "@/components/room/channel-room-header";
 import { RoomOnboarding } from "@/components/room/room-onboarding";
 import { useRoomHotkeys } from "@/hooks/use-room-hotkeys";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import { RoomExperienceChrome, type ChannelExperience } from "@/features/experience/room-experience-chrome";
+import { useChannelPresence } from "@/hooks/use-channel-presence";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import {
   closeChannel,
@@ -53,9 +67,37 @@ import {
 import { channelChatHref, channelPlayerHref, useNotificationStore } from "@/lib/notifications/store";
 import { cn } from "@/lib/utils";
 
-const TAB_IDS = ["chat", "player", "queue", "insights", "dj-booth", "admin", "health"] as const;
+const TAB_IDS = ["chat", "player", "queue", "insights", "listeners", "dj-booth", "admin", "health"] as const;
 
 type TabId = (typeof TAB_IDS)[number];
+type TabGroup = "listen" | "social" | "dj";
+
+const TAB_TO_GROUP: Record<TabId, TabGroup> = {
+  chat: "social",
+  player: "listen",
+  queue: "listen",
+  insights: "social",
+  listeners: "social",
+  "dj-booth": "dj",
+  admin: "dj",
+  health: "dj",
+};
+
+const GROUP_LABELS: Record<TabGroup, string> = {
+  listen: "Listen",
+  social: "Social",
+  dj: "DJ",
+};
+
+function tabsInGroup(group: TabGroup, canManage: boolean): TabId[] {
+  const all = TAB_IDS.filter((t) => TAB_TO_GROUP[t] === group);
+  if (canManage) return all;
+  return all.filter((t) => t !== "dj-booth" && t !== "admin" && t !== "listeners");
+}
+
+function groupForTab(tab: TabId): TabGroup {
+  return TAB_TO_GROUP[tab];
+}
 
 function tabFromSearchValue(value: string | null): TabId | null {
   const raw = value ?? "";
@@ -122,6 +164,7 @@ export function ChannelDashboardTabs(props: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "chat");
+  const [tabGroup, setTabGroup] = useState<TabGroup>(() => groupForTab(tabFromSearchValue(searchParams.get("tab")) ?? "chat"));
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
   const [canManageChannel, setCanManageChannel] = useState(false);
   const [membershipLoaded, setMembershipLoaded] = useState(false);
@@ -147,6 +190,8 @@ export function ChannelDashboardTabs(props: Props) {
   const [apiMetrics, setApiMetrics] = useState<Awaited<ReturnType<typeof getApiMetrics>> | null>(null);
   const [wsQueue, setWsQueue] = useState<QueueItemSummary[] | null>(null);
   const [chatTabUnread, setChatTabUnread] = useState(0);
+  const [listenerPreviewOpen, setListenerPreviewOpen] = useState(false);
+  const { onlineCount } = useChannelPresence(channelId);
   const pushNotification = useNotificationStore((s) => s.push);
   const rttSamplesRef = useRef<number[]>([]);
   const lastTrackKeyRef = useRef<string | null>(null);
@@ -155,6 +200,34 @@ export function ChannelDashboardTabs(props: Props) {
   const latestSendMessageRef = useRef<((payload: Record<string, unknown>) => boolean) | undefined>(undefined);
   const startedAtText = startedAt == null ? "No active playback session yet" : `${startedAt}`;
   const pausedAtText = pausedAt == null ? (isChannelOnline ? "Not paused" : "No paused position available") : `${pausedAt}s`;
+
+  function selectTabGroup(group: TabGroup) {
+    setTabGroup(group);
+    const options = tabsInGroup(group, canManageChannel);
+    if (!options.includes(activeTab)) {
+      setActiveTab(options[0] ?? "chat");
+    }
+  }
+
+  function selectTab(tab: TabId) {
+    setActiveTab(tab);
+    setTabGroup(groupForTab(tab));
+  }
+
+  function shareChannel() {
+    const url = `${window.location.origin}/channel/${channelId}`;
+    void (async () => {
+      try {
+        if (navigator.share) await navigator.share({ title: channelName, url });
+        else {
+          await navigator.clipboard.writeText(url);
+          showToast("Room link copied.", "success");
+        }
+      } catch {
+        /* cancelled */
+      }
+    })();
+  }
 
   useEffect(() => {
     setExperience((initialExperience as ChannelExperience) ?? {});
@@ -372,11 +445,14 @@ export function ChannelDashboardTabs(props: Props) {
     const onInApp = (event: Event) => {
       const item = (event as CustomEvent<{ category?: string; channelId?: string }>).detail;
       if (item?.category !== "chat" || String(item.channelId) !== String(channelId)) return;
-      if (activeTab !== "chat") setChatTabUnread((c) => c + 1);
+      const chatVisible = canManageChannel
+        ? activeTab === "chat"
+        : typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+      if (!chatVisible) setChatTabUnread((c) => c + 1);
     };
     window.addEventListener("stream-in-app-notification", onInApp);
     return () => window.removeEventListener("stream-in-app-notification", onInApp);
-  }, [activeTab, channelId]);
+  }, [activeTab, canManageChannel, channelId]);
 
   useEffect(() => {
     if (activeTab !== "health") return;
@@ -536,9 +612,16 @@ export function ChannelDashboardTabs(props: Props) {
   useEffect(() => {
     return () => {
       upsertGlobalPlayerState({
+        channelId: null,
         socketState: "closed",
+        trackPath: undefined,
+        startedAt: undefined,
+        pausedAt: undefined,
+        initialIsPlaying: false,
         canControl: false,
         sendSocketMessage: undefined,
+        latestSocketPayload: null,
+        experience: null,
       });
     };
   }, [upsertGlobalPlayerState]);
@@ -612,45 +695,68 @@ export function ChannelDashboardTabs(props: Props) {
   }
 
   if (!canManageChannel) {
+    const listenerChatPanel = (
+      <ChannelChatPanel
+        channelId={channelId}
+        channelIsActive={channelIsActive}
+        connectEnabled={membershipLoaded && currentUserId !== null}
+        variant="listener"
+        canModerate={false}
+        nowPlayingLabel={nowPlayingLabel}
+        channelName={channelName}
+        roomActiveTab="chat"
+      />
+    );
+    const listenerQueuePanel = <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
+
     return (
-      <>
-        <RoomExperienceChrome
-          channelId={channelId}
-          sendMessage={sendMessage}
-          socketState={socketState}
-          canControl={false}
-          experience={experience}
-        />
-        <ChannelListenerView
-          channelId={channelId}
-          channelName={channelName}
-          channelPrivacy={channelPrivacy}
-          description={initialDescription}
-          memberLimit={initialMemberLimit}
-          joinRequiresApproval={initialJoinRequiresApproval}
-          isLive={isChannelOnline}
-          socketState={socketState}
-          nowPlayingLabel={nowPlayingLabel}
-          showLeave={!isChannelOwner && currentUserId !== null}
-          onLeaveClick={() => setLeaveDialogOpen(true)}
-          brandLogoUrl={brandLogoUrl ?? undefined}
-          sendSocketMessage={sendMessage}
-          experience={experience}
-        />
-        <div className="mx-auto w-full max-w-3xl px-3 sm:px-6">
-          <ChannelChatPanel
+      <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
+        <RoomOnboarding channelId={channelId} />
+        <div className="mx-auto w-full max-w-6xl space-y-6 px-3 pb-28 sm:px-6">
+          <RoomExperienceChrome
             channelId={channelId}
-            channelIsActive={channelIsActive}
-            connectEnabled={membershipLoaded && currentUserId !== null}
-            variant="listener"
-            canModerate={canManageChannel}
-            nowPlayingLabel={nowPlayingLabel}
+            sendMessage={sendMessage}
+            socketState={socketState}
+            canControl={false}
+            experience={experience}
+          />
+          <ChannelRoomHeader
             channelName={channelName}
-            roomActiveTab="chat"
+            channelPrivacy={channelPrivacy}
+            brandLogoUrl={brandLogoUrl}
+            isLive={isChannelOnline}
+            isPlaying={isChannelOnline}
+            socketState={socketState}
+            channelIsActive={channelIsActive}
+            nowPlayingLabel={nowPlayingLabel}
+            accent={experience.accent}
+            showLeave={!isChannelOwner && currentUserId !== null}
+            onLeave={() => setLeaveDialogOpen(true)}
+            onShare={shareChannel}
+            onlineCount={onlineCount}
+          />
+          <ChannelListenerMeta
+            description={initialDescription}
+            memberLimit={initialMemberLimit}
+            joinRequiresApproval={initialJoinRequiresApproval}
+            experience={experience}
+          />
+          <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,380px)]">
+            <div className="min-w-0">{listenerChatPanel}</div>
+            <aside className="hidden lg:flex lg:flex-col lg:gap-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Up next</p>
+              {listenerQueuePanel}
+            </aside>
+          </div>
+          <ChannelMobileBar
+            chatUnread={chatTabUnread}
+            chatPanel={listenerChatPanel}
+            queuePanel={listenerQueuePanel}
+            onChatOpen={() => setChatTabUnread(0)}
           />
         </div>
         {leaveDialog}
-      </>
+      </ChannelQueueProvider>
     );
   }
 
@@ -658,6 +764,21 @@ export function ChannelDashboardTabs(props: Props) {
     latestPlaybackPayload && typeof (latestPlaybackPayload as { track?: { id?: number } }).track?.id === "number"
       ? (latestPlaybackPayload as { track?: { id?: number } }).track!.id!
       : null;
+
+  const chatPanel = (
+    <ChannelChatPanel
+      channelId={channelId}
+      channelIsActive={channelIsActive}
+      connectEnabled={membershipLoaded && currentUserId !== null}
+      variant="admin"
+      canModerate={canManageChannel}
+      nowPlayingLabel={nowPlayingLabel}
+      channelName={channelName}
+      roomActiveTab={activeTab}
+    />
+  );
+
+  const queuePanel = <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
 
   return (
     <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
@@ -693,117 +814,103 @@ export function ChannelDashboardTabs(props: Props) {
           </Button>
         </div>
       ) : null}
-      <section
-        className={cn(
-          "overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5 shadow-lg shadow-black/20 backdrop-blur-xl",
-          "animate-in fade-in slide-in-from-bottom-2 duration-500",
-        )}
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            {brandLogoUrl ? (
-              <img src={brandLogoUrl} alt="" className="h-14 w-14 shrink-0 rounded-2xl border border-white/10 object-cover shadow-lg" />
-            ) : null}
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Control room</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{channelName}</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {isChannelOwner && channelIsActive ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setCloseChannelDialogOpen(true)}
-              >
-                <DoorClosed className="h-4 w-4" aria-hidden />
-                Close channel
-              </Button>
-            ) : null}
-            {!isChannelOwner && currentUserId != null ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 border-red-900/60 text-red-200 hover:bg-red-950/40"
-                onClick={() => setLeaveDialogOpen(true)}
-              >
-                <LogOut className="h-4 w-4" aria-hidden />
-                Leave channel
-              </Button>
-            ) : null}
-            <Badge variant={isChannelOnline ? "success" : "secondary"}>{isChannelOnline ? "Live" : "Idle"}</Badge>
-            <Badge variant={isChannelOnline ? "success" : "outline"} className="capitalize">
-              {isChannelOnline ? "Playing" : "Paused"}
-            </Badge>
-            <Badge variant="outline" className="capitalize">
-              {channelPrivacy}
-            </Badge>
-            {!channelIsActive ? (
-              <Badge variant="warning">Closed</Badge>
-            ) : (
-              <Badge variant={socketState === "connected" ? "success" : "warning"}>{socketState}</Badge>
-            )}
-          </div>
-        </div>
-      </section>
+      <ChannelRoomHeader
+        channelName={channelName}
+        channelPrivacy={channelPrivacy}
+        brandLogoUrl={brandLogoUrl}
+        isLive={isChannelOnline}
+        isPlaying={isChannelOnline}
+        socketState={socketState}
+        channelIsActive={channelIsActive}
+        nowPlayingLabel={nowPlayingLabel}
+        accent={experience.accent}
+        isOwner={isChannelOwner}
+        showLeave={!isChannelOwner && currentUserId != null}
+        onLeave={() => setLeaveDialogOpen(true)}
+        onCloseChannel={isChannelOwner && channelIsActive ? () => setCloseChannelDialogOpen(true) : undefined}
+        onShare={shareChannel}
+        onlineCount={onlineCount}
+      />
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="w-full animate-in fade-in duration-500">
+            <Tabs value={activeTab} onValueChange={(v) => selectTab(v as TabId)} className="w-full animate-in fade-in duration-500">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {(["listen", "social", "dj"] as TabGroup[]).map((group) => {
+            if (group === "dj" && !canManageChannel) return null;
+            return (
+              <Button
+                key={group}
+                type="button"
+                size="sm"
+                variant={tabGroup === group ? "default" : "secondary"}
+                onClick={() => selectTabGroup(group)}
+              >
+                {GROUP_LABELS[group]}
+              </Button>
+            );
+          })}
+        </div>
         <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
-          <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-center">
-            <TabsTrigger value="chat" className="gap-1.5">
-              <MessageSquare className="h-4 w-4 opacity-80" aria-hidden />
-              Chat
-              {chatTabUnread > 0 ? (
-                <span className="ml-1 rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-slate-950">
-                  {chatTabUnread > 9 ? "9+" : chatTabUnread}
-                </span>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="player" className="gap-1.5">
-              <Radio className="h-4 w-4 opacity-80" aria-hidden />
-              Listen
-            </TabsTrigger>
-            <TabsTrigger value="queue" className="gap-1.5">
-              <Sparkles className="h-4 w-4 opacity-80" aria-hidden />
-              Queue
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-1.5">
-              <Lightbulb className="h-4 w-4 opacity-80" aria-hidden />
-              Insights
-            </TabsTrigger>
-            {canManageChannel ? (
+          <TabsList className="inline-flex min-h-11 w-max min-w-full flex-wrap justify-start gap-1 sm:w-full sm:flex-nowrap sm:justify-start">
+            {tabsInGroup(tabGroup, canManageChannel).includes("chat") ? (
+              <TabsTrigger value="chat" className="gap-1.5">
+                <MessageSquare className="h-4 w-4 opacity-80" aria-hidden />
+                Chat
+                {chatTabUnread > 0 ? (
+                  <span className="ml-1 rounded-full bg-brand px-1.5 text-[10px] font-semibold text-zinc-950">
+                    {chatTabUnread > 9 ? "9+" : chatTabUnread}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            ) : null}
+            {tabsInGroup(tabGroup, canManageChannel).includes("player") ? (
+              <TabsTrigger value="player" className="gap-1.5">
+                <Radio className="h-4 w-4 opacity-80" aria-hidden />
+                Playlist
+              </TabsTrigger>
+            ) : null}
+            {tabsInGroup(tabGroup, canManageChannel).includes("queue") ? (
+              <TabsTrigger value="queue" className="gap-1.5 lg:hidden">
+                <Sparkles className="h-4 w-4 opacity-80" aria-hidden />
+                Queue
+              </TabsTrigger>
+            ) : null}
+            {tabsInGroup(tabGroup, canManageChannel).includes("insights") ? (
+              <TabsTrigger value="insights" className="gap-1.5">
+                <Lightbulb className="h-4 w-4 opacity-80" aria-hidden />
+                Insights
+              </TabsTrigger>
+            ) : null}
+            {canManageChannel && tabsInGroup(tabGroup, canManageChannel).includes("listeners") ? (
+              <TabsTrigger value="listeners" className="gap-1.5">
+                <Users className="h-4 w-4 opacity-80" aria-hidden />
+                Listeners
+              </TabsTrigger>
+            ) : null}
+            {canManageChannel && tabsInGroup(tabGroup, canManageChannel).includes("dj-booth") ? (
               <TabsTrigger value="dj-booth" className="gap-1.5">
                 <Headphones className="h-4 w-4 opacity-80" aria-hidden />
                 DJ booth
               </TabsTrigger>
             ) : null}
-            {canManageChannel ? (
+            {canManageChannel && tabsInGroup(tabGroup, canManageChannel).includes("admin") ? (
               <TabsTrigger value="admin" className="gap-1.5">
                 <Settings2 className="h-4 w-4 opacity-80" aria-hidden />
                 Control
               </TabsTrigger>
             ) : null}
-            <TabsTrigger value="health" className="gap-1.5">
-              <HeartPulse className="h-4 w-4 opacity-80" aria-hidden />
-              Health
-            </TabsTrigger>
+            {tabsInGroup(tabGroup, canManageChannel).includes("health") ? (
+              <TabsTrigger value="health" className="gap-1.5">
+                <HeartPulse className="h-4 w-4 opacity-80" aria-hidden />
+                Health
+              </TabsTrigger>
+            ) : null}
           </TabsList>
         </div>
 
+        <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,380px)]">
+          <div className="min-w-0">
         <TabsContent value="chat" className="mt-5">
-          <ChannelChatPanel
-            channelId={channelId}
-            channelIsActive={channelIsActive}
-            connectEnabled={membershipLoaded && currentUserId !== null}
-            variant="admin"
-            canModerate={canManageChannel}
-            nowPlayingLabel={nowPlayingLabel}
-            channelName={channelName}
-            roomActiveTab={activeTab}
-          />
+          {chatPanel}
         </TabsContent>
 
         <TabsContent value="player" className="mt-5 focus-visible:outline-none space-y-6">
@@ -823,8 +930,8 @@ export function ChannelDashboardTabs(props: Props) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="queue" className="mt-5">
-          <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />
+        <TabsContent value="queue" className="mt-5 lg:hidden">
+          {queuePanel}
         </TabsContent>
 
         <TabsContent value="insights" className="mt-5">
@@ -832,12 +939,18 @@ export function ChannelDashboardTabs(props: Props) {
         </TabsContent>
 
         {canManageChannel ? (
+          <TabsContent value="listeners" className="mt-5">
+            <ChannelListenersPanel channelId={channelId} onPreviewListenerView={() => setListenerPreviewOpen(true)} />
+          </TabsContent>
+        ) : null}
+
+        {canManageChannel ? (
           <TabsContent value="dj-booth" className="mt-5">
             <DjBoothPanel
               channelId={channelId}
               canManage={canManageChannel && channelIsActive}
               sendSocketMessage={sendMessage}
-              nowPlayingLabel={nowPlayingLabel}
+              nowPlayingTitle={nowPlayingLabel}
             />
           </TabsContent>
         ) : null}
@@ -925,7 +1038,61 @@ export function ChannelDashboardTabs(props: Props) {
             </CardContent>
           </Card>
         </TabsContent>
+          </div>
+          <aside className="hidden lg:flex lg:flex-col lg:gap-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Up next</p>
+            {queuePanel}
+          </aside>
+        </div>
+
+      <ChannelMobileBar
+        chatUnread={chatTabUnread}
+        chatPanel={chatPanel}
+        queuePanel={queuePanel}
+        onChatOpen={() => setChatTabUnread(0)}
+      />
+
       </Tabs>
+
+      <Sheet open={listenerPreviewOpen} onOpenChange={setListenerPreviewOpen}>
+        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Listener view preview</SheetTitle>
+            <SheetDescription>This is what non-DJ members see in the room (read-only preview).</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
+            <ChannelListenerView
+              channelId={channelId}
+              channelName={channelName}
+              channelPrivacy={channelPrivacy}
+              description={initialDescription}
+              memberLimit={initialMemberLimit}
+              joinRequiresApproval={initialJoinRequiresApproval}
+              isLive={isChannelOnline}
+              socketState={socketState}
+              nowPlayingLabel={nowPlayingLabel}
+              showLeave={false}
+              onLeaveClick={() => {}}
+              brandLogoUrl={brandLogoUrl ?? undefined}
+              channelIsActive={channelIsActive}
+              onlineCount={onlineCount}
+              onShare={shareChannel}
+              experience={experience}
+              compact
+            />
+            <ChannelChatPanel
+              channelId={channelId}
+              channelIsActive={channelIsActive}
+              connectEnabled={membershipLoaded && currentUserId !== null}
+              variant="listener"
+              canModerate={canManageChannel}
+              nowPlayingLabel={nowPlayingLabel}
+              channelName={channelName}
+              roomActiveTab="chat"
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {closeChannelDialog}
       {leaveDialog}

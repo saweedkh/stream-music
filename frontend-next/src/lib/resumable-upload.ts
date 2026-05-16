@@ -1,5 +1,7 @@
 /** Persist in-progress chunked uploads so they can resume after refresh or network blip. */
 
+import type { TrackSummary } from "@/lib/api";
+
 const STORAGE_KEY = "stream-music:chunk-upload";
 
 export type PendingChunkUpload = {
@@ -47,7 +49,7 @@ export type ResumableTrackPayload = {
   title: string;
   artist?: string;
   album?: string;
-  visibility: string;
+  visibility: TrackSummary["visibility"];
   file: File;
 };
 

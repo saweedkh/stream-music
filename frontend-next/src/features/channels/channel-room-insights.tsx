@@ -111,7 +111,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
   const recapTop = useMemo(() => {
     const counts = new Map<string, { title: string; count: number }>();
     for (const row of history) {
-      const key = row.track_title ?? `track-${row.track_id ?? row.id}`;
+      const key = row.track_title ?? `track-${row.track ?? row.id}`;
       const prev = counts.get(key);
       counts.set(key, { title: row.track_title ?? key, count: (prev?.count ?? 0) + 1 });
     }

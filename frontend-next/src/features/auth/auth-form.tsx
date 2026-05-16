@@ -74,8 +74,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <Card className="mx-auto max-w-md border-emerald-900/40">
-      <CardHeader className="bg-gradient-to-r from-emerald-950/30 to-transparent">
+    <Card className="border-zinc-800/90 bg-zinc-950/40 shadow-none">
+      <CardHeader className="border-b border-zinc-800/80 bg-gradient-to-r from-emerald-950/20 to-transparent pb-4">
         <CardTitle>{mode === "register" ? "Create account" : "Login"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

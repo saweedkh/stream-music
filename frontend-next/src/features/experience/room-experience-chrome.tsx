@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle, Send, Share2, Sparkles } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast-provider";
+import { useChannelPresence } from "@/hooks/use-channel-presence";
 
 export type ChannelExperience = {
   accent?: string;
@@ -52,8 +55,7 @@ const REACTIONS = ["🔥", "❤️", "😂", "👏", "🎧", "✨"];
 
 export function RoomExperienceChrome({ channelId, sendMessage, socketState, canControl, experience }: Props) {
   const { showToast } = useToast();
-  const [members, setMembers] = useState<Array<{ id: number; username: string }>>([]);
-  const [count, setCount] = useState(0);
+  const { onlineMembers: members, onlineCount: count } = useChannelPresence(channelId);
   const [lastShout, setLastShout] = useState<{ user: string; text: string } | null>(null);
   const [floaters, setFloaters] = useState<Array<{ id: number; emoji: string; x: number }>>([]);
   const [shoutDraft, setShoutDraft] = useState("");
@@ -84,10 +86,6 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       const p = e.detail?.payload;
       if (!p) return;
       const action = (p.action ?? "").toLowerCase();
-      if (action === "presence_update") {
-        setMembers(Array.isArray(p.members) ? p.members : []);
-        setCount(typeof p.count === "number" ? p.count : 0);
-      }
       if (action === "reaction" && p.emoji) {
         const id = ++floaterId.current;
         const x = 10 + Math.random() * 80;
@@ -122,24 +120,6 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
     window.addEventListener("channel-room-help", onHelp);
     return () => window.removeEventListener("channel-room-help", onHelp);
   }, []);
-
-  function playDjTone(freq: number) {
-    if (typeof window === "undefined" || !canControl) return;
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      gain.gain.value = 0.08;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
-      window.setTimeout(() => void ctx.close(), 200);
-    } catch {
-      /* ignore */
-    }
-  }
 
   useEffect(() => {
     if (socketState !== "connected") return;
@@ -183,13 +163,9 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex -space-x-2">
           {members.slice(0, 8).map((m) => (
-            <span
-              key={m.id}
-              title={m.username}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-xs font-semibold uppercase text-zinc-200"
-            >
-              {(m.username || "?").slice(0, 1)}
-            </span>
+            <Avatar key={m.id} className="h-9 w-9 border-2 border-zinc-950" title={m.username}>
+              <AvatarFallback className="text-xs">{(m.username || "?").slice(0, 1)}</AvatarFallback>
+            </Avatar>
           ))}
           {members.length === 0 ? (
             <span className="text-xs text-zinc-500">Listening… connect to see who&apos;s here.</span>
@@ -259,20 +235,6 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
           Vote skip ({experience.veto_skip_threshold ? `≥${experience.veto_skip_threshold}` : "tally"})
         </Button>
       </div>
-      {canControl ? (
-        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
-          <span className="w-full text-[10px] font-medium uppercase tracking-wide text-zinc-500">DJ cues (local)</span>
-          {[
-            { label: "Airhorn", freq: 880 },
-            { label: "Drop", freq: 220 },
-            { label: "Tick", freq: 1200 },
-          ].map((c) => (
-            <Button key={c.label} type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => playDjTone(c.freq)}>
-              {c.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
       {experience.veto_skip_threshold && experience.veto_skip_threshold > 0 ? (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-xs text-zinc-500">
@@ -281,13 +243,10 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
               {skipVotes} / {skipThreshold || experience.veto_skip_threshold}
             </span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-            <div               className="h-full bg-amber-500/90 transition-all duration-300"
-              style={{
-                width: `${Math.min(100, (skipVotes / Math.max(1, skipThreshold || experience.veto_skip_threshold)) * 100)}%`,
-              }}
-            />
-          </div>
+          <Progress
+            value={Math.min(100, (skipVotes / Math.max(1, skipThreshold || experience.veto_skip_threshold)) * 100)}
+            className="h-2 [&>div]:bg-amber-500/90"
+          />
         </div>
       ) : null}
       {experience.room_rules?.trim() ? (

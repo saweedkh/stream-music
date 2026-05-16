@@ -188,6 +188,7 @@ export type QueueItemSummary = {
   id: number;
   channel: number;
   track: number;
+  track_detail?: TrackSummary;
   position: number;
   added_by: number | null;
   added_by_username?: string | null;

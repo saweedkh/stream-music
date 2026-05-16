@@ -4,6 +4,7 @@ import type { Html5Qrcode } from "html5-qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
+import { cn } from "@/lib/utils";
 
 type Props = {
   onDecoded: (value: string) => void;
@@ -29,6 +30,7 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
 
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(true);
+  const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
     const prereq = getCameraPrereqError();
@@ -57,13 +59,14 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
           const value = extractJoinInputFromScannedText(decodedText);
           if (!value) return;
           settled = true;
+          setScanned(true);
           void html5
             .stop()
             .then(() => html5.clear())
             .catch(() => {})
             .finally(() => {
               html5Ref.current = null;
-              onDecodedRef.current(value);
+              window.setTimeout(() => onDecodedRef.current(value), 400);
             });
         };
 
@@ -106,8 +109,13 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
       {error ? <p className="text-xs text-rose-400">{error}</p> : null}
       <div
         id={regionId}
-        className="mx-auto w-full max-w-[280px] overflow-hidden rounded-lg border border-zinc-700 bg-black shadow-inner [&_video]:mx-auto [&_video]:max-h-[260px] [&_video]:w-full [&_video]:object-cover"
+        className={cn(
+          "mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border-2 bg-black p-1 shadow-inner transition-colors",
+          scanned ? "animate-scan-success border-brand" : "border-zinc-700",
+          "[&_video]:mx-auto [&_video]:max-h-[280px] [&_video]:w-full [&_video]:rounded-xl [&_video]:object-cover",
+        )}
       />
+      {scanned ? <p className="text-center text-sm font-medium text-brand">QR recognized — joining…</p> : null}
       <Button type="button" variant="secondary" size="sm" className="w-full" onClick={onCancel}>
         Cancel camera
       </Button>

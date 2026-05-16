@@ -5,6 +5,7 @@ import { useContext, useEffect, useState } from "react";
 import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
 import { UpNextStrip } from "@/components/room/up-next-strip";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,17 +86,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
             {readOnly ? (
               <p className="py-6 text-center text-sm text-zinc-500">Reopen the channel to load or edit the queue.</p>
             ) : null}
-            {!readOnly && loading ? (
-              <div className="space-y-2 py-2">
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-14 animate-pulse rounded-lg bg-zinc-800/50"
-                    style={{ animationDelay: `${i * 60}ms` }}
-                  />
-                ))}
-              </div>
-            ) : null}
+            {!readOnly && loading ? <ListSkeleton rows={6} className="py-2" /> : null}
             {!readOnly &&
               !loading &&
               queue.map((item) => (
@@ -210,8 +201,11 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
                 </div>
               </div>
               ))}
-            {!readOnly && queue.length === 0 ? (
-              <p className="py-8 text-center text-sm text-zinc-500">Queue is empty — add tracks from the Listen tab.</p>
+            {!readOnly && !loading && queue.length === 0 ? (
+              <EmptyState
+                title="Queue is empty"
+                description="Add tracks from the Listen tab or let listeners suggest songs."
+              />
             ) : null}
           </div>
         </ScrollArea>

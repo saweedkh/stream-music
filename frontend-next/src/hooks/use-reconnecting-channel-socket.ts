@@ -44,16 +44,18 @@ export function useReconnectingChannelSocket({ channelId, onMessage, enabled = t
       socketRef.current = ws;
 
       ws.onopen = () => {
+        const socket = socketRef.current;
+        if (!socket) return;
         setSocketState("connected");
         if (debugSocket) console.debug("[channel-socket] connected", { channelId });
         if (attempt > 0) {
-          ws.send(JSON.stringify({ action: "resync" }));
+          socket.send(JSON.stringify({ action: "resync" }));
         }
         if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
         heartbeatTimerRef.current = setInterval(() => {
-          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          if (socket.readyState !== WebSocket.OPEN) return;
           if (debugSocket) console.debug("[channel-socket] heartbeat -> PING_LATENCY", { channelId });
-          ws.send(JSON.stringify({ action: "PING_LATENCY", client_ts: Date.now() }));
+          socket.send(JSON.stringify({ action: "PING_LATENCY", client_ts: Date.now() }));
         }, 20000);
       };
 
