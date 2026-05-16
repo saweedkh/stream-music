@@ -14,8 +14,8 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-auto min-h-11 items-center justify-start gap-1 rounded-xl border border-zinc-800/90 bg-zinc-950/60 p-1 text-zinc-400 backdrop-blur-sm",
-      "w-full max-w-full flex-wrap sm:flex-nowrap",
+      "inline-flex h-auto min-h-10 w-full max-w-full flex-wrap items-center justify-start gap-1 rounded-xl border border-border/80 bg-muted/25 p-1 text-muted-foreground backdrop-blur-sm sm:flex-nowrap",
+      className,
     )}
     {...props}
   />
@@ -30,10 +30,10 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       "disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-emerald-600/90 data-[state=active]:text-white data-[state=active]:shadow-md",
-      "data-[state=inactive]:text-zinc-400 data-[state=inactive]:hover:bg-zinc-800/80 data-[state=inactive]:hover:text-zinc-200",
+      "data-[state=active]:bg-brand data-[state=active]:text-foreground data-[state=active]:shadow-md data-[state=active]:shadow-brand/20",
+      "data-[state=inactive]:hover:bg-muted/40 data-[state=inactive]:hover:text-foreground",
     )}
     {...props}
   />
@@ -47,8 +47,8 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-5 ring-offset-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40",
-      "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300 motion-reduce:animate-none",
+      "mt-5 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+      "animate-in fade-in-0 slide-in-from-bottom-2 duration-300 motion-reduce:animate-none",
     )}
     {...props}
   />

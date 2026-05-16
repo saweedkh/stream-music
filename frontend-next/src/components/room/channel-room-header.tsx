@@ -53,7 +53,7 @@ export function ChannelRoomHeader({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-2xl border border-zinc-800/80 bg-card/60 p-5 shadow-lg shadow-black/25 backdrop-blur-xl",
+        "overflow-hidden rounded-2xl border border-border/80 bg-card/60 p-5 shadow-lg shadow-black/25 backdrop-blur-xl",
         "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none",
         className,
       )}
@@ -83,7 +83,7 @@ export function ChannelRoomHeader({
               </Button>
             ) : null}
             {showLeave && onLeave ? (
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 border-red-900/60 text-red-200 hover:bg-red-950/40" onClick={onLeave}>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 border-red-900/60 text-destructive hover:bg-red-950/40" onClick={onLeave}>
                 <LogOut className="h-4 w-4" aria-hidden />
                 Leave
               </Button>
@@ -114,10 +114,10 @@ export function ChannelRoomHeader({
             letter={letter}
             accent={accent}
             size="lg"
-            className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4"
+            className="rounded-xl border border-border/60 bg-card/40 p-4"
           />
         ) : (
-          <p className="rounded-xl border border-dashed border-zinc-800/80 bg-zinc-950/30 px-4 py-6 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-border/80 bg-card/30 px-4 py-6 text-center text-sm text-muted-foreground">
             Nothing playing yet — queue a track or wait for the DJ.
           </p>
         )}

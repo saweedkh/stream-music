@@ -47,12 +47,12 @@ export function RoomOnboarding({ channelId }: { channelId: string }) {
   const current = STEPS[step];
   return (
     <Dialog open={open} onOpenChange={(v) => !v && finish()}>
-      <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+      <DialogContent className="border-border bg-background sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{current?.title}</DialogTitle>
-          <DialogDescription className="text-zinc-400">{current?.body}</DialogDescription>
+          <DialogDescription className="text-muted-foreground">{current?.body}</DialogDescription>
         </DialogHeader>
-        <p className="text-center text-xs text-zinc-500">
+        <p className="text-center text-xs text-muted-foreground">
           Step {step + 1} of {STEPS.length}
         </p>
         <DialogFooter className="gap-2 sm:gap-0">

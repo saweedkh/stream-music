@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export function ChannelRoomLoading() {
   return (
     <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col gap-5 px-4 py-12 sm:px-6">
-      <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950/55 p-6 sm:p-8">
+      <div className="rounded-3xl border border-border/80 bg-background/55 p-6 sm:p-8">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="mt-4 h-8 w-2/3" />
         <Skeleton className="mt-3 h-4 w-full" />
@@ -22,12 +22,12 @@ export function ChannelRoomLoading() {
           <Skeleton className="h-6 w-14 rounded-full" />
         </div>
       </div>
-      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-5">
+      <div className="rounded-2xl border border-border/80 bg-background/55 p-5">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-4 h-10 w-full" />
         <Skeleton className="mt-2 h-4 w-1/2" />
       </div>
-      <p className="text-center text-sm text-zinc-500">Loading your access…</p>
+      <p className="text-center text-sm text-muted-foreground">Loading your access…</p>
     </div>
   );
 }
@@ -52,12 +52,12 @@ export function ChannelListenerMeta({ description, memberLimit, joinRequiresAppr
   return (
     <div className="space-y-4">
       {description?.trim() ? (
-        <p className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-4 py-3 text-sm leading-relaxed text-zinc-400">{description.trim()}</p>
+        <p className="rounded-xl border border-border/80 bg-card/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">{description.trim()}</p>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
         {typeof memberLimit === "number" ? (
-          <Badge variant="outline" className="text-zinc-400">
+          <Badge variant="outline" className="text-muted-foreground">
             Cap {memberLimit}
           </Badge>
         ) : null}
@@ -69,9 +69,9 @@ export function ChannelListenerMeta({ description, memberLimit, joinRequiresAppr
       </div>
 
       {experience?.room_rules?.trim() ? (
-        <section className="rounded-2xl border border-zinc-800/80 bg-zinc-950/55 p-4 sm:p-5">
-          <h2 className="text-sm font-medium text-zinc-400">Room rules</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{experience.room_rules.trim()}</p>
+        <section className="rounded-2xl border border-border/80 bg-background/55 p-4 sm:p-5">
+          <h2 className="text-sm font-medium text-muted-foreground">Room rules</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{experience.room_rules.trim()}</p>
         </section>
       ) : null}
     </div>
@@ -153,7 +153,7 @@ export function ChannelListenerView({
             <Button
               type="button"
               variant="outline"
-              className="w-full gap-2 border-red-900/55 text-red-200 hover:bg-red-950/35 sm:ml-auto sm:w-auto"
+              className="w-full gap-2 border-red-900/55 text-destructive hover:bg-red-950/35 sm:ml-auto sm:w-auto"
               onClick={onLeaveClick}
             >
               <LogOut className="size-4" aria-hidden />

@@ -395,11 +395,11 @@ export function ChannelChatPanel({
   const shellClass =
     variant === "listener"
       ? cn(
-          "relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-zinc-950/95 via-emerald-950/20 to-zinc-950/95",
+          "relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95",
           "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_25px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-2xl",
           "before:pointer-events-none before:absolute before:inset-0 before:rounded-3xl before:bg-[radial-gradient(800px_circle_at_20%_-10%,rgba(52,211,153,0.12),transparent_45%)]",
         )
-      : "overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/50 shadow-lg shadow-black/25";
+      : "overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-black/25";
 
   const headerTitle = variant === "listener" ? "Live room chat" : "Channel chat";
   const headerSubtitle =
@@ -409,7 +409,7 @@ export function ChannelChatPanel({
   const scrollAreaClass = cn(
     "rounded-2xl border",
     isFullscreen ? "min-h-0 flex-1 basis-0" : scrollMinH,
-    variant === "listener" ? "border-white/[0.06] bg-black/25" : "border-zinc-800/60 bg-zinc-950/60",
+    variant === "listener" ? "border-border/40 bg-[var(--surface-inset)]" : "border-border/60 bg-card/60",
   );
 
   return (
@@ -421,39 +421,39 @@ export function ChannelChatPanel({
       <div
         className={cn(
           "flex items-start gap-3 border-b px-4 py-3 sm:px-5",
-          variant === "listener" ? "border-white/[0.06] bg-black/20" : "border-zinc-800/70",
+          variant === "listener" ? "border-border/40 bg-[var(--surface-inset)]" : "border-border/70",
         )}
       >
         <div
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-2xl border",
             variant === "listener"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-emerald-500/25 bg-emerald-950/40 text-emerald-400",
+              ? "border-brand/30 bg-brand/10 text-brand"
+              : "border-brand/25 bg-[var(--brand-subtle)] text-brand",
           )}
         >
           <MessageCircle className="size-5" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-semibold tracking-tight text-zinc-50 sm:text-base">{headerTitle}</h2>
+            <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">{headerTitle}</h2>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                connected ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-200",
+                connected ? "bg-brand/15 text-brand" : "bg-amber-500/15 text-warning",
               )}
             >
               {connected ? "Live" : chatSocketState === "closed" ? "Offline" : "Connecting…"}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-zinc-500 sm:text-sm">{headerSubtitle}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{headerSubtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1 self-start pt-0.5">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-9 text-zinc-400 hover:text-white"
+            className="size-9 text-muted-foreground hover:text-foreground"
             aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             onClick={() => void toggleFullscreen()}
           >
@@ -475,7 +475,7 @@ export function ChannelChatPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 gap-1 text-xs text-emerald-300/90"
+              className="h-9 gap-1 text-xs text-brand/90"
               disabled={!channelIsActive}
               onClick={() => shareNowPlayingInChat()}
             >
@@ -488,7 +488,7 @@ export function ChannelChatPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 gap-1.5 text-xs text-amber-200/95 hover:bg-amber-950/40 hover:text-amber-100"
+              className="h-9 gap-1.5 text-xs text-warning/95 hover:bg-amber-950/40 hover:text-amber-100"
               disabled={!connected}
               onClick={() => void confirmPurgeAll()}
             >
@@ -501,8 +501,8 @@ export function ChannelChatPanel({
 
       <div className={cn("flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4", variant === "listener" && "sm:p-5", isFullscreen && "min-h-0 flex-1")}>
         {pinnedMessage ? (
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/25 px-3 py-2 text-xs text-emerald-100">
-            <p className="font-semibold uppercase tracking-wide text-emerald-300/90">Pinned message</p>
+          <div className="rounded-xl border border-brand/25 bg-[var(--brand-subtle)] px-3 py-2 text-xs text-brand">
+            <p className="font-semibold uppercase tracking-wide text-brand/90">Pinned message</p>
             <p className="mt-1 line-clamp-2">{pinnedMessage.body}</p>
           </div>
         ) : null}
@@ -511,7 +511,7 @@ export function ChannelChatPanel({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 self-center text-xs text-zinc-400 hover:text-zinc-200"
+            className="h-8 self-center text-xs text-muted-foreground hover:text-foreground"
             disabled={loadingOlder || !connected}
             onClick={() => void requestOlder()}
           >
@@ -522,12 +522,12 @@ export function ChannelChatPanel({
         <ScrollArea className={scrollAreaClass}>
           <div className="space-y-3 p-3 pr-2 sm:p-4">
             {!hydrated && connectEnabled ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-zinc-500">
-                <Loader2 className="size-8 animate-spin text-emerald-500/60" />
+              <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+                <Loader2 className="size-8 animate-spin text-brand/60" />
                 <span>Joining chat…</span>
               </div>
             ) : visibleMessages.length === 0 ? (
-              <p className="py-16 text-center text-sm text-zinc-500">No messages yet — say hi to the room.</p>
+              <p className="py-16 text-center text-sm text-muted-foreground">No messages yet — say hi to the room.</p>
             ) : (
               visibleMessages.map((m) => {
                 const mine = myUserId != null && m.user_id === myUserId;
@@ -543,7 +543,7 @@ export function ChannelChatPanel({
                     id={`chat-msg-${m.id}`}
                     className={cn(
                       "group relative scroll-mt-24 rounded-lg transition-colors",
-                      highlightMessageId === m.id && "ring-2 ring-emerald-400/70 ring-offset-2 ring-offset-zinc-950",
+                      highlightMessageId === m.id && "ring-2 ring-brand/70 ring-offset-2 ring-offset-background",
                     )}
                   >
                     <div className={cn("flex gap-2", mine ? "justify-end" : "justify-start")}>
@@ -551,15 +551,15 @@ export function ChannelChatPanel({
                         className={cn(
                           "relative max-w-[min(92%,28rem)] rounded-2xl border px-3.5 py-2.5 text-sm shadow-md transition-[box-shadow,transform]",
                           mine
-                            ? "border-emerald-600/35 bg-emerald-950/55 text-emerald-50"
+                            ? "border-brand/35 bg-[var(--brand-subtle)] text-brand-foreground"
                             : variant === "listener"
-                              ? "border-white/[0.07] bg-zinc-900/70 text-zinc-100"
-                              : "border-zinc-700/60 bg-zinc-900/85 text-zinc-100",
-                          variant === "listener" && mine && "shadow-emerald-900/20",
+                              ? "border-white/[0.07] bg-card/70 text-foreground"
+                              : "border-border/60 bg-card/85 text-foreground",
+                          variant === "listener" && mine && "shadow-brand/20",
                         )}
                       >
                         {!mine ? (
-                          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">{m.username}</p>
+                          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{m.username}</p>
                         ) : null}
                         {editingId === m.id ? (
                           <div className="space-y-2">
@@ -567,7 +567,7 @@ export function ChannelChatPanel({
                               value={editDraft}
                               onChange={(e) => setEditDraft(e.target.value)}
                               maxLength={2000}
-                              className="border-zinc-700 bg-zinc-950/80 text-sm"
+                              className="border-border bg-card/80 text-sm"
                             />
                             <div className="flex justify-end gap-2">
                               <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>
@@ -579,13 +579,13 @@ export function ChannelChatPanel({
                             </div>
                           </div>
                         ) : deleted ? (
-                          <p className="italic text-zinc-500">This message was deleted.</p>
+                          <p className="italic text-muted-foreground">This message was deleted.</p>
                         ) : (
                           <p className="whitespace-pre-wrap break-words leading-relaxed">{renderMessageWithMentions(m.body)}</p>
                         )}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums text-zinc-500">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                           <span>{new Date(m.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
-                          {m.edited_at ? <span className="text-zinc-600">edited</span> : null}
+                          {m.edited_at ? <span className="text-muted-foreground">edited</span> : null}
                         </div>
                       </div>
 
@@ -595,7 +595,7 @@ export function ChannelChatPanel({
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="size-8 text-zinc-400 hover:text-white"
+                            className="size-8 text-muted-foreground hover:text-foreground"
                             aria-label="Message actions"
                             onClick={() => setOpenActionsId((id) => (id === m.id ? null : m.id))}
                           >
@@ -610,7 +610,7 @@ export function ChannelChatPanel({
                         className={cn(
                           "mb-2 flex flex-wrap items-center gap-1 rounded-xl border p-1.5",
                           mine ? "ml-auto max-w-[min(92%,28rem)] justify-end" : "max-w-[min(92%,28rem)]",
-                          variant === "listener" ? "border-white/[0.08] bg-black/35" : "border-zinc-800 bg-zinc-950/90",
+                          variant === "listener" ? "border-border/60 bg-[var(--surface-inset)]" : "border-border bg-card/90",
                         )}
                       >
                         {QUICK_REACTIONS.map((em) => (
@@ -633,7 +633,7 @@ export function ChannelChatPanel({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-8 gap-1 text-xs text-zinc-300"
+                            className="h-8 gap-1 text-xs text-foreground/80"
                             onClick={() => {
                               setEditingId(m.id);
                               setEditDraft(m.body);
@@ -648,7 +648,7 @@ export function ChannelChatPanel({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-8 gap-1 text-xs text-red-300 hover:text-red-200"
+                            className="h-8 gap-1 text-xs text-red-300 hover:text-destructive"
                             onClick={() => confirmDelete(m.id)}
                           >
                             <Trash2 className="size-3.5" /> Delete
@@ -659,7 +659,7 @@ export function ChannelChatPanel({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-8 gap-1 text-xs text-emerald-300 hover:text-emerald-200"
+                            className="h-8 gap-1 text-xs text-brand hover:text-brand"
                             onClick={() => {
                               setPin(m.id);
                               setOpenActionsId(null);
@@ -673,7 +673,7 @@ export function ChannelChatPanel({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-8 gap-1 text-xs text-zinc-300"
+                            className="h-8 gap-1 text-xs text-foreground/80"
                             onClick={() => {
                               setPin(null);
                               setOpenActionsId(null);
@@ -695,12 +695,12 @@ export function ChannelChatPanel({
                               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
                               variant === "listener"
                                 ? "border-white/10 bg-white/5 hover:bg-white/10"
-                                : "border-zinc-700/80 bg-zinc-900/80 hover:bg-zinc-800",
+                                : "border-border/80 bg-card/80 hover:bg-muted",
                             )}
                             onClick={() => toggleReaction(m.id, s.emoji)}
                           >
                             <span>{s.emoji}</span>
-                            <span className="tabular-nums text-zinc-400">{s.count}</span>
+                            <span className="tabular-nums text-muted-foreground">{s.count}</span>
                           </button>
                         ))}
                       </div>
@@ -738,7 +738,7 @@ export function ChannelChatPanel({
             disabled={!channelIsActive || sending || !connected}
             className={cn(
               "border text-sm",
-              variant === "listener" ? "border-white/10 bg-black/30 text-zinc-100 placeholder:text-zinc-600" : "border-zinc-800 bg-zinc-900/80",
+              variant === "listener" ? "border-border/60 bg-[var(--surface-inset)] text-foreground placeholder:text-muted-foreground" : "border-border bg-card/80",
             )}
             onKeyDown={(e) => {
               if (mentionOpen && mentionCandidates.length > 0) {
@@ -770,14 +770,14 @@ export function ChannelChatPanel({
             }}
           />
           {mentionOpen && mentionCandidates.length > 0 ? (
-            <div className="absolute bottom-full left-0 z-20 mb-1 max-h-40 w-full overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 py-1 shadow-xl">
+            <div className="absolute bottom-full left-0 z-20 mb-1 max-h-40 w-full overflow-auto rounded-lg border border-border bg-background py-1 shadow-xl">
               {mentionCandidates.slice(0, 8).map((m, i) => (
                 <button
                   key={m.id}
                   type="button"
                   className={cn(
                     "block w-full px-3 py-1.5 text-left text-sm",
-                    i === mentionIndex ? "bg-emerald-900/50 text-emerald-100" : "text-zinc-300 hover:bg-zinc-800",
+                    i === mentionIndex ? "bg-[var(--brand-subtle)] text-brand" : "text-foreground/80 hover:bg-muted",
                   )}
                   onMouseDown={(ev) => {
                     ev.preventDefault();
@@ -791,7 +791,7 @@ export function ChannelChatPanel({
           ) : null}
           <Button
             type="button"
-            className="shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-500"
+            className="shrink-0 gap-1.5 bg-brand hover:bg-brand"
             disabled={!channelIsActive || sending || !connected || !draft.trim()}
             onClick={() => void submitSend()}
           >
@@ -799,7 +799,7 @@ export function ChannelChatPanel({
             Send
           </Button>
         </div>
-        {!channelIsActive ? <p className="text-center text-xs text-zinc-500">Reopen the channel to send new messages.</p> : null}
+        {!channelIsActive ? <p className="text-center text-xs text-muted-foreground">Reopen the channel to send new messages.</p> : null}
       </div>
     </div>
   );

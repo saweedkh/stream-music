@@ -68,7 +68,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         <div
           id={id}
           className={cn(
-            "flex h-10 w-full items-center rounded-lg border border-zinc-700/90 bg-zinc-950/80 px-3 text-sm text-zinc-500",
+            "flex h-10 w-full items-center rounded-lg border border-border/90 bg-card/80 px-3 text-sm text-muted-foreground",
             className,
           )}
         >
@@ -92,12 +92,12 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           id={id}
           aria-invalid={ariaInvalid}
           className={cn(
-            "flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-zinc-700/90 bg-zinc-950/80 px-3 py-2 text-left text-sm text-zinc-100 shadow-inner transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+            "flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border/90 bg-card/80 px-3 py-2 text-left text-sm text-foreground shadow-inner transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             "disabled:cursor-not-allowed disabled:opacity-50",
             "[&>span]:line-clamp-1 [&>span]:min-w-0",
             ariaInvalid && "border-red-500/70 focus-visible:ring-red-500/50",
-            !ariaInvalid && valid && "border-emerald-600/50 focus-visible:ring-emerald-500/40",
+            !ariaInvalid && valid && "border-brand/50 focus-visible:ring-brand/40",
             className,
           )}
         >
@@ -111,7 +111,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             position="popper"
             sideOffset={4}
             className={cn(
-              "z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-zinc-700/90 bg-zinc-950 text-zinc-100 shadow-xl shadow-black/50",
+              "z-[100] max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border/90 bg-background text-foreground shadow-xl shadow-black/50",
               "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             )}
           >
@@ -123,7 +123,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                   disabled={item.disabled}
                   className={cn(
                     "relative flex w-full cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none",
-                    "data-[highlighted]:bg-zinc-800 data-[state=checked]:bg-emerald-950/60 data-[state=checked]:text-emerald-100",
+                    "data-[highlighted]:bg-muted data-[state=checked]:bg-[var(--brand-subtle)] data-[state=checked]:text-brand",
                     "data-[disabled]:pointer-events-none data-[disabled]:opacity-40",
                   )}
                 >

@@ -61,12 +61,12 @@ export function ChannelManagementSection(props: Props) {
                 />
               ))}
             </div>
-            {channels.length === 0 ? <p className="py-6 text-center text-sm text-zinc-500">No channels yet — create one on the right.</p> : null}
+            {channels.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No channels yet — create one on the right.</p> : null}
           </ScrollArea>
         </CardContent>
       </Card>
 
-      <Card className="border-emerald-500/15 lg:col-span-2">
+      <Card className="border-brand/15 lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-base">New channel</CardTitle>
         </CardHeader>
@@ -165,7 +165,7 @@ function ChannelCard({
               {channel.privacy}
             </Badge>
             {channel.membership_is_active === false ? (
-              <Badge variant="outline" className="border-zinc-600 text-zinc-400">
+              <Badge variant="outline" className="border-border text-muted-foreground">
                 Left — tap Open to reconnect
               </Badge>
             ) : null}
@@ -176,7 +176,7 @@ function ChannelCard({
             ) : null}
           </div>
         </div>
-        <p className="text-xs text-zinc-500">Cap: {channel.member_limit ?? "—"}</p>
+        <p className="text-xs text-muted-foreground">Cap: {channel.member_limit ?? "—"}</p>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
         {!isActive && !isOwner ? (

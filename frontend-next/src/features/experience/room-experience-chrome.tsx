@@ -70,7 +70,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
   const accentRing = useMemo(() => {
     const a = (experience.accent || "emerald").toLowerCase();
     const map: Record<string, string> = {
-      emerald: "border-emerald-500/40 shadow-emerald-900/30",
+      emerald: "border-brand/40 shadow-brand/30",
       violet: "border-violet-500/40 shadow-violet-900/30",
       rose: "border-rose-500/40 shadow-rose-900/30",
       amber: "border-amber-500/40 shadow-amber-900/30",
@@ -159,18 +159,18 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
   }
 
   return (
-    <div className={cn("relative mb-4 rounded-2xl border bg-zinc-950/50 p-4 backdrop-blur-sm", accentRing)}>
+    <div className={cn("relative mb-4 rounded-2xl border bg-card/50 p-4 backdrop-blur-sm", accentRing)}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex -space-x-2">
           {members.slice(0, 8).map((m) => (
-            <Avatar key={m.id} className="h-9 w-9 border-2 border-zinc-950" title={m.username}>
+            <Avatar key={m.id} className="h-9 w-9 border-2 border-background" title={m.username}>
               <AvatarFallback className="text-xs">{(m.username || "?").slice(0, 1)}</AvatarFallback>
             </Avatar>
           ))}
           {members.length === 0 ? (
-            <span className="text-xs text-zinc-500">Listening… connect to see who&apos;s here.</span>
+            <span className="text-xs text-muted-foreground">Listening… connect to see who&apos;s here.</span>
           ) : (
-            <span className="pl-2 text-xs text-zinc-400">{count} online</span>
+            <span className="pl-2 text-xs text-muted-foreground">{count} online</span>
           )}
         </div>
         <div className="flex flex-wrap gap-1">
@@ -191,7 +191,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
           type="button"
           variant="ghost"
           size="sm"
-          className="ml-auto gap-1 text-zinc-400"
+          className="ml-auto gap-1 text-muted-foreground"
           onClick={async () => {
             const url = `${window.location.origin}/channel/${channelId}`;
             try {
@@ -208,14 +208,14 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
           <Share2 className="h-4 w-4" />
           Share
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="gap-1 text-zinc-400" onClick={() => setHelpOpen(true)}>
+        <Button type="button" variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={() => setHelpOpen(true)}>
           <HelpCircle className="h-4 w-4" />
           Hotkeys
         </Button>
       </div>
       {lastShout ? (
-        <p className="mt-3 truncate text-sm text-zinc-300">
-          <span className="font-semibold text-emerald-300/90">{lastShout.user}:</span> {lastShout.text}
+        <p className="mt-3 truncate text-sm text-foreground/80">
+          <span className="font-semibold text-brand/90">{lastShout.user}:</span> {lastShout.text}
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
@@ -224,7 +224,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
           placeholder="Shout (40 chars, 30s cooldown)"
           value={shoutDraft}
           onChange={(e) => setShoutDraft(e.target.value)}
-          className="max-w-md border-zinc-800 bg-zinc-900/80"
+          className="max-w-md border-border bg-card/80"
           onKeyDown={(e) => e.key === "Enter" && sendShout()}
         />
         <Button type="button" size="sm" className="gap-1" onClick={() => sendShout()}>
@@ -237,7 +237,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       </div>
       {experience.veto_skip_threshold && experience.veto_skip_threshold > 0 ? (
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs text-zinc-500">
+          <div className="mb-1 flex justify-between text-xs text-muted-foreground">
             <span>Skip votes</span>
             <span>
               {skipVotes} / {skipThreshold || experience.veto_skip_threshold}
@@ -250,8 +250,8 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
         </div>
       ) : null}
       {experience.room_rules?.trim() ? (
-        <div className="mt-3 rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-xs text-zinc-300">
-          <p className="font-medium text-zinc-400">Room rules</p>
+        <div className="mt-3 rounded-lg border border-border/80 bg-card/50 px-3 py-2 text-xs text-foreground/80">
+          <p className="font-medium text-muted-foreground">Room rules</p>
           <p className="mt-1 whitespace-pre-wrap">{experience.room_rules.trim()}</p>
         </div>
       ) : null}
@@ -261,13 +261,13 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
         </p>
       ) : null}
       {rehearsalMuted ? (
-        <p className="mt-2 flex items-center gap-2 text-xs text-amber-200/90">
+        <p className="mt-2 flex items-center gap-2 text-xs text-warning/90">
           <Sparkles className="h-3.5 w-3.5 shrink-0" />
           Soundcheck mode — playback is muted for listeners until DJs go live.
         </p>
       ) : null}
       {experience.listening_party_only && !canControl ? (
-        <p className="mt-1 text-xs text-zinc-500">Listening party — only DJs control playback; you can vote and suggest tracks.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Listening party — only DJs control playback; you can vote and suggest tracks.</p>
       ) : null}
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
         {floaters.map((f) => (
@@ -281,12 +281,12 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
         ))}
       </div>
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+        <DialogContent className="border-border bg-background sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Room hotkeys</DialogTitle>
-            <DialogDescription className="text-left text-zinc-400">
-              <kbd className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-xs">?</kbd> or{" "}
-              <kbd className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-xs">Shift+/</kbd> — this help
+            <DialogDescription className="text-left text-muted-foreground">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 text-xs">?</kbd> or{" "}
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 text-xs">Shift+/</kbd> — this help
               <br />
               Reactions and shouts use the live socket (no page reload).
             </DialogDescription>

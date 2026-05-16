@@ -72,7 +72,7 @@ export function JoinChannelDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-emerald-800/50 text-emerald-100 hover:bg-emerald-950/40">
+        <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-brand/50 text-brand hover:bg-[var(--brand-subtle)]">
           <LogIn className="h-4 w-4" aria-hidden />
           Join channel
         </Button>
@@ -81,7 +81,7 @@ export function JoinChannelDialog() {
         <DialogHeader>
           <DialogTitle>Join a channel</DialogTitle>
           <DialogDescription>
-            Paste an <strong className="text-zinc-200">invite code</strong> (UUID), a <strong className="text-zinc-200">public join code</strong>,
+            Paste an <strong className="text-foreground">invite code</strong> (UUID), a <strong className="text-foreground">public join code</strong>,
             or a full join URL. QR scan fills this automatically.
           </DialogDescription>
         </DialogHeader>

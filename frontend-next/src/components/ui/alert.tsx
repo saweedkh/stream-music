@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 const alertVariants = cva("relative w-full rounded-lg border px-4 py-3 text-sm [&_p]:leading-relaxed", {
   variants: {
     variant: {
-      default: "border-zinc-700 bg-zinc-900/70 text-zinc-200",
+      default: "border-border bg-card/70 text-foreground",
       info: "border-sky-800/60 bg-sky-950/40 text-sky-100",
       error: "border-red-900/70 bg-red-950/45 text-red-100",
-      success: "border-emerald-800/60 bg-emerald-950/40 text-emerald-100",
+      success: "border-brand/60 bg-[var(--brand-subtle)] text-brand",
     },
   },
   defaultVariants: {

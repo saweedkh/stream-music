@@ -433,7 +433,7 @@ export function PlaylistManager() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -445,8 +445,8 @@ export function PlaylistManager() {
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
       <aside className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Playlists</h2>
-          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-emerald-400 hover:text-emerald-300" onClick={() => setShowCreatePlaylist(true)}>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Playlists</h2>
+          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-brand hover:text-brand" onClick={() => setShowCreatePlaylist(true)}>
             <Plus className="h-4 w-4" />
             New
           </Button>
@@ -454,14 +454,14 @@ export function PlaylistManager() {
 
         <ScrollArea className="h-[calc(100vh-260px)] min-h-[200px]">
           <div className="space-y-1 pr-1">
-            {playlists.length === 0 && <p className="px-2 text-xs text-zinc-500">No playlists yet.</p>}
+            {playlists.length === 0 && <p className="px-2 text-xs text-muted-foreground">No playlists yet.</p>}
             {playlists.map((pl) => (
               <div
                 key={pl.id}
                 className={`group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
                   selectedPlaylistId === pl.id
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100"
+                    ? "bg-brand/15 text-brand"
+                    : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
                 }`}
                 onClick={() => {
                   setSelectedPlaylistId(pl.id);
@@ -479,7 +479,7 @@ export function PlaylistManager() {
                       if (e.key === "Escape") setRenamingPlaylistId(null);
                     }}
                     onBlur={commitRename}
-                    className="w-full min-w-0 rounded bg-zinc-900 px-1 text-sm text-zinc-100 outline outline-1 outline-emerald-500/60"
+                    className="w-full min-w-0 rounded bg-card px-1 text-sm text-foreground outline outline-1 outline-brand/60"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
@@ -487,7 +487,7 @@ export function PlaylistManager() {
                 )}
                 <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
-                    className="rounded p-0.5 hover:text-zinc-100"
+                    className="rounded p-0.5 hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       setRenamingPlaylistId(pl.id);
@@ -517,16 +517,16 @@ export function PlaylistManager() {
       {/* ── Main panel ──────────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-col gap-4">
         {/* ── Track library ─────────────────────────────────────────────── */}
-        <Card className="border-zinc-800/90">
+        <Card className="border-border/90">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-base">
                 <Music className="mr-1.5 inline h-4 w-4 opacity-60" />
                 Track Library
-                {libraryTotal > 0 && <span className="ml-2 text-xs font-normal text-zinc-500">({libraryTotal} tracks)</span>}
+                {libraryTotal > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">({libraryTotal} tracks)</span>}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-zinc-400 hover:text-zinc-200" onClick={() => setShowUpload((v) => !v)}>
+                <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-muted-foreground hover:text-foreground" onClick={() => setShowUpload((v) => !v)}>
                   <Plus className="h-4 w-4" />
                   Upload
                   <ChevronDown className={`h-3 w-3 transition-transform ${showUpload ? "rotate-180" : ""}`} />
@@ -535,7 +535,7 @@ export function PlaylistManager() {
             </div>
             {/* Upload form (collapsible) */}
             {showUpload && (
-              <div className="mt-3 grid gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-4 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 rounded-xl border border-border/80 bg-card/60 p-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Title</Label>
                   <Input className="h-8 text-sm" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="Track title" />
@@ -556,7 +556,7 @@ export function PlaylistManager() {
                 </div>
                 <div className="sm:col-span-2">
                   <div
-                    className="mb-2 rounded-lg border border-dashed border-zinc-700/80 bg-zinc-950/60 px-4 py-3 text-center text-xs text-zinc-500 transition hover:border-emerald-500/40"
+                    className="mb-2 rounded-lg border border-dashed border-border/80 bg-card/60 px-4 py-3 text-center text-xs text-muted-foreground transition hover:border-brand/40"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -568,12 +568,12 @@ export function PlaylistManager() {
                   <input
                     type="file"
                     accept="audio/*"
-                    className="mb-2 w-full rounded border border-zinc-700/80 bg-zinc-950/80 px-3 py-1.5 text-xs text-zinc-300 file:mr-2 file:rounded file:border-0 file:bg-zinc-800 file:px-2 file:py-1 file:text-xs file:text-zinc-200"
+                    className="mb-2 w-full rounded border border-border/80 bg-card/80 px-3 py-1.5 text-xs text-foreground/80 file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:text-foreground"
                     onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
                   />
                   {uploading && (
-                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${uploadProgress}%` }} />
                     </div>
                   )}
                   <Button size="sm" className="w-full" disabled={uploading} onClick={handleUpload}>
@@ -588,7 +588,7 @@ export function PlaylistManager() {
             {/* Search + select all */}
             <div className="mb-3 flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-8 pl-8 text-sm"
                   placeholder="Search by title or artist…"
@@ -596,14 +596,14 @@ export function PlaylistManager() {
                   onChange={(e) => setLibQuery(e.target.value)}
                 />
                 {libQuery && (
-                  <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300" onClick={() => setLibQuery("")}>
+                  <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground/80" onClick={() => setLibQuery("")}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
               {libraryTracks.length > 0 && (
                 <button
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/60 transition hover:border-emerald-500/50"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-card/60 transition hover:border-brand/50"
                   title={allLibSelected ? "Deselect all" : "Select all on page"}
                   onClick={() => {
                     if (allLibSelected) {
@@ -621,27 +621,27 @@ export function PlaylistManager() {
                     }
                   }}
                 >
-                  {allLibSelected ? <Check className="h-4 w-4 text-emerald-400" /> : <Check className="h-4 w-4 text-zinc-600" />}
+                  {allLibSelected ? <Check className="h-4 w-4 text-brand" /> : <Check className="h-4 w-4 text-muted-foreground" />}
                 </button>
               )}
             </div>
 
             {/* Selection bar */}
             {selectedTrackIds.size > 0 && (
-              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">
+              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-[var(--brand-subtle)] px-3 py-2 text-sm text-brand">
                 <span>{selectedTrackIds.size} selected</span>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 px-2 text-zinc-400 hover:text-zinc-200"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setSelectedTrackIds(new Set())}
                   >
                     Clear
                   </Button>
                   <Button
                     size="sm"
-                    className="h-7 gap-1 bg-emerald-600 px-3 hover:bg-emerald-500"
+                    className="h-7 gap-1 bg-brand px-3 hover:bg-brand"
                     disabled={!selectedPlaylistId || bulkAdding}
                     onClick={handleBulkAdd}
                   >
@@ -663,10 +663,10 @@ export function PlaylistManager() {
 
             {libLoading ? (
               <div className="flex h-24 items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : libraryTracks.length === 0 ? (
-              <p className="py-6 text-center text-sm text-zinc-500">
+              <p className="py-6 text-center text-sm text-muted-foreground">
                 {libQuery ? "No tracks match your search." : "No tracks yet. Upload your first track."}
               </p>
             ) : (
@@ -678,15 +678,15 @@ export function PlaylistManager() {
                       key={track.id}
                       className={`group flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
                         selected
-                          ? "border-emerald-500/40 bg-emerald-950/30"
-                          : "border-zinc-800/70 bg-zinc-950/40 hover:border-zinc-700/80"
+                          ? "border-brand/40 bg-[var(--brand-subtle)]"
+                          : "border-border/70 bg-card/40 hover:border-border/80"
                       }`}
                     >
                       <button
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                           selected
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : "border-zinc-700 hover:border-emerald-500/60"
+                            ? "border-brand bg-brand text-brand-foreground"
+                            : "border-border hover:border-brand/60"
                         }`}
                         onClick={() =>
                           setSelectedTrackIds((prev) => {
@@ -701,8 +701,8 @@ export function PlaylistManager() {
                       </button>
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-zinc-100">{track.title}</p>
-                        <p className="truncate text-xs text-zinc-500">
+                        <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">
                           {track.artist || <span className="italic">No artist</span>}
                           {track.album ? ` · ${track.album}` : ""}
                         </p>
@@ -714,21 +714,21 @@ export function PlaylistManager() {
 
                       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
-                          className="rounded p-1 text-zinc-400 hover:text-emerald-400"
+                          className="rounded p-1 text-muted-foreground hover:text-brand"
                           title="Add to selected playlist"
                           onClick={() => void handleAddSingle(track.id)}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          className="rounded p-1 text-zinc-400 hover:text-zinc-200"
+                          className="rounded p-1 text-muted-foreground hover:text-foreground"
                           title="Edit track"
                           onClick={() => openEditTrack(track)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          className="rounded p-1 text-zinc-400 hover:text-rose-400"
+                          className="rounded p-1 text-muted-foreground hover:text-rose-400"
                           title="Delete track"
                           onClick={() => setDeleteTrackTarget(track)}
                         >
@@ -743,7 +743,7 @@ export function PlaylistManager() {
 
             {/* Pagination */}
             {libraryTotal > LIB_PAGE && (
-              <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
+              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   {libOffset + 1}–{Math.min(libOffset + LIB_PAGE, libraryTotal)} of {libraryTotal}
                 </span>
@@ -762,19 +762,19 @@ export function PlaylistManager() {
 
         {/* ── Selected playlist items ──────────────────────────────────── */}
         {selectedPlaylist ? (
-          <Card className="border-zinc-800/90">
+          <Card className="border-border/90">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <CardTitle className="flex-1 text-base">
                   <ListMusic className="mr-1.5 inline h-4 w-4 opacity-60" />
                   {selectedPlaylist.name}
-                  <span className="ml-2 text-xs font-normal text-zinc-500">
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
                     ({playlistItems.length} track{playlistItems.length !== 1 ? "s" : ""})
                   </span>
                 </CardTitle>
               </div>
               <div className="relative mt-2">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-8 pl-8 text-sm"
                   placeholder="Search in playlist…"
@@ -782,7 +782,7 @@ export function PlaylistManager() {
                   onChange={(e) => setPlaylistQuery(e.target.value)}
                 />
                 {playlistQuery && (
-                  <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300" onClick={() => setPlaylistQuery("")}>
+                  <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground/80" onClick={() => setPlaylistQuery("")}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -790,7 +790,7 @@ export function PlaylistManager() {
             </CardHeader>
             <CardContent className="pt-0">
               {filteredPlaylistItems.length === 0 ? (
-                <p className="py-6 text-center text-sm text-zinc-500">
+                <p className="py-6 text-center text-sm text-muted-foreground">
                   {isFiltering ? "No tracks match your search." : "No tracks in this playlist. Add some from the library above."}
                 </p>
               ) : (
@@ -800,25 +800,25 @@ export function PlaylistManager() {
                     return (
                       <div
                         key={item.id}
-                        className="group flex items-center gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/40 px-3 py-2 transition-colors hover:border-zinc-700/80"
+                        className="group flex items-center gap-2 rounded-lg border border-border/70 bg-card/40 px-3 py-2 transition-colors hover:border-border/80"
                         draggable={!isFiltering}
                         onDragStart={() => setDraggingItemId(item.id)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => void handleDrop(index)}
                       >
-                        <GripVertical className={`h-4 w-4 shrink-0 text-zinc-600 ${isFiltering ? "opacity-20" : "cursor-grab"}`} />
-                        <span className="w-5 shrink-0 text-center text-xs text-zinc-600">{item.position + 1}</span>
+                        <GripVertical className={`h-4 w-4 shrink-0 text-muted-foreground ${isFiltering ? "opacity-20" : "cursor-grab"}`} />
+                        <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{item.position + 1}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-zinc-100">{t ? t.title : `Track #${item.track}`}</p>
+                          <p className="truncate text-sm font-medium text-foreground">{t ? t.title : `Track #${item.track}`}</p>
                           {t && (
-                            <p className="truncate text-xs text-zinc-500">
+                            <p className="truncate text-xs text-muted-foreground">
                               {t.artist || <span className="italic">No artist</span>}
                               {t.album ? ` · ${t.album}` : ""}
                             </p>
                           )}
                         </div>
                         <button
-                          className="shrink-0 rounded p-1 text-zinc-500 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
+                          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
                           title="Remove from playlist"
                           onClick={() => void handleRemoveItem(item.id)}
                         >
@@ -832,7 +832,7 @@ export function PlaylistManager() {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-zinc-800/60 text-sm text-zinc-600">
+          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground">
             Select a playlist to see its tracks
           </div>
         )}

@@ -20,7 +20,7 @@ export function AuthLayout({ title, description, children }: Props) {
           <span className="mt-0.5 block text-xs text-muted-foreground">LAN parties &amp; shared listening</span>
         </span>
       </Link>
-      <div className="rounded-2xl border border-zinc-800/90 bg-card/80 p-5 shadow-2xl shadow-black/40 backdrop-blur-md sm:p-6">
+      <div className="glass-panel-elevated p-5 sm:p-6">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
         <div className="mt-6">{children}</div>

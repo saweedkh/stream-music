@@ -21,8 +21,8 @@ export default async function ChannelPage({ params }: Props) {
       return (
         <AuthGuard>
           <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-            <h1 className="text-xl font-semibold text-white">This channel is closed</h1>
-            <p className="text-sm text-zinc-400">The owner ended the room. You cannot listen or sync here anymore.</p>
+            <h1 className="text-xl font-semibold text-foreground">This channel is closed</h1>
+            <p className="text-sm text-muted-foreground">The owner ended the room. You cannot listen or sync here anymore.</p>
             <Button asChild variant="secondary">
               <Link href="/dashboard">Back to dashboard</Link>
             </Button>

@@ -17,8 +17,8 @@ type Props = {
 export function UpNextStrip({ items, className }: Props) {
   if (!items.length) return null;
   return (
-    <div className={cn("rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-3", className)}>
-      <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+    <div className={cn("rounded-xl border border-border/70 bg-card/40 p-3", className)}>
+      <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         <ListMusic className="size-3.5 shrink-0" aria-hidden />
         Up next
       </p>
@@ -28,15 +28,15 @@ export function UpNextStrip({ items, className }: Props) {
             key={item.id}
             className={cn(
               "flex items-center gap-2 rounded-lg px-1.5 py-1.5",
-              i === 0 && "bg-zinc-800/30",
+              i === 0 && "bg-muted/30",
             )}
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-800/90 font-mono text-[10px] tabular-nums text-zinc-400">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted/90 font-mono text-[10px] tabular-nums text-muted-foreground">
               {i + 1}
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">{item.title}</span>
+            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.title}</span>
             {item.artist ? (
-              <span className="hidden max-w-[36%] truncate text-xs text-zinc-500 sm:inline">{item.artist}</span>
+              <span className="hidden max-w-[36%] truncate text-xs text-muted-foreground sm:inline">{item.artist}</span>
             ) : null}
           </li>
         ))}

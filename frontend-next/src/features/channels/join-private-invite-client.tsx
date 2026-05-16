@@ -34,8 +34,8 @@ export function JoinPrivateInviteClient({ token }: { token: string }) {
   }, [router, token]);
 
   return (
-    <div className="space-y-3 text-sm text-zinc-300">
-      <p className="text-base font-medium text-white">Private channel invite</p>
+    <div className="space-y-3 text-sm text-foreground/80">
+      <p className="text-base font-medium text-foreground">Private channel invite</p>
       <p>{message}</p>
     </div>
   );

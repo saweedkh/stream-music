@@ -47,7 +47,7 @@ function JoinPendingInner() {
   }, [channelId]);
 
   return (
-    <Card className="mx-auto max-w-md border-zinc-800/90">
+    <Card className="mx-auto max-w-md border-border/90">
       <CardHeader>
         <CardTitle>Join request pending</CardTitle>
       </CardHeader>
@@ -69,7 +69,7 @@ function JoinPendingInner() {
 
 export default function JoinPendingPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-400">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
       <JoinPendingInner />
     </Suspense>
   );

@@ -36,21 +36,21 @@ export function DjBoothPanel({ channelId, canManage, sendSocketMessage, nowPlayi
 
   return (
     <div className="space-y-4">
-      <Card className="border-emerald-900/40 bg-gradient-to-br from-zinc-950 via-emerald-950/20 to-zinc-950">
+      <Card className="border-brand/40 bg-gradient-to-br from-background via-[var(--brand-subtle)] to-background">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Headphones className="size-5 text-emerald-400" />
+            <Headphones className="size-5 text-brand" />
             DJ booth
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             Compact view for hosts — queue, skip, and what plays next.
           </p>
           {nowPlayingTitle ? (
-            <p className="truncate text-base font-medium text-white">{nowPlayingTitle}</p>
+            <p className="truncate text-base font-medium text-foreground">{nowPlayingTitle}</p>
           ) : (
-            <p className="text-sm text-zinc-500">Nothing playing</p>
+            <p className="text-sm text-muted-foreground">Nothing playing</p>
           )}
           <UpNextStrip items={upNext} />
           <div className="flex flex-wrap gap-2">
@@ -65,7 +65,7 @@ export function DjBoothPanel({ channelId, canManage, sendSocketMessage, nowPlayi
               <SkipForward className="size-4" />
               Skip
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-zinc-400" asChild>
+            <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" asChild>
               <a href={`#channel-queue-panel`}>
                 <ListMusic className="size-4" />
                 Full queue

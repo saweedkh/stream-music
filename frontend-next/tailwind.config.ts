@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: ["class"],
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
@@ -20,10 +21,13 @@ const config: Config = {
         ring: "var(--ring)",
         brand: {
           DEFAULT: "var(--brand)",
+          foreground: "var(--brand-foreground)",
           strong: "var(--brand-strong)",
           muted: "var(--brand-muted)",
         },
+        warning: "var(--warning)",
         destructive: "var(--destructive)",
+        success: "var(--success)",
       },
       borderRadius: {
         lg: "var(--radius)",

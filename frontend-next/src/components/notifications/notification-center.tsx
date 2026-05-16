@@ -18,9 +18,9 @@ const CATEGORY_META: Record<
   { label: string; icon: typeof MessageSquare; className: string }
 > = {
   chat: { label: "Chat", icon: MessageSquare, className: "text-sky-400 bg-sky-500/15" },
-  playback: { label: "Playback", icon: Music, className: "text-emerald-400 bg-emerald-500/15" },
+  playback: { label: "Playback", icon: Music, className: "text-brand bg-brand/15" },
   moderation: { label: "Moderation", icon: Shield, className: "text-amber-400 bg-amber-500/15" },
-  system: { label: "System", icon: Bell, className: "text-slate-300 bg-slate-500/15" },
+  system: { label: "System", icon: Bell, className: "text-muted-foreground bg-muted/30" },
 };
 
 const CATEGORY_ORDER: NotificationCategory[] = ["chat", "playback", "moderation", "system"];
@@ -43,8 +43,8 @@ function NotificationRow({ item, onOpen }: { item: AppNotification; onOpen: (ite
       className={cn(
         "flex w-full gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
         item.read
-          ? "border-slate-800/60 bg-slate-900/30 hover:bg-slate-900/50"
-          : "border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/10",
+          ? "border-border/60 bg-card/30 hover:bg-card/50"
+          : "border-brand/25 bg-brand/5 hover:bg-brand/10",
       )}
     >
       <span className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", meta.className)}>
@@ -52,13 +52,13 @@ function NotificationRow({ item, onOpen }: { item: AppNotification; onOpen: (ite
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-slate-100">{item.title}</span>
+          <span className="truncate text-sm font-medium text-foreground">{item.title}</span>
           <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] font-medium uppercase tracking-wide">
             {meta.label}
           </Badge>
         </span>
-        <span className="mt-0.5 line-clamp-2 text-xs text-slate-400">{item.body}</span>
-        <span className="mt-1 block text-[10px] text-slate-500">{formatWhen(item.createdAt)}</span>
+        <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.body}</span>
+        <span className="mt-1 block text-[10px] text-muted-foreground">{formatWhen(item.createdAt)}</span>
       </span>
     </button>
   );
@@ -103,7 +103,7 @@ export function NotificationCenter() {
           {unread > 0 ? (
             <Badge
               variant="success"
-              className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 py-0 text-[10px] font-semibold text-emerald-950"
+              className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 py-0 text-[10px] font-semibold text-brand-foreground"
             >
               {unread > 9 ? "9+" : unread}
             </Badge>
@@ -118,7 +118,7 @@ export function NotificationCenter() {
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex items-center justify-between px-3 py-2.5">
-          <span className="text-sm font-semibold text-slate-100">Notifications</span>
+          <span className="text-sm font-semibold text-foreground">Notifications</span>
           {items.length > 0 ? (
             <div className="flex items-center gap-1">
               <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={() => markAllRead()} title="Mark all read">
@@ -138,7 +138,7 @@ export function NotificationCenter() {
         <ScrollArea className="max-h-[min(70vh,24rem)]">
           <div className="p-2">
             {items.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-slate-500">
+              <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                 No notifications yet. Chat and track changes appear here while you browse.
               </p>
             ) : (
@@ -148,7 +148,7 @@ export function NotificationCenter() {
                 const meta = CATEGORY_META[cat];
                 return (
                   <section key={cat} className="mb-3 last:mb-0">
-                    <h3 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{meta.label}</h3>
+                    <h3 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{meta.label}</h3>
                     <ul className="space-y-1.5">
                       {list.map((item) => (
                         <li key={item.id}>
@@ -166,7 +166,7 @@ export function NotificationCenter() {
         <Separator />
 
         <div className="px-3 py-2 text-center">
-          <Link href="/dashboard" className="text-xs text-slate-400 hover:text-emerald-300" onClick={() => setOpen(false)}>
+          <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-brand" onClick={() => setOpen(false)}>
             Push settings on dashboard
           </Link>
         </div>

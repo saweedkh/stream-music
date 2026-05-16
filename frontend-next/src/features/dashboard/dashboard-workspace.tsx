@@ -271,7 +271,7 @@ export function DashboardWorkspace() {
   if (isLoading) {
     return (
       <div className="space-y-6 pb-24">
-        <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5 shadow-lg shadow-black/25 backdrop-blur-xl">
+        <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/45 p-5 shadow-lg shadow-black/25 backdrop-blur-xl">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="mt-3 h-9 w-56" />
           <Skeleton className="mt-3 h-4 w-full max-w-xl" />
@@ -280,7 +280,7 @@ export function DashboardWorkspace() {
             <Skeleton className="h-9 w-24" />
           </div>
         </section>
-        <section className="rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5">
+        <section className="rounded-2xl border border-border/70 bg-background/45 p-5">
           <Skeleton className="h-11 w-full rounded-xl" />
           <Skeleton className="mt-5 h-48 w-full rounded-xl" />
         </section>
@@ -341,12 +341,14 @@ export function DashboardWorkspace() {
 
   return (
     <div className="space-y-6 pb-24">
-      <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/45 p-5 shadow-lg shadow-black/25 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <section className="glass-panel-elevated animate-track-enter p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-widest text-emerald-500/90">Workspace</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Dashboard</h1>
-            <p className="max-w-lg text-sm text-zinc-400 sm:text-base">Channels, media library, playlists, and sharing in one place.</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-brand">Workspace</p>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Dashboard</h1>
+            <p className="max-w-lg text-sm text-muted-foreground sm:text-base">
+              Channels, media library, playlists, and sharing in one place.
+            </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <JoinChannelDialog />

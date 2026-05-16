@@ -18,8 +18,8 @@ const Switch = React.forwardRef<HTMLButtonElement, Props>(({ className, checked,
     onClick={() => !disabled && onCheckedChange(!checked)}
     className={cn(
       "peer inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
-      checked ? "bg-emerald-600" : "bg-zinc-700",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      checked ? "bg-brand" : "bg-muted",
       disabled && "cursor-not-allowed opacity-50",
       className,
     )}

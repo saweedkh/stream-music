@@ -51,7 +51,7 @@ export function PlaylistBuilderSection(props: Props) {
   } = props;
 
   return (
-    <Card className="border-zinc-800/90">
+    <Card className="border-border/90">
       <CardHeader>
         <CardTitle className="text-lg">Playlist builder</CardTitle>
         <CardDescription>Create playlists, attach them to a channel, and reorder items by drag and drop.</CardDescription>
@@ -77,7 +77,7 @@ export function PlaylistBuilderSection(props: Props) {
           Create Playlist
         </Button>
 
-        <div className="space-y-1 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-400">
+        <div className="space-y-1 rounded-lg border border-border/80 bg-card/40 p-3 text-xs text-muted-foreground">
           {playlists.map((playlist) => (
             <p key={playlist.id}>
               {playlist.name} {playlist.channel ? `(channel ${playlist.channel})` : "(private)"}
@@ -85,7 +85,7 @@ export function PlaylistBuilderSection(props: Props) {
           ))}
         </div>
 
-        <div className="mt-2 space-y-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3">
+        <div className="mt-2 space-y-2 rounded-lg border border-border/80 bg-card/40 p-3">
           <Label>Add track to playlist</Label>
           <Select value={itemPlaylistId} valid={Boolean(itemPlaylistId)} onChange={(e) => onItemPlaylistIdChange(e.target.value)}>
             <option value="">Select playlist</option>
@@ -106,14 +106,14 @@ export function PlaylistBuilderSection(props: Props) {
           <Button variant="secondary" className="w-full" onClick={onAddPlaylistItem}>
             Add Item
           </Button>
-          <div className="space-y-1 text-xs text-zinc-500">
+          <div className="space-y-1 text-xs text-muted-foreground">
             {Object.entries(groupedPlaylistItems).map(([playlistId, items]) => (
-              <div key={playlistId} className="rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-2.5">
-                <p className="mb-2 text-zinc-300">Playlist {playlistId}</p>
+              <div key={playlistId} className="rounded-lg border border-border/80 bg-card/50 p-2.5">
+                <p className="mb-2 text-foreground/80">Playlist {playlistId}</p>
                 {items.map((item, dropIndex) => (
                   <div
                     key={item.id}
-                    className="mb-1 rounded-lg border border-zinc-700/70 bg-zinc-900/60 p-2 transition-colors hover:border-zinc-600/80"
+                    className="mb-1 rounded-lg border border-border/70 bg-card/60 p-2 transition-colors hover:border-border/80"
                     draggable
                     onDragStart={() => setDraggingPlaylistItemId(item.id)}
                     onDragOver={(event) => event.preventDefault()}

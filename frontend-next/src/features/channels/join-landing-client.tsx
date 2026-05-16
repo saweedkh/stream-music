@@ -43,8 +43,8 @@ export function JoinLandingClient() {
   }, [router, searchParams]);
 
   return (
-    <div className="space-y-3 text-sm text-zinc-300">
-      <p className="text-base font-medium text-white">Channel invite</p>
+    <div className="space-y-3 text-sm text-foreground/80">
+      <p className="text-base font-medium text-foreground">Channel invite</p>
       <p>{message}</p>
     </div>
   );

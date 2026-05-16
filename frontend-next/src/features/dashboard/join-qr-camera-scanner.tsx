@@ -104,14 +104,14 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-zinc-500">Point the camera at a channel QR. The field will fill automatically.</p>
-      {starting ? <p className="text-xs text-zinc-400">Starting camera…</p> : null}
+      <p className="text-xs text-muted-foreground">Point the camera at a channel QR. The field will fill automatically.</p>
+      {starting ? <p className="text-xs text-muted-foreground">Starting camera…</p> : null}
       {error ? <p className="text-xs text-rose-400">{error}</p> : null}
       <div
         id={regionId}
         className={cn(
           "mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border-2 bg-black p-1 shadow-inner transition-colors",
-          scanned ? "animate-scan-success border-brand" : "border-zinc-700",
+          scanned ? "animate-scan-success border-brand" : "border-border",
           "[&_video]:mx-auto [&_video]:max-h-[280px] [&_video]:w-full [&_video]:rounded-xl [&_video]:object-cover",
         )}
       />

@@ -477,16 +477,16 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
   }, [items, playlistFiltering, playlistQuery]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-gradient-to-br from-zinc-950 via-zinc-950 to-emerald-950/15 shadow-2xl shadow-black/40 ring-1 ring-white/5">
-      <div className="border-b border-zinc-800/80 bg-zinc-950/40 px-5 py-5 backdrop-blur-md sm:px-6">
+    <div className="overflow-hidden rounded-2xl border border-border/90 bg-gradient-to-br from-background via-background to-[var(--brand-subtle)] shadow-2xl shadow-black/40 ring-1 ring-border/30">
+      <div className="border-b border-border/80 bg-card/40 px-5 py-5 backdrop-blur-md sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3.5">
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-inner shadow-emerald-900/30">
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-brand/10 text-brand shadow-inner shadow-brand/30">
               <Sparkles className="size-5" />
             </span>
             <div className="space-y-1.5">
-              <h2 className="text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">Channel playlists</h2>
-              <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">Channel playlists</h2>
+              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
                 {canManage
                   ? "Search your library by title or artist, queue playback on the channel, and curate playlists in bulk without freezing the UI."
                   : "Browse playlists and tracks. Playback is controlled by channel moderators."}
@@ -499,7 +499,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="gap-2 border-zinc-700/80 bg-zinc-900/80"
+                className="gap-2 border-border/80 bg-card/80"
                 disabled={shuffling}
                 onClick={() => handleShuffleSocket()}
               >
@@ -512,13 +512,13 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
       </div>
 
       <div className="grid min-h-[440px] lg:grid-cols-[minmax(0,280px)_1fr]">
-        <aside className="border-b border-zinc-800/80 bg-zinc-950/30 p-4 lg:border-b-0 lg:border-r lg:border-zinc-800/80">
+        <aside className="border-b border-border/80 bg-card/30 p-4 lg:border-b-0 lg:border-r lg:border-border/80">
           {loadingLists ? (
             <div className="space-y-2 py-1">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-11 animate-pulse rounded-xl bg-zinc-800/55"
+                  className="h-11 animate-pulse rounded-xl bg-muted/55"
                   style={{ animationDelay: `${i * 70}ms` }}
                 />
               ))}
@@ -526,8 +526,8 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
           ) : null}
 
           {canManage ? (
-            <div className="mb-4 space-y-2 rounded-xl border border-zinc-800/70 bg-zinc-900/40 p-3">
-              <Label htmlFor={`ch-${channelId}-pl-name`} className="text-xs uppercase tracking-wide text-zinc-500">
+            <div className="mb-4 space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
+              <Label htmlFor={`ch-${channelId}-pl-name`} className="text-xs uppercase tracking-wide text-muted-foreground">
                 New playlist
               </Label>
               <div className="flex gap-2">
@@ -537,7 +537,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                   valid={Boolean(newPlaylistName.trim())}
                   onChange={(e) => setNewPlaylistName(e.target.value)}
                   placeholder="Warm-up set"
-                  className="border-zinc-700/80 bg-zinc-950/80"
+                  className="border-border/80 bg-card/80"
                 />
                 <Button type="button" size="sm" className="shrink-0" onClick={() => void handleCreatePlaylist()} disabled={isCreatingPlaylist}>
                   {isCreatingPlaylist ? <Loader2 className="size-4 animate-spin" /> : "Create"}
@@ -546,11 +546,11 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
             </div>
           ) : null}
 
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Playlists</p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Playlists</p>
           <ScrollArea className="h-[min(280px,40vh)] lg:h-[min(360px,50vh)]">
             <div className="space-y-1.5 pr-2">
               {!playlists.length && !loadingLists ? (
-                <p className="py-6 text-center text-sm text-zinc-500">No playlists yet.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">No playlists yet.</p>
               ) : (
                 playlists.map((p) => {
                   const active = String(p.id) === selectedPlaylistId;
@@ -565,8 +565,8 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                       className={cn(
                         "flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors",
                         active
-                          ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-100 shadow-sm shadow-emerald-900/20"
-                          : "border-transparent bg-zinc-900/30 text-zinc-300 hover:border-zinc-700/80 hover:bg-zinc-900/60",
+                          ? "border-brand/40 bg-[var(--brand-subtle)] text-brand shadow-sm shadow-brand/20"
+                          : "border-transparent bg-card/30 text-foreground/80 hover:border-border/80 hover:bg-card/60",
                       )}
                     >
                       <ListMusic className="size-4 shrink-0 opacity-70" />
@@ -584,8 +584,8 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
           </ScrollArea>
 
           {canManage && playlists.length > 1 ? (
-            <div className="mt-4 rounded-xl border border-zinc-800/60 bg-zinc-900/25 p-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Quick play</p>
+            <div className="mt-4 rounded-xl border border-border/60 bg-card/25 p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quick play</p>
               <div className="flex flex-wrap gap-1.5">
                 {playlists.slice(0, 8).map((p) => (
                   <Button key={p.id} type="button" variant="secondary" size="sm" className="h-8 text-xs" onClick={() => startPlaylist(p.id, p.name)}>
@@ -600,15 +600,15 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
         <section className="flex min-w-0 flex-col">
           {!selectedPlaylistId ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <Library className="size-12 text-zinc-600" />
-              <p className="text-sm text-zinc-400">Choose a playlist from the list to edit tracks or use the library search.</p>
+              <Library className="size-12 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Choose a playlist from the list to edit tracks or use the library search.</p>
             </div>
           ) : (
             <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "library" | "playlist")} className="flex flex-1 flex-col px-4 pb-4 pt-4 sm:px-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-zinc-100">{selectedPlaylist?.name ?? "Playlist"}</p>
-                  <p className="text-xs text-zinc-500">{items.length} tracks in this list</p>
+                  <p className="truncate text-base font-semibold text-foreground">{selectedPlaylist?.name ?? "Playlist"}</p>
+                  <p className="text-xs text-muted-foreground">{items.length} tracks in this list</p>
                 </div>
                 {canManage ? (
                   <div className="flex flex-wrap gap-2">
@@ -637,27 +637,27 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
 
               <TabsContent value="library" className="mt-0 flex flex-1 flex-col">
                 <div className="relative mt-4">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={libraryQuery}
                     onChange={(e) => setLibraryQuery(e.target.value)}
                     placeholder="Search by track or artist…"
-                    className="border-zinc-700/90 bg-zinc-900/50 pl-10"
+                    className="border-border/90 bg-card/50 pl-10"
                     valid
                     aria-label="Search tracks"
                   />
                 </div>
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   Results are capped at {LIBRARY_SEARCH_LIMIT} matches per search. Bulk adds run in batches of {BULK_ADD_CHUNK} so large selections stay
                   responsive.
                 </p>
 
                 {canManage && selectedCount > 0 ? (
-                  <div className="mt-4 flex flex-col gap-3 rounded-xl border border-emerald-500/25 bg-emerald-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-emerald-100">
+                  <div className="mt-4 flex flex-col gap-3 rounded-xl border border-brand/25 bg-[var(--brand-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-brand">
                       <span className="font-semibold">{selectedCount}</span> selected
                       {bulkProgress ? (
-                        <span className="ml-2 text-emerald-200/80">
+                        <span className="ml-2 text-brand/80">
                           ({bulkProgress.done}/{bulkProgress.total})
                         </span>
                       ) : null}
@@ -677,17 +677,17 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                   </div>
                 ) : null}
 
-                <ScrollArea className="mt-4 h-[min(280px,38vh)] flex-1 rounded-xl border border-zinc-800/80 sm:h-[min(320px,42vh)]">
+                <ScrollArea className="mt-4 h-[min(280px,38vh)] flex-1 rounded-xl border border-border/80 sm:h-[min(320px,42vh)]">
                   <div className="p-2">
                     {!debouncedLibraryQuery ? (
-                      <p className="py-10 text-center text-sm text-zinc-500">Type at least one character to search your accessible library.</p>
+                      <p className="py-10 text-center text-sm text-muted-foreground">Type at least one character to search your accessible library.</p>
                     ) : libraryLoading ? (
-                      <p className="flex items-center justify-center gap-2 py-10 text-sm text-zinc-500">
+                      <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
                         Searching…
                       </p>
                     ) : !libraryTracks.length ? (
-                      <p className="py-10 text-center text-sm text-zinc-500">No tracks match that search.</p>
+                      <p className="py-10 text-center text-sm text-muted-foreground">No tracks match that search.</p>
                     ) : (
                       <ul className="space-y-1">
                         {libraryTracks.map((t) => {
@@ -697,13 +697,13 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                               key={t.id}
                               className={cn(
                                 "flex items-center gap-2 rounded-lg border px-2 py-2 text-sm transition-colors sm:gap-3",
-                                selected ? "border-emerald-500/35 bg-emerald-950/20" : "border-zinc-800/60 bg-zinc-950/40 hover:border-zinc-700/80",
+                                selected ? "border-brand/35 bg-[var(--brand-subtle)]" : "border-border/60 bg-card/40 hover:border-border/80",
                               )}
                             >
                               {canManage ? (
                                 <input
                                   type="checkbox"
-                                  className="size-4 shrink-0 rounded border-zinc-600 bg-zinc-900 accent-emerald-500"
+                                  className="size-4 shrink-0 rounded border-border bg-card accent-brand"
                                   checked={selected}
                                   onChange={() => toggleTrackSelection(t.id)}
                                   aria-label={`Select ${t.title}`}
@@ -712,8 +712,8 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                                 <span className="w-4 shrink-0" />
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium text-zinc-100">{t.title}</p>
-                                <p className="truncate text-xs text-zinc-500">{t.artist || "Unknown artist"}</p>
+                                <p className="truncate font-medium text-foreground">{t.title}</p>
+                                <p className="truncate text-xs text-muted-foreground">{t.artist || "Unknown artist"}</p>
                               </div>
                               {canManage ? (
                                 <div className="flex shrink-0 items-center gap-1">
@@ -721,7 +721,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-9 w-9 text-emerald-400 hover:text-emerald-300"
+                                    className="h-9 w-9 text-brand hover:text-brand"
                                     title="Play on channel"
                                     disabled={playingTrackId === t.id}
                                     onClick={() => void handlePlayTrackOnChannel(t)}
@@ -758,9 +758,9 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                 ) : null}
 
                 {canManage ? (
-                  <div className="mt-6 space-y-3 rounded-xl border border-zinc-800/70 bg-zinc-900/30 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                      <Upload className="size-4 text-zinc-400" />
+                  <div className="mt-6 space-y-3 rounded-xl border border-border/70 bg-card/30 p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Upload className="size-4 text-muted-foreground" />
                       Upload audio
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -771,7 +771,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                           value={uploadTitle}
                           valid={Boolean(uploadTitle.trim())}
                           onChange={(e) => setUploadTitle(e.target.value)}
-                          className="border-zinc-700/80 bg-zinc-950/80"
+                          className="border-border/80 bg-card/80"
                         />
                       </div>
                       <div className="space-y-2">
@@ -794,10 +794,10 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                       <Input id={`ch-${channelId}-up-file`} type="file" accept="audio/*" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
                     </div>
                     {uploadProgress != null ? (
-                      <p className="text-xs text-zinc-400">
+                      <p className="text-xs text-muted-foreground">
                         Uploading… {uploadProgress}%{" "}
-                        <span className="inline-block h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-zinc-800 align-middle">
-                          <span className="block h-full bg-emerald-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+                        <span className="inline-block h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-muted align-middle">
+                          <span className="block h-full bg-brand transition-all" style={{ width: `${uploadProgress}%` }} />
                         </span>
                       </p>
                     ) : null}
@@ -811,33 +811,33 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
 
               <TabsContent value="playlist" className="mt-0 flex flex-1 flex-col">
                 <div className="mt-4 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-zinc-300">
-                    Order <span className="text-zinc-500">({items.length})</span>
+                  <p className="text-sm font-medium text-foreground/80">
+                    Order <span className="text-muted-foreground">({items.length})</span>
                   </p>
-                  {loadingItems ? <Loader2 className="size-4 shrink-0 animate-spin text-zinc-500" /> : null}
+                  {loadingItems ? <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" /> : null}
                 </div>
                 <div className="relative mt-3">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={playlistQuery}
                     onChange={(e) => setPlaylistQuery(e.target.value)}
                     placeholder="Search inside this playlist…"
-                    className="border-zinc-700/90 bg-zinc-900/50 pl-10"
+                    className="border-border/90 bg-card/50 pl-10"
                     aria-label="Search playlist tracks"
                     valid
                   />
                 </div>
                 {playlistFiltering ? (
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Showing {filteredItems.length} result(s) for “{playlistQuery.trim()}”. Drag reorder is disabled while searching.
                   </p>
                 ) : null}
-                <ScrollArea className="mt-2 h-[min(280px,38vh)] flex-1 rounded-xl border border-zinc-800/80 sm:h-[min(360px,48vh)]">
+                <ScrollArea className="mt-2 h-[min(280px,38vh)] flex-1 rounded-xl border border-border/80 sm:h-[min(360px,48vh)]">
                   <div className="space-y-1 p-3 pr-2">
                     {!items.length && !loadingItems ? (
-                      <p className="py-8 text-center text-sm text-zinc-500">Empty playlist. Add tracks from the Library tab.</p>
+                      <p className="py-8 text-center text-sm text-muted-foreground">Empty playlist. Add tracks from the Library tab.</p>
                     ) : playlistFiltering && !filteredItems.length ? (
-                      <p className="py-8 text-center text-sm text-zinc-500">No matches in this playlist.</p>
+                      <p className="py-8 text-center text-sm text-muted-foreground">No matches in this playlist.</p>
                     ) : (
                       filteredItems.map((item, index) => {
                         const trackId = item.track_detail?.id ?? item.track;
@@ -845,7 +845,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                         <div
                           key={item.id}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-2 py-2.5 text-sm",
+                            "flex items-center gap-2 rounded-lg border border-border/70 bg-card/50 px-2 py-2.5 text-sm",
                             dragItemId === item.id && "opacity-60",
                           )}
                           draggable={canManage && !playlistFiltering}
@@ -854,15 +854,15 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                           onDrop={(e) => onDropRow(e, index)}
                         >
                           {canManage ? (
-                            <span className="cursor-grab text-zinc-500 active:cursor-grabbing" title="Drag to reorder">
+                            <span className="cursor-grab text-muted-foreground active:cursor-grabbing" title="Drag to reorder">
                               <GripVertical className="size-4" />
                             </span>
                           ) : (
-                            <span className="w-6 text-center font-mono text-xs text-zinc-500">{index + 1}</span>
+                            <span className="w-6 text-center font-mono text-xs text-muted-foreground">{index + 1}</span>
                           )}
-                          <span className="min-w-0 flex-1 truncate text-zinc-200">{item.track_detail?.title ?? `Track #${item.track}`}</span>
+                          <span className="min-w-0 flex-1 truncate text-foreground">{item.track_detail?.title ?? `Track #${item.track}`}</span>
                           {item.track_detail?.artist ? (
-                            <span className="hidden max-w-[28%] truncate text-xs text-zinc-500 sm:inline">{item.track_detail.artist}</span>
+                            <span className="hidden max-w-[28%] truncate text-xs text-muted-foreground sm:inline">{item.track_detail.artist}</span>
                           ) : null}
                           <div className="flex shrink-0 items-center gap-1">
                             <Button
@@ -873,7 +873,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                               title="Same-artist picks from this channel"
                               onClick={() => setSimilarAnchorId((prev) => (prev === trackId ? null : trackId))}
                             >
-                              <Sparkles className={cn("size-4", similarAnchorId === trackId && "text-emerald-400")} />
+                              <Sparkles className={cn("size-4", similarAnchorId === trackId && "text-brand")} />
                             </Button>
                             {canManage ? (
                               <>
@@ -934,19 +934,19 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
                   </div>
                 </ScrollArea>
                 {similarAnchorId ? (
-                  <div className="mt-3 rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-3 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90">Same artist in this channel</p>
+                  <div className="mt-3 rounded-xl border border-brand/40 bg-[var(--brand-subtle)] px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand/90">Same artist in this channel</p>
                     {similarBusy ? (
                       <div className="mt-3 flex justify-center py-2">
-                        <Loader2 className="size-5 animate-spin text-emerald-400/80" />
+                        <Loader2 className="size-5 animate-spin text-brand/80" />
                       </div>
                     ) : similarTracks.length === 0 ? (
-                      <p className="mt-2 text-xs text-zinc-500">No other tracks from this artist appear in your channel playlists.</p>
+                      <p className="mt-2 text-xs text-muted-foreground">No other tracks from this artist appear in your channel playlists.</p>
                     ) : (
                       <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto pr-1">
                         {similarTracks.map((t) => (
-                          <li key={t.id} className="flex items-center gap-2 rounded-md border border-emerald-900/30 bg-zinc-950/40 px-2 py-1.5 text-sm">
-                            <span className="min-w-0 flex-1 truncate text-zinc-100">{t.title}</span>
+                          <li key={t.id} className="flex items-center gap-2 rounded-md border border-brand/30 bg-card/40 px-2 py-1.5 text-sm">
+                            <span className="min-w-0 flex-1 truncate text-foreground">{t.title}</span>
                             {canManage && sendSocketMessage ? (
                               <Button
                                 type="button"
@@ -975,7 +975,7 @@ export function ChannelPlaylistPanel({ channelId, canManage, sendSocketMessage }
       </div>
 
       {status ? (
-        <div className="border-t border-zinc-800/80 px-5 py-3">
+        <div className="border-t border-border/80 px-5 py-3">
           <Alert>{status}</Alert>
         </div>
       ) : null}

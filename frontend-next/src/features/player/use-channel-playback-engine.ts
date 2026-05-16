@@ -143,6 +143,42 @@ export function useChannelPlaybackEngine({
     }
   }, []);
 
+  const requestAutoNext = useCallback(
+    (howl: Howl) => {
+      if (!isPlayingRef.current || !socketConnectedRef.current) return;
+
+      const trackKey = syncRef.current.trackPath ?? "";
+      if (autoNextSentForTrackRef.current === trackKey) return;
+
+      const audio = getHowlHtml5Audio(howl);
+      const dur =
+        audio && Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : typeof howl.duration === "function"
+            ? Number(howl.duration()) || 0
+            : 0;
+      let pos = 0;
+      if (audio && Number.isFinite(audio.currentTime)) pos = audio.currentTime;
+      else if (typeof howl.seek() === "function") pos = Number(howl.seek()) || 0;
+
+      // After a natural end Howler often resets seek to 0 — only skip mid-track stop/unload.
+      if (dur > 3 && pos > 1.5 && pos < dur - 1.5) return;
+
+      autoNextSentForTrackRef.current = trackKey;
+      const payload = {
+        action: "auto_next" as const,
+        client_duration_sec: dur,
+        client_event_id: `${channelId}:${trackKey}:${Date.now()}`,
+      };
+      const ok = sendSocketMessageRef.current?.(payload);
+      if (!ok) pendingSocketCommandRef.current = payload;
+    },
+    [channelId],
+  );
+
+  const requestAutoNextRef = useRef(requestAutoNext);
+  requestAutoNextRef.current = requestAutoNext;
+
   const startHowlTransport = useCallback((howl: Howl, opts?: { forceSeek?: boolean }) => {
     const snap = syncRef.current;
     const expected = expectedTimeSeconds({
@@ -444,24 +480,7 @@ export function useChannelPlaybackEngine({
       },
       onend: () => {
         if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        if (!isPlayingRef.current || !socketConnectedRef.current) return;
-
-        const trackKey = syncRef.current.trackPath ?? "";
-        if (autoNextSentForTrackRef.current === trackKey) return;
-
-        const dur = typeof howl.duration === "function" ? Number(howl.duration()) || 0 : 0;
-        const pos = typeof howl.seek() === "function" ? Number(howl.seek()) : 0;
-        if (dur > 3 && pos < dur - 2) return;
-
-        autoNextSentForTrackRef.current = trackKey;
-        const send = sendSocketMessageRef.current;
-        const payload = {
-          action: "auto_next" as const,
-          client_duration_sec: dur,
-          client_event_id: `${channelId}:${trackKey}:${Date.now()}`,
-        };
-        const ok = send?.(payload);
-        if (!ok) pendingSocketCommandRef.current = payload;
+        requestAutoNextRef.current(howl);
       },
     });
 
@@ -479,6 +498,18 @@ export function useChannelPlaybackEngine({
       setVizAudioEl(null);
     };
   }, [activeTrackPath, channelId, startHowlTransport, teardownMainHowl]);
+
+  useEffect(() => {
+    const howl = howlRef.current;
+    const audio = vizAudioEl;
+    if (!howl || !audio) return;
+    const onNativeEnded = () => {
+      if (howlRef.current !== howl) return;
+      requestAutoNextRef.current(howl);
+    };
+    audio.addEventListener("ended", onNativeEnded);
+    return () => audio.removeEventListener("ended", onNativeEnded);
+  }, [vizAudioEl, activeTrackPath]);
 
   useEffect(() => {
     let raf = 0;
@@ -526,6 +557,22 @@ export function useChannelPlaybackEngine({
         );
         const rehearsalMute = Boolean(exp?.rehearsal_mode && !canControlRef.current && !liftActive);
         howl.volume(rehearsalMute || introGate ? 0 : volume);
+
+        const trackDur =
+          audio && Number.isFinite(audio.duration) && audio.duration > 0
+            ? audio.duration
+            : typeof howl.duration === "function"
+              ? Number(howl.duration()) || 0
+              : 0;
+        const trackKey = snap.trackPath ?? "";
+        if (
+          snap.isPlaying &&
+          trackDur > 0.5 &&
+          posNow >= trackDur - 0.35 &&
+          autoNextSentForTrackRef.current !== trackKey
+        ) {
+          requestAutoNextRef.current(howl);
+        }
       }
       raf = window.requestAnimationFrame(tick);
     };

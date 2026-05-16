@@ -120,16 +120,16 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-emerald-900/30 bg-gradient-to-br from-zinc-950 to-emerald-950/15 lg:col-span-2">
-        <CardHeader className="border-b border-zinc-800/80 pb-3">
+      <Card className="border-brand/30 bg-gradient-to-br from-background to-[var(--brand-subtle)] lg:col-span-2">
+        <CardHeader className="border-b border-border/80 pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="size-5 text-emerald-400" />
+            <History className="size-5 text-brand" />
             Party recap
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pt-4">
           {recapTop.length === 0 ? (
-            <p className="text-sm text-zinc-500">Play some tracks to build tonight&apos;s recap.</p>
+            <p className="text-sm text-muted-foreground">Play some tracks to build tonight&apos;s recap.</p>
           ) : (
             <ol className="space-y-1 text-sm">
               {recapTop.map((t, i) => (
@@ -137,18 +137,18 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
                   <span>
                     {i + 1}. {t.title}
                   </span>
-                  <span className="text-emerald-400/90">×{t.count}</span>
+                  <span className="text-brand/90">×{t.count}</span>
                 </li>
               ))}
             </ol>
           )}
-          <Link href={`/party/${channelId}`} className="text-xs text-emerald-400 hover:underline">
+          <Link href={`/party/${channelId}`} className="text-xs text-brand hover:underline">
             Public recap page →
           </Link>
         </CardContent>
       </Card>
-      <Card className="border-zinc-800/90 lg:col-span-2">
-        <CardHeader className="border-b border-zinc-800/80 pb-3">
+      <Card className="border-border/90 lg:col-span-2">
+        <CardHeader className="border-b border-border/80 pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Lightbulb className="size-5 text-amber-400" />
             Track suggestions
@@ -156,7 +156,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           <div className="flex flex-wrap gap-2">
-            <Select value={suggestionFilter} onChange={(e) => setSuggestionFilter(e.target.value as typeof suggestionFilter)} className="w-40 border-zinc-800 bg-zinc-900">
+            <Select value={suggestionFilter} onChange={(e) => setSuggestionFilter(e.target.value as typeof suggestionFilter)} className="w-40 border-border bg-card">
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
@@ -167,7 +167,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
             </Button>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Select value={suggestTrackId} onChange={(e) => setSuggestTrackId(e.target.value)} className="min-w-[200px] flex-1 border-zinc-800 bg-zinc-900">
+            <Select value={suggestTrackId} onChange={(e) => setSuggestTrackId(e.target.value)} className="min-w-[200px] flex-1 border-border bg-card">
               <option value="">Pick a track to suggest…</option>
               {tracks.map((t) => (
                 <option key={t.id} value={String(t.id)}>
@@ -176,16 +176,16 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
                 </option>
               ))}
             </Select>
-            <Input placeholder="Note (optional)" value={suggestNote} onChange={(e) => setSuggestNote(e.target.value)} className="max-w-xs border-zinc-800 bg-zinc-900" maxLength={280} />
+            <Input placeholder="Note (optional)" value={suggestNote} onChange={(e) => setSuggestNote(e.target.value)} className="max-w-xs border-border bg-card" maxLength={280} />
             <Button type="button" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
               Suggest
             </Button>
           </div>
           <ScrollArea className="h-48">
             <ul className="space-y-2 pr-3 text-sm">
-              {suggestions.length === 0 ? <li className="text-zinc-500">No suggestions in this filter.</li> : null}
+              {suggestions.length === 0 ? <li className="text-muted-foreground">No suggestions in this filter.</li> : null}
               {suggestions.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-3 py-2">
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card/40 px-3 py-2">
                   <span>
                     Track #{s.track}
                     {s.note ? ` — ${s.note}` : ""}
@@ -210,8 +210,8 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
         </CardContent>
       </Card>
 
-      <Card className="border-zinc-800/90">
-        <CardHeader className="border-b border-zinc-800/80 pb-3">
+      <Card className="border-border/90">
+        <CardHeader className="border-b border-border/80 pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <History className="size-5 text-sky-400" />
             Playback history
@@ -219,7 +219,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
         </CardHeader>
         <CardContent className="pt-4">
           <ScrollArea className="h-56">
-            <ul className="space-y-1 pr-3 font-mono text-xs text-zinc-400">
+            <ul className="space-y-1 pr-3 font-mono text-xs text-muted-foreground">
               {history.map((row) => (
                 <li key={row.id}>
                   {row.emitted_at?.slice(11, 19)} · {row.event_type}
@@ -231,8 +231,8 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
         </CardContent>
       </Card>
 
-      <Card className="border-zinc-800/90">
-        <CardHeader className="border-b border-zinc-800/80 pb-3">
+      <Card className="border-border/90">
+        <CardHeader className="border-b border-border/80 pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <ThumbsUp className="size-5 text-rose-400" />
             Track reactions
@@ -240,13 +240,13 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
         </CardHeader>
         <CardContent className="space-y-3 pt-4">
           <div className="flex gap-2">
-            <Input value={reactionEmoji} onChange={(e) => setReactionEmoji(e.target.value)} maxLength={8} className="w-20 border-zinc-800 bg-zinc-900" />
+            <Input value={reactionEmoji} onChange={(e) => setReactionEmoji(e.target.value)} maxLength={8} className="w-20 border-border bg-card" />
             <Button type="button" size="sm" onClick={() => void postReaction()} disabled={!currentTrackId}>
               React to now playing
             </Button>
           </div>
           <ScrollArea className="h-40">
-            <ul className="space-y-1 text-sm text-zinc-300">
+            <ul className="space-y-1 text-sm text-foreground/80">
               {reactions.map((r) => (
                 <li key={r.id}>
                   {r.emoji} @{r.username}
@@ -258,8 +258,8 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
       </Card>
 
       {canManage ? (
-        <Card className="border-zinc-800/90 lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-zinc-800/80 pb-3">
+        <Card className="border-border/90 lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/80 pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Shield className="size-5 text-violet-400" />
               Audit log
@@ -273,7 +273,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
           </CardHeader>
           <CardContent className="pt-4">
             <ScrollArea className="h-48">
-              <ul className="space-y-1 pr-3 font-mono text-xs text-zinc-400">
+              <ul className="space-y-1 pr-3 font-mono text-xs text-muted-foreground">
                 {audit.map((row) => (
                   <li key={row.id}>
                     {row.created_at?.slice(0, 19)} · {row.action} · {row.actor_username ?? "?"}

@@ -155,8 +155,8 @@ export function NotificationPreferencesCard() {
 
   if (loading) {
     return (
-      <Card className="border-zinc-800/90 bg-zinc-950/40">
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-zinc-400">
+      <Card className="border-border/90 bg-card/40">
+        <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="size-5 animate-spin" aria-hidden />
           Loading notification settings…
         </CardContent>
@@ -167,13 +167,13 @@ export function NotificationPreferencesCard() {
   const canUsePush = isPushEnvironmentSupported() && Boolean(vapidPublic);
 
   return (
-    <Card className="border-zinc-800/90 bg-zinc-950/40">
-      <CardHeader className="border-b border-zinc-800/70 pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg text-zinc-100">
-          <Bell className="size-5 text-emerald-400/90" aria-hidden />
+    <Card className="border-border/90 bg-card/40">
+      <CardHeader className="border-b border-border/70 pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+          <Bell className="size-5 text-brand/90" aria-hidden />
           Notifications
         </CardTitle>
-        <CardDescription className="text-zinc-400">
+        <CardDescription className="text-muted-foreground">
           Choose how channel chat reaches you, and whether moderators get alerts for reactions and skip votes. Tapping a
           notification opens that channel with the chat tab.
         </CardDescription>
@@ -192,7 +192,7 @@ export function NotificationPreferencesCard() {
               <li>
                 <a
                   href={certInstallUrl}
-                  className="font-medium text-emerald-300 underline underline-offset-2"
+                  className="font-medium text-brand underline underline-offset-2"
                 >
                   Download CA certificate
                 </a>{" "}
@@ -208,7 +208,7 @@ export function NotificationPreferencesCard() {
               <li>
                 Force-quit the browser, reopen{" "}
                 {httpsSiteUrl ? (
-                  <a href={httpsSiteUrl} className="text-emerald-300 underline">
+                  <a href={httpsSiteUrl} className="text-brand underline">
                     {httpsSiteUrl}
                   </a>
                 ) : (
@@ -221,18 +221,18 @@ export function NotificationPreferencesCard() {
         ) : null}
 
         {pushEnabled ? (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/25 px-3 py-2 text-sm text-emerald-200">
+          <div className="flex items-center gap-2 rounded-lg border border-brand/30 bg-[var(--brand-subtle)] px-3 py-2 text-sm text-brand">
             <CheckCircle2 className="size-4 shrink-0" aria-hidden />
             Push is active on this browser. Chat and moderator alerts will be delivered here when enabled below.
           </div>
         ) : null}
 
         <div className="space-y-2">
-          <Label className="text-zinc-200">Channel chat (this browser)</Label>
+          <Label className="text-foreground">Channel chat (this browser)</Label>
           <Select
             value={settings.chat_notify}
             disabled={saving}
-            className="border-zinc-800 bg-zinc-900/80"
+            className="border-border bg-card/80"
             onChange={(e) =>
               void persistPatch({ chat_notify: e.target.value as UserNotificationSettings["chat_notify"] })
             }
@@ -243,10 +243,10 @@ export function NotificationPreferencesCard() {
           </Select>
         </div>
 
-        <div className="space-y-3 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-4">
-          <p className="text-sm font-medium text-zinc-200">When you moderate a channel</p>
+        <div className="space-y-3 rounded-xl border border-border/70 bg-card/50 p-4">
+          <p className="text-sm font-medium text-foreground">When you moderate a channel</p>
           <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="adm-react" className="text-sm text-zinc-400">
+            <Label htmlFor="adm-react" className="text-sm text-muted-foreground">
               Reactions
             </Label>
             <Switch
@@ -257,7 +257,7 @@ export function NotificationPreferencesCard() {
             />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="adm-vote" className="text-sm text-zinc-400">
+            <Label htmlFor="adm-vote" className="text-sm text-muted-foreground">
               Skip votes
             </Label>
             <Switch
@@ -271,13 +271,13 @@ export function NotificationPreferencesCard() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label className="text-zinc-400">Quiet hours start (0–23, optional)</Label>
+            <Label className="text-muted-foreground">Quiet hours start (0–23, optional)</Label>
             <Input
               type="number"
               min={0}
               max={23}
               placeholder="e.g. 23"
-              className="border-zinc-800 bg-zinc-900/80"
+              className="border-border bg-card/80"
               value={settings.push_quiet_hours_start ?? ""}
               onChange={(e) =>
                 void persistPatch({
@@ -287,13 +287,13 @@ export function NotificationPreferencesCard() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-zinc-400">Quiet hours end (0–23)</Label>
+            <Label className="text-muted-foreground">Quiet hours end (0–23)</Label>
             <Input
               type="number"
               min={0}
               max={23}
               placeholder="e.g. 7"
-              className="border-zinc-800 bg-zinc-900/80"
+              className="border-border bg-card/80"
               value={settings.push_quiet_hours_end ?? ""}
               onChange={(e) =>
                 void persistPatch({
@@ -304,8 +304,8 @@ export function NotificationPreferencesCard() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-xl border border-zinc-800/70 bg-zinc-950/50 p-4">
-          <p className="text-sm font-medium text-zinc-200">Push categories</p>
+        <div className="space-y-3 rounded-xl border border-border/70 bg-card/50 p-4">
+          <p className="text-sm font-medium text-foreground">Push categories</p>
           {(
             [
               ["push_category_chat", "Chat"],
@@ -314,7 +314,7 @@ export function NotificationPreferencesCard() {
             ] as const
           ).map(([key, label]) => (
             <div key={key} className="flex items-center justify-between gap-3">
-              <Label className="text-sm text-zinc-400">{label}</Label>
+              <Label className="text-sm text-muted-foreground">{label}</Label>
               <Switch
                 checked={Boolean(settings[key])}
                 disabled={saving}
@@ -337,7 +337,7 @@ export function NotificationPreferencesCard() {
           <Button
             type="button"
             variant="outline"
-            className="gap-2 border-zinc-700"
+            className="gap-2 border-border"
             disabled={pushBusy || !pushEnabled}
             onClick={() => void disablePush()}
           >
@@ -367,12 +367,12 @@ export function NotificationPreferencesCard() {
         {!vapidPublic ? (
           <p className="text-xs text-amber-300/90">
             Backend has no VAPID keys. Set WEBPUSH_VAPID_PUBLIC_KEY / WEBPUSH_VAPID_PRIVATE_KEY and restart:{" "}
-            <code className="text-amber-200/80">docker compose restart backend</code>
+            <code className="text-warning/80">docker compose restart backend</code>
           </p>
         ) : !canUsePush && !envIssue ? (
-          <p className="text-xs text-zinc-500">Waiting for a secure browser context…</p>
+          <p className="text-xs text-muted-foreground">Waiting for a secure browser context…</p>
         ) : saving ? (
-          <p className="text-xs text-zinc-500">Saving preferences…</p>
+          <p className="text-xs text-muted-foreground">Saving preferences…</p>
         ) : null}
       </CardContent>
     </Card>

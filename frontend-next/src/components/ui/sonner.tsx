@@ -1,14 +1,17 @@
 "use client";
 
 import type { ComponentProps } from "react";
+import { useTheme } from "next-themes";
 import { Toaster as Sonner } from "sonner";
 
 type ToasterProps = ComponentProps<typeof Sonner>;
 
 export function Toaster(props: ToasterProps) {
+  const { resolvedTheme } = useTheme();
+
   return (
     <Sonner
-      theme="dark"
+      theme={resolvedTheme === "light" ? "light" : "dark"}
       position="top-right"
       richColors
       closeButton
@@ -16,12 +19,12 @@ export function Toaster(props: ToasterProps) {
       toastOptions={{
         classNames: {
           toast:
-            "group border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-lg shadow-black/40 backdrop-blur-md",
+            "group border border-border bg-card/95 text-foreground shadow-lg shadow-black/20 backdrop-blur-md",
           title: "text-sm font-medium",
-          description: "text-xs text-zinc-400",
-          success: "!border-emerald-800/50 !bg-emerald-950/90",
-          error: "!border-red-900/50 !bg-red-950/90",
-          info: "!border-zinc-700 !bg-zinc-900/95",
+          description: "text-xs text-muted-foreground",
+          success: "!border-brand/50 !bg-[var(--brand-subtle)]",
+          error: "!border-destructive/50 !bg-destructive/10",
+          info: "!border-border !bg-card/95",
         },
       }}
       {...props}

@@ -31,12 +31,12 @@ export function HomeActions() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-emerald-900/30">
+      <Card className="border-brand/30">
         <CardHeader>
           <CardTitle>Start from dashboard</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-slate-300">Manage your channels, monitor sync health, and open admin controls.</p>
+          <p className="text-sm text-foreground/80">Manage your channels, monitor sync health, and open admin controls.</p>
           <Link href="/dashboard">
             <Button className="w-full">Open Dashboard</Button>
           </Link>

@@ -48,7 +48,7 @@ export function TrackLibrarySection(props: Props) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Card className="border-zinc-800/90">
+      <Card className="border-border/90">
         <CardHeader>
           <CardTitle className="text-lg">Upload</CardTitle>
           <CardDescription>Add audio to your library with visibility controls.</CardDescription>
@@ -71,7 +71,7 @@ export function TrackLibrarySection(props: Props) {
           <div className="space-y-2">
             <Label>Audio file</Label>
             <div
-              className="rounded-lg border border-dashed border-zinc-700/80 bg-zinc-950/60 p-5 text-center text-sm text-zinc-400 transition hover:border-emerald-500/50"
+              className="rounded-lg border border-dashed border-border/80 bg-card/60 p-5 text-center text-sm text-muted-foreground transition hover:border-brand/50"
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
@@ -81,20 +81,20 @@ export function TrackLibrarySection(props: Props) {
               Drag and drop audio file here
             </div>
             <input
-              className="w-full rounded-lg border border-zinc-700/80 bg-zinc-950/80 px-3 py-2.5 text-sm text-zinc-200 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:text-zinc-200"
+              className="w-full rounded-lg border border-border/80 bg-card/80 px-3 py-2.5 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
               type="file"
               accept="audio/*"
               onChange={(e) => onTrackFileChange(e.target.files?.[0] ?? null)}
             />
-            {selectedTrackFileName ? <p className="text-xs text-zinc-500">Selected file: {selectedTrackFileName}</p> : null}
+            {selectedTrackFileName ? <p className="text-xs text-muted-foreground">Selected file: {selectedTrackFileName}</p> : null}
             {errors.trackFile ? <p className="text-xs text-rose-400">{errors.trackFile}</p> : null}
           </div>
           {isUploading ? (
             <div className="space-y-1">
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
-              <p className="text-xs text-zinc-500">Uploading... {uploadProgress}%</p>
+              <p className="text-xs text-muted-foreground">Uploading... {uploadProgress}%</p>
             </div>
           ) : null}
           <Button className="w-full" onClick={onUploadTrack} disabled={isUploading}>
@@ -103,24 +103,24 @@ export function TrackLibrarySection(props: Props) {
         </CardContent>
       </Card>
 
-      <Card className="border-zinc-800/90">
+      <Card className="border-border/90">
         <CardHeader>
           <CardTitle className="text-lg">Library ({tracks.length})</CardTitle>
           <CardDescription>Everything you have uploaded.</CardDescription>
         </CardHeader>
         <CardContent>
           {tracks.length === 0 ? (
-            <p className="text-sm text-zinc-500">No tracks yet. Upload your first track.</p>
+            <p className="text-sm text-muted-foreground">No tracks yet. Upload your first track.</p>
           ) : (
             <div className="space-y-2">
               {tracks.map((track) => (
                 <div
                   key={track.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-3 py-2.5 transition-colors hover:border-zinc-700/90"
+                  className="flex items-center justify-between rounded-lg border border-border/80 bg-card/40 px-3 py-2.5 transition-colors hover:border-border/90"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-100">{track.title}</p>
-                    <p className="text-xs text-zinc-500">Track #{track.id}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
+                    <p className="text-xs text-muted-foreground">Track #{track.id}</p>
                   </div>
                   <Badge variant={visibilityTone[track.visibility]}>{track.visibility}</Badge>
                 </div>

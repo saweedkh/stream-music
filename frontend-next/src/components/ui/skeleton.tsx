@@ -9,7 +9,7 @@ export function Skeleton({ className }: SkeletonProps) {
     <div
       aria-hidden
       className={cn(
-        "animate-pulse rounded-md border border-zinc-800/70 bg-gradient-to-r from-zinc-900/75 via-zinc-800/55 to-zinc-900/75",
+        "animate-pulse rounded-md border border-border/70 bg-gradient-to-r from-card/75 via-muted/55 to-card/75",
         className,
       )}
     />

@@ -62,8 +62,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
   }, [channelId, readOnly]);
 
   return (
-    <Card className="overflow-hidden border-zinc-800/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-zinc-800/80 pb-4">
+    <Card className="overflow-hidden border-border/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-border/80 pb-4">
         <div className="space-y-1">
           <CardTitle className="text-lg">Queue</CardTitle>
         </div>
@@ -76,7 +76,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
         <ScrollArea className="h-[min(380px,45vh)]">
           <div className="space-y-2 p-5 pr-3">
             {readOnly ? (
-              <p className="py-6 text-center text-sm text-zinc-500">Reopen the channel to load or edit the queue.</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">Reopen the channel to load or edit the queue.</p>
             ) : null}
             {!readOnly && loading ? <ListSkeleton rows={6} className="py-2" /> : null}
             {!readOnly &&
@@ -84,20 +84,20 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
               queue.map((item) => (
               <div
                 key={item.id}
-                className="group flex flex-col gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 transition-colors duration-200 hover:border-zinc-700/90 hover:bg-zinc-900/35 sm:flex-row sm:items-center sm:gap-3"
+                className="group flex flex-col gap-2 rounded-lg border border-border/80 bg-card/40 p-3 transition-colors duration-200 hover:border-border/90 hover:bg-card/35 sm:flex-row sm:items-center sm:gap-3"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="inline-flex min-w-9 justify-center rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-400">
+                  <span className="inline-flex min-w-9 justify-center rounded-md border border-border/80 bg-card/80 px-2 py-1 font-mono text-xs text-muted-foreground">
                     #{item.position}
                   </span>
-                  <span className="truncate text-sm font-medium text-zinc-100">
+                  <span className="truncate text-sm font-medium text-foreground">
                     {trackMap[item.track]?.title ?? `Track ${item.track}`}
                     {item.added_by_username ? (
-                      <span className="ml-2 text-xs font-normal text-zinc-500">· {item.added_by_username}</span>
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">· {item.added_by_username}</span>
                     ) : null}
                   </span>
                   {(item.upvote_count ?? 0) > 0 ? (
-                    <span className="text-xs text-zinc-500">{item.upvote_count} up</span>
+                    <span className="text-xs text-muted-foreground">{item.upvote_count} up</span>
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">

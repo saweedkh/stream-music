@@ -17,7 +17,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   if (state === "loading") {
     return (
-      <div className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4 text-sm text-slate-400 backdrop-blur">
+      <div className="surface-card rounded-2xl p-4 text-sm text-muted-foreground">
         Checking session...
       </div>
     );

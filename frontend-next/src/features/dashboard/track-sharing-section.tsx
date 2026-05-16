@@ -38,7 +38,7 @@ export function TrackSharingSection(props: Props) {
   } = props;
 
   return (
-    <Card className="border-zinc-800/90">
+    <Card className="border-border/90">
       <CardHeader>
         <CardTitle className="text-lg">Sharing</CardTitle>
         <CardDescription>Grant users or channels access to specific tracks.</CardDescription>
@@ -78,9 +78,9 @@ export function TrackSharingSection(props: Props) {
           </Select>
         </div>
         <Button onClick={onAddShare}>Add Share Permission</Button>
-        <div className="space-y-1 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-400">
+        <div className="space-y-1 rounded-lg border border-border/80 bg-card/40 p-3 text-xs text-muted-foreground">
           {trackShares.map((share) => (
-            <div key={share.id} className="flex items-center gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/50 px-2 py-1.5">
+            <div key={share.id} className="flex items-center gap-2 rounded-lg border border-border/70 bg-card/50 px-2 py-1.5">
               <p className="flex-1">
                 {share.username ? `user: ${share.username}` : ""} {share.channel_name ? `channel: ${share.channel_name}` : ""}
               </p>

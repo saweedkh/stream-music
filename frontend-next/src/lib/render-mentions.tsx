@@ -6,7 +6,7 @@ export function renderMessageWithMentions(body: string): ReactNode[] {
   return parts.map((part, i) => {
     if (part.startsWith("@") && part.length > 1) {
       return (
-        <span key={i} className="font-medium text-emerald-300/95">
+        <span key={i} className="font-medium text-brand/95">
           {part}
         </span>
       );

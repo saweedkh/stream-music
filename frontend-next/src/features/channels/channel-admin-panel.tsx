@@ -44,16 +44,15 @@ import {
   listChannelJoinRequests,
   listPlaylists,
   rejectJoinRequest,
-  removeChannelMember,
   rotatePrivateInvite,
   rotatePublicLink,
-  updateChannelMemberRole,
   updateChannelSettings,
   uploadChannelBrandLogo,
   type ChannelMember,
   type JoinRequestRow,
   type PlaylistSummary,
 } from "@/lib/api";
+import { ChannelMemberRosterActions } from "@/features/channels/channel-member-roster-actions";
 import { channelSettingsSchema } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -98,28 +97,28 @@ function QrTile({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-3 rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900/80 to-zinc-950/90 p-5 text-center shadow-inner",
+        "flex flex-col items-center gap-3 rounded-2xl border border-border/80 bg-gradient-to-b from-card/80 to-background/90 p-5 text-center shadow-inner",
         disabled && "opacity-50",
       )}
     >
       <div>
-        <p className="text-sm font-semibold text-zinc-100">{title}</p>
-        {subtitle ? <p className="mt-1 text-xs text-zinc-500">{subtitle}</p> : null}
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       {value ? (
         <button
           type="button"
           onClick={onCopy}
-          className="group rounded-2xl bg-white p-3 shadow-lg ring-2 ring-transparent transition hover:ring-emerald-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          className="group rounded-2xl bg-white p-3 shadow-lg ring-2 ring-transparent transition hover:ring-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
           title="Click to copy link"
         >
           <QRCode value={value} size={168} className="h-[168px] w-[168px]" />
-          <span className="mt-2 block text-[11px] font-medium text-zinc-600 group-hover:text-emerald-700">
+          <span className="mt-2 block text-[11px] font-medium text-muted-foreground group-hover:text-brand-strong">
             Tap to copy link
           </span>
         </button>
       ) : (
-        <div className="flex h-[196px] w-[196px] items-center justify-center rounded-2xl border border-dashed border-zinc-700/80 bg-zinc-950/50 text-xs text-zinc-500">
+        <div className="flex h-[196px] w-[196px] items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card/50 text-xs text-muted-foreground">
           Not available yet
         </div>
       )}
@@ -319,19 +318,6 @@ export function ChannelAdminPanel({
     }
   }
 
-  async function handoffDj(userId: number, username: string) {
-    setBusy(`dj-${userId}`);
-    try {
-      await updateChannelSettings(channelId, { experience: { current_dj_user_id: userId } });
-      showToast(`${username} is the active DJ for rotation.`, "success");
-      router.refresh();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "DJ handoff failed.", "error");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function liftRehearsalMix() {
     setBusy("lift");
     const until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -449,22 +435,22 @@ export function ChannelAdminPanel({
   const canPublicSlug = privacy === "public" || privacy === "unlisted";
 
   return (
-    <Card className="overflow-hidden border-zinc-800/90 shadow-xl shadow-black/25">
-      <CardHeader className="border-b border-zinc-800/80 bg-gradient-to-r from-zinc-950 via-zinc-900/95 to-emerald-950/20 pb-6">
+    <Card className="overflow-hidden border-border/90 shadow-xl shadow-black/25">
+      <CardHeader className="border-b border-border/80 bg-gradient-to-r from-background via-card/95 to-[var(--brand-subtle)] pb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-950/50 text-emerald-400 shadow-lg shadow-emerald-900/20">
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-[var(--brand-subtle)] text-brand shadow-lg shadow-brand/20">
               <Radio className="size-5" />
             </span>
             <div>
-              <CardTitle className="text-xl text-white">Control room</CardTitle>
-              <CardDescription className="mt-1 max-w-xl text-zinc-400">
+              <CardTitle className="text-xl text-foreground">Control room</CardTitle>
+              <CardDescription className="mt-1 max-w-xl text-muted-foreground">
                 Tune the room, share short join codes, and manage members — without juggling long URLs.
               </CardDescription>
             </div>
           </div>
           {!channelIsActive ? (
-            <Badge variant="secondary" className="border-amber-800/50 bg-amber-950/40 text-amber-200">
+            <Badge variant="secondary" className="border-amber-800/50 bg-amber-950/40 text-warning">
               Channel closed
             </Badge>
           ) : null}
@@ -489,8 +475,8 @@ export function ChannelAdminPanel({
 
           <TabsContent value="settings" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-4 rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Room profile</h3>
+              <div className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Room profile</h3>
                 <div className="space-y-2">
                   <Label htmlFor={`ch-name-${channelId}`}>Name</Label>
                   <Input
@@ -499,7 +485,7 @@ export function ChannelAdminPanel({
                     aria-invalid={Boolean(fieldErrors.name)}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Channel name"
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   />
                   {fieldErrors.name ? <p className="text-xs text-red-400">{fieldErrors.name}</p> : null}
                 </div>
@@ -511,7 +497,7 @@ export function ChannelAdminPanel({
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="What is this room about?"
                     rows={3}
-                    className="flex w-full resize-none rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                    className="flex w-full resize-none rounded-md border border-border bg-card/80 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                   />
                 </div>
                 <div className="space-y-2">
@@ -520,7 +506,7 @@ export function ChannelAdminPanel({
                     id={`ch-privacy-${channelId}`}
                     value={privacy}
                     onChange={(e) => setPrivacy(e.target.value as typeof privacy)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   >
                     <option value="public">Public — anyone with a code can join</option>
                     <option value="private">Private — invite code required</option>
@@ -536,28 +522,28 @@ export function ChannelAdminPanel({
                     value={memberLimit}
                     aria-invalid={Boolean(fieldErrors.memberLimit)}
                     onChange={(e) => setMemberLimit(e.target.value)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   />
                   {fieldErrors.memberLimit ? <p className="text-xs text-red-400">{fieldErrors.memberLimit}</p> : null}
                 </div>
               </div>
 
-              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5">
+              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border/70 bg-card/40 p-5">
                 <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Access rules</h3>
-                  <p className="mt-2 text-sm text-zinc-500">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Access rules</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
                     When enabled, new members wait in a queue until a moderator approves them.
                   </p>
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3">
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/50 px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-zinc-100">Require approval to join</p>
-                    <p className="text-xs text-zinc-500">Recommended for open rooms</p>
+                    <p className="text-sm font-medium text-foreground">Require approval to join</p>
+                    <p className="text-xs text-muted-foreground">Recommended for open rooms</p>
                   </div>
                   <Switch checked={joinRequiresApproval} onCheckedChange={setJoinRequiresApproval} id={`ch-approval-${channelId}`} />
                 </div>
                 <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-500"
+                  className="w-full bg-brand hover:bg-brand"
                   disabled={!channelIsActive || busy === "settings"}
                   onClick={() => void saveSettings()}
                 >
@@ -567,9 +553,9 @@ export function ChannelAdminPanel({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Room experience</h3>
-              <p className="mt-1 text-sm text-zinc-500">
+            <div className="rounded-2xl border border-border/70 bg-card/40 p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Room experience</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Accent colors, soundcheck mode, queue lock, blind roulette playlist, skip-vote threshold, intro clip length, and channel logo.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -579,7 +565,7 @@ export function ChannelAdminPanel({
                     id={`ch-exp-accent-${channelId}`}
                     value={expAccent}
                     onChange={(e) => setExpAccent(e.target.value)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   >
                     <option value="emerald">Emerald</option>
                     <option value="violet">Violet</option>
@@ -594,7 +580,7 @@ export function ChannelAdminPanel({
                     id={`ch-blind-pl-${channelId}`}
                     value={expBlindPlaylistId}
                     onChange={(e) => setExpBlindPlaylistId(e.target.value)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   >
                     <option value="">— none —</option>
                     {adminPlaylists.map((p) => (
@@ -603,12 +589,12 @@ export function ChannelAdminPanel({
                       </option>
                     ))}
                   </Select>
-                  <p className="text-xs text-zinc-500">Used when DJs send a blind draw over the live socket.</p>
+                  <p className="text-xs text-muted-foreground">Used when DJs send a blind draw over the live socket.</p>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
                   <div>
-                    <p className="text-sm font-medium text-zinc-100">Soundcheck (rehearsal) mode</p>
-                    <p className="text-xs text-zinc-500">Listeners hear silence until moderators disable this.</p>
+                    <p className="text-sm font-medium text-foreground">Soundcheck (rehearsal) mode</p>
+                    <p className="text-xs text-muted-foreground">Listeners hear silence until moderators disable this.</p>
                   </div>
                   <Switch checked={expRehearsal} onCheckedChange={setExpRehearsal} id={`ch-exp-reh-${channelId}`} />
                 </div>
@@ -623,13 +609,13 @@ export function ChannelAdminPanel({
                     >
                       Lift soundcheck 15 min
                     </Button>
-                    <p className="text-xs text-zinc-500">Listeners hear the main mix until the lift expires.</p>
+                    <p className="text-xs text-muted-foreground">Listeners hear the main mix until the lift expires.</p>
                   </div>
                 ) : null}
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
                   <div>
-                    <p className="text-sm font-medium text-zinc-100">Lock queue adds</p>
-                    <p className="text-xs text-zinc-500">Only the room owner can enqueue while locked.</p>
+                    <p className="text-sm font-medium text-foreground">Lock queue adds</p>
+                    <p className="text-xs text-muted-foreground">Only the room owner can enqueue while locked.</p>
                   </div>
                   <Switch checked={expQueueLocked} onCheckedChange={setExpQueueLocked} id={`ch-exp-lock-${channelId}`} />
                 </div>
@@ -642,9 +628,9 @@ export function ChannelAdminPanel({
                     max={120}
                     value={expIntro}
                     onChange={(e) => setExpIntro(e.target.value)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-zinc-500">After this point, listeners are muted locally (sync stays aligned).</p>
+                  <p className="text-xs text-muted-foreground">After this point, listeners are muted locally (sync stays aligned).</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`ch-exp-veto-${channelId}`}>Skip vote threshold</Label>
@@ -655,36 +641,36 @@ export function ChannelAdminPanel({
                     max={999}
                     value={expVeto}
                     onChange={(e) => setExpVeto(e.target.value)}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-zinc-500">0 = tally only. When reached, the room auto-advances like “next”.</p>
+                  <p className="text-xs text-muted-foreground">0 = tally only. When reached, the room auto-advances like “next”.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`ch-exp-anti-${channelId}`}>Anti-repeat window</Label>
-                  <Input id={`ch-exp-anti-${channelId}`} type="number" min={0} value={expAntiRepeat} onChange={(e) => setExpAntiRepeat(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                  <Input id={`ch-exp-anti-${channelId}`} type="number" min={0} value={expAntiRepeat} onChange={(e) => setExpAntiRepeat(e.target.value)} className="border-border bg-card/80" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`ch-exp-bias-${channelId}`}>Shuffle bias (0–2)</Label>
-                  <Input id={`ch-exp-bias-${channelId}`} type="number" min={0} max={2} step={0.1} value={expShuffleBias} onChange={(e) => setExpShuffleBias(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                  <Input id={`ch-exp-bias-${channelId}`} type="number" min={0} max={2} step={0.1} value={expShuffleBias} onChange={(e) => setExpShuffleBias(e.target.value)} className="border-border bg-card/80" />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-zinc-100">Track suggestions</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-foreground">Track suggestions</p>
                   <Switch checked={expSuggestions} onCheckedChange={setExpSuggestions} />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3">
-                  <p className="text-sm font-medium text-zinc-100">DJ rotation</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3">
+                  <p className="text-sm font-medium text-foreground">DJ rotation</p>
                   <Switch checked={expDjRotation} onCheckedChange={setExpDjRotation} />
                 </div>
                 <div className="space-y-2">
                   <Label>Rotate every N tracks</Label>
-                  <Input type="number" min={1} value={expDjEvery} onChange={(e) => setExpDjEvery(e.target.value)} className="border-zinc-800 bg-zinc-900/80" />
+                  <Input type="number" min={1} value={expDjEvery} onChange={(e) => setExpDjEvery(e.target.value)} className="border-border bg-card/80" />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-zinc-100">Listening party</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-foreground">Listening party</p>
                   <Switch checked={expListeningParty} onCheckedChange={setExpListeningParty} />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/60 bg-zinc-900/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-zinc-100">Radio mode</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
+                  <p className="text-sm font-medium text-foreground">Radio mode</p>
                   <Switch checked={expRadio} onCheckedChange={setExpRadio} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
@@ -693,7 +679,7 @@ export function ChannelAdminPanel({
                     id={`ch-exp-queue-end-${channelId}`}
                     value={expQueueEndMode}
                     onChange={(e) => setExpQueueEndMode(e.target.value as "loop" | "stop" | "repeat_one")}
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   >
                     <option value="loop">Loop playlist</option>
                     <option value="stop">Stop at last track</option>
@@ -708,7 +694,7 @@ export function ChannelAdminPanel({
                     onChange={(e) => setExpRoomRules(e.target.value)}
                     rows={3}
                     maxLength={2000}
-                    className="w-full rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+                    className="w-full rounded-md border border-border bg-card/80 px-3 py-2 text-sm text-foreground"
                     placeholder="Be kind, no spoilers, request in chat…"
                   />
                 </div>
@@ -719,9 +705,9 @@ export function ChannelAdminPanel({
                     value={expScheduledStart}
                     onChange={(e) => setExpScheduledStart(e.target.value)}
                     placeholder="2026-05-16T21:00:00Z"
-                    className="border-zinc-800 bg-zinc-900/80"
+                    className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-zinc-500">Blocks play/shuffle until this time (UTC ISO string).</p>
+                  <p className="text-xs text-muted-foreground">Blocks play/shuffle until this time (UTC ISO string).</p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor={`ch-brand-logo-${channelId}`}>Brand logo</Label>
@@ -729,7 +715,7 @@ export function ChannelAdminPanel({
                     id={`ch-brand-logo-${channelId}`}
                     type="file"
                     accept="image/*"
-                    className="cursor-pointer border-zinc-800 bg-zinc-900/80"
+                    className="cursor-pointer border-border bg-card/80"
                     disabled={busy === "logo"}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -742,7 +728,7 @@ export function ChannelAdminPanel({
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  className="bg-emerald-600 hover:bg-emerald-500"
+                  className="bg-brand hover:bg-brand"
                   disabled={!channelIsActive || busy === "experience"}
                   onClick={() => void saveExperience()}
                 >
@@ -764,11 +750,11 @@ export function ChannelAdminPanel({
               </div>
             </div>
 
-            <div className="h-px bg-zinc-800/90" />
+            <div className="h-px bg-muted/90" />
 
             <div className="rounded-2xl border border-red-900/35 bg-red-950/15 p-5">
-              <h3 className="text-sm font-semibold text-red-200">Danger zone</h3>
-              <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+              <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 Permanently delete this channel and its related data. Only the channel owner sees this option — moderators and guests cannot remove
                 the room.
               </p>
@@ -784,21 +770,21 @@ export function ChannelAdminPanel({
                   Delete channel
                 </Button>
               ) : (
-                <p className="mt-4 text-xs text-zinc-500">Only the room owner can delete this channel.</p>
+                <p className="mt-4 text-xs text-muted-foreground">Only the room owner can delete this channel.</p>
               )}
             </div>
           </TabsContent>
 
           <TabsContent value="invites" className="space-y-8">
-            <section className="rounded-2xl border border-emerald-900/30 bg-gradient-to-br from-emerald-950/30 to-zinc-950/40 p-5">
+            <section className="rounded-2xl border border-brand/30 bg-gradient-to-br from-[var(--brand-subtle)] to-background/40 p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Shield className="size-4 text-emerald-400" />
-                    <h3 className="font-semibold text-zinc-100">Private invite</h3>
+                    <Shield className="size-4 text-brand" />
+                    <h3 className="font-semibold text-foreground">Private invite</h3>
                   </div>
-                  <p className="mt-1 max-w-lg text-sm text-zinc-500">
-                    Every room has an active invite code. Guests enter <strong className="text-zinc-300">only this code</strong> (or scan QR)
+                  <p className="mt-1 max-w-lg text-sm text-muted-foreground">
+                    Every room has an active invite code. Guests enter <strong className="text-foreground/80">only this code</strong> (or scan QR)
                     — no full URL needed.
                   </p>
                 </div>
@@ -816,7 +802,7 @@ export function ChannelAdminPanel({
               </div>
               {inviteToken ? (
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <code className="flex-1 rounded-lg border border-zinc-800 bg-black/40 px-3 py-2 font-mono text-sm text-emerald-200">
+                  <code className="flex-1 rounded-lg border border-border bg-[var(--surface-inset)] px-3 py-2 font-mono text-sm text-brand">
                     {inviteToken}
                   </code>
                   <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => void copyText(inviteToken, showToast)}>
@@ -825,17 +811,17 @@ export function ChannelAdminPanel({
                   </Button>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-zinc-500">Loading invite…</p>
+                <p className="mt-4 text-sm text-muted-foreground">Loading invite…</p>
               )}
             </section>
 
             {canPublicSlug && publicSlug ? (
-              <section className="rounded-2xl border border-zinc-800/70 bg-zinc-950/40 p-5">
+              <section className="rounded-2xl border border-border/70 bg-card/40 p-5">
                 <div className="flex items-center gap-2">
                   <UserPlus className="size-4 text-sky-400" />
-                  <h3 className="font-semibold text-zinc-100">Public join code</h3>
+                  <h3 className="font-semibold text-foreground">Public join code</h3>
                 </div>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Set a short memorable code (letters, numbers, hyphens). Guests type this code to join.
                 </p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -843,7 +829,7 @@ export function ChannelAdminPanel({
                     value={publicJoinSlugDraft}
                     onChange={(e) => setPublicJoinSlugDraft(e.target.value)}
                     placeholder="e.g. friday-jams"
-                    className="border-zinc-800 bg-zinc-900/80 font-mono sm:max-w-xs"
+                    className="border-border bg-card/80 font-mono sm:max-w-xs"
                   />
                   <Button type="button" disabled={!channelIsActive || busy === "slug"} onClick={() => void savePublicSlug()}>
                     {busy === "slug" ? <Loader2 className="size-4 animate-spin" /> : "Save code"}
@@ -853,7 +839,7 @@ export function ChannelAdminPanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="mt-2 text-xs text-zinc-500 hover:text-zinc-300"
+                  className="mt-2 text-xs text-muted-foreground hover:text-foreground/80"
                   disabled={!channelIsActive || busy === "rotate-public"}
                   onClick={() => void rotatePublicUuid()}
                 >
@@ -863,7 +849,7 @@ export function ChannelAdminPanel({
             ) : null}
 
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-500">QR codes</h3>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">QR codes</h3>
               <div className="grid gap-6 sm:grid-cols-2">
                 <QrTile
                   title="Private invite"
@@ -885,24 +871,24 @@ export function ChannelAdminPanel({
           </TabsContent>
 
           <TabsContent value="people" className="space-y-6">
-            <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/35">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 px-4 py-3">
-                <h3 className="text-sm font-semibold text-zinc-300">Pending join requests</h3>
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/35">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground/80">Pending join requests</h3>
                 <Button variant="secondary" size="sm" onClick={() => void loadJoinRequests()}>
                   Refresh
                 </Button>
               </div>
               <div className="p-4">
                 {joinRequests.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-zinc-500">No pending requests.</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground">No pending requests.</p>
                 ) : (
                   <div className="space-y-2">
                     {joinRequests.map((jr) => (
                       <div
                         key={jr.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-3 py-2.5 text-sm"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-card/40 px-3 py-2.5 text-sm"
                       >
-                        <span className="font-medium text-zinc-200">@{jr.username}</span>
+                        <span className="font-medium text-foreground">@{jr.username}</span>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
@@ -942,77 +928,33 @@ export function ChannelAdminPanel({
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-zinc-800/70 bg-zinc-950/35">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 px-4 py-3">
-                <h3 className="text-sm font-semibold text-zinc-300">Members</h3>
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/35">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground/80">Members</h3>
                 <Button variant="secondary" size="sm" onClick={() => void loadMembers()}>
                   Refresh
                 </Button>
               </div>
               <ScrollArea className="h-[min(360px,45vh)]">
                 <div className="space-y-2 p-4 pr-3">
-                  {members.length === 0 ? <p className="py-6 text-center text-sm text-zinc-500">No members yet.</p> : null}
+                  {members.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No members yet.</p> : null}
                   {members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="grid gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-3 text-xs md:grid-cols-[1fr_minmax(0,140px)_auto_auto] md:items-center"
-                    >
-                      <span className="min-w-0 truncate font-medium text-zinc-200">{member.username}</span>
-                      <Select
-                        id={`m-${member.id}-role`}
-                        aria-label={`Role for ${member.username}`}
-                        value={member.role}
-                        className="border-zinc-800 bg-zinc-950/80"
-                        onChange={(e) =>
-                          setMembers((prev) =>
-                            prev.map((m) => (m.id === member.id ? { ...m, role: e.target.value as ChannelMember["role"] } : m)),
-                          )
-                        }
-                      >
-                        <option value="owner">Owner</option>
-                        <option value="moderator">Moderator</option>
-                        <option value="member">Member</option>
-                      </Select>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="md:justify-self-end"
-                        onClick={async () => {
-                          try {
-                            await updateChannelMemberRole(channelId, member.id, member.role);
-                            showToast(`Role updated for ${member.username}.`, "success");
-                          } catch (error) {
-                            showToast(error instanceof Error ? error.message : "Cannot update role.", "error");
-                          }
-                        }}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="md:justify-self-end"
-                        disabled={busy === `dj-${member.user_id}`}
-                        onClick={() => void handoffDj(member.user_id, member.username)}
-                      >
-                        DJ
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="md:justify-self-end"
-                        onClick={async () => {
-                          try {
-                            await removeChannelMember(channelId, member.id);
-                            showToast(`Removed ${member.username}.`, "success");
-                            await loadMembers();
-                          } catch (error) {
-                            showToast(error instanceof Error ? error.message : "Cannot remove.", "error");
-                          }
-                        }}
-                      >
-                        Remove
-                      </Button>
+                    <div key={member.id} className="rounded-xl border border-border/80 bg-card/40 p-3">
+                      <p className="truncate text-sm font-medium text-foreground">@{member.username}</p>
+                      {member.is_active ? (
+                        <ChannelMemberRosterActions
+                          key={`${member.id}-${member.role}`}
+                          channelId={channelId}
+                          member={member}
+                          isOwnerViewer={canDeleteChannel}
+                          channelIsActive={channelIsActive}
+                          onUpdated={loadMembers}
+                          layout="inline"
+                          className="mt-2 border-t-0 pt-0"
+                        />
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">Inactive</p>
+                      )}
                     </div>
                   ))}
                 </div>
