@@ -7,6 +7,10 @@ export const metadata = {
   manifest: "/manifest.json",
   themeColor: "#10b981",
   appleWebApp: { capable: true, title: "Stream Music" },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

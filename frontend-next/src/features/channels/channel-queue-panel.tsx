@@ -3,7 +3,6 @@
 import { ChevronDown, ChevronUp, Play, RefreshCw, ThumbsUp, Trash2 } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
-import { UpNextStrip } from "@/components/room/up-next-strip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Alert } from "@/components/ui/alert";
@@ -74,13 +73,6 @@ export function ChannelQueuePanel({ channelId, readOnly = false }: { channelId: 
         </Button>
       </CardHeader>
       <CardContent className="space-y-3 p-4">
-        <UpNextStrip
-          items={queue.slice(0, 3).map((q) => ({
-            id: q.id,
-            title: trackMap[q.track]?.title ?? q.track_detail?.title ?? `Track #${q.track}`,
-            artist: trackMap[q.track]?.artist ?? q.track_detail?.artist,
-          }))}
-        />
         <ScrollArea className="h-[min(380px,45vh)]">
           <div className="space-y-2 p-5 pr-3">
             {readOnly ? (

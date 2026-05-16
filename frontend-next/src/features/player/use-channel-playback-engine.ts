@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Howl, Howler } from "howler";
+
+/** One HTML5 track at a time; keep the pool tiny so leaked instances surface quickly. */
+if (typeof window !== "undefined") {
+  Howler.html5PoolSize = 2;
+}
 import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/playback-payload";
@@ -107,6 +112,10 @@ export function useChannelPlaybackEngine({
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.75);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
   const [queueVersion, setQueueVersion] = useState(0);
   const queueVersionRef = useRef(0);
   queueVersionRef.current = queueVersion;
@@ -125,11 +134,6 @@ export function useChannelPlaybackEngine({
     const prev = howlRef.current;
     howlRef.current = null;
     setVizAudioEl(null);
-    try {
-      Howler.stop();
-    } catch {
-      /* ignore */
-    }
     if (!prev) return;
     try {
       prev.stop();
@@ -414,7 +418,7 @@ export function useChannelPlaybackEngine({
       src: [src],
       html5: true,
       preload: true,
-      volume,
+      volume: volumeRef.current,
       onload: () => {
         if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
         setIsBuffering(false);
@@ -436,7 +440,7 @@ export function useChannelPlaybackEngine({
         if (loadGen !== loadGenerationRef.current) return;
         loadedTrackSrcRef.current = null;
         setIsBuffering(false);
-        onToast?.("Cannot load audio source", "error");
+        onToastRef.current?.("Cannot load audio source", "error");
       },
       onend: () => {
         if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
@@ -474,7 +478,7 @@ export function useChannelPlaybackEngine({
       }
       setVizAudioEl(null);
     };
-  }, [activeTrackPath, channelId, onToast, startHowlTransport, teardownMainHowl, volume]);
+  }, [activeTrackPath, channelId, startHowlTransport, teardownMainHowl]);
 
   useEffect(() => {
     let raf = 0;

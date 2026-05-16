@@ -44,6 +44,7 @@ import { ChannelListenersPanel } from "@/features/channels/channel-listeners-pan
 import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
 import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
+import { ChannelUpNextSidebar } from "@/features/channels/channel-up-next-sidebar";
 import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
 import { DjBoothPanel } from "@/features/channels/dj-booth-panel";
 import { ChannelMobileBar } from "@/components/room/channel-mobile-bar";
@@ -682,6 +683,11 @@ export function ChannelDashboardTabs(props: Props) {
     </Dialog>
   );
 
+  const currentTrackId =
+    latestPlaybackPayload && typeof (latestPlaybackPayload as { track?: { id?: number } }).track?.id === "number"
+      ? (latestPlaybackPayload as { track?: { id?: number } }).track!.id!
+      : null;
+
   if (!membershipLoaded) {
     return (
       <>
@@ -738,12 +744,13 @@ export function ChannelDashboardTabs(props: Props) {
             joinRequiresApproval={initialJoinRequiresApproval}
             experience={experience}
           />
-          <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,380px)]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="min-w-0">{listenerChatPanel}</div>
-            <aside className="hidden lg:flex lg:flex-col lg:gap-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Up next</p>
-              {listenerQueuePanel}
-            </aside>
+            <ChannelUpNextSidebar
+              className="hidden lg:block"
+              currentTrackId={currentTrackId}
+              accent={experience.accent}
+            />
           </div>
           <ChannelMobileBar
             chatUnread={chatTabUnread}
@@ -756,11 +763,6 @@ export function ChannelDashboardTabs(props: Props) {
       </ChannelQueueProvider>
     );
   }
-
-  const currentTrackId =
-    latestPlaybackPayload && typeof (latestPlaybackPayload as { track?: { id?: number } }).track?.id === "number"
-      ? (latestPlaybackPayload as { track?: { id?: number } }).track!.id!
-      : null;
 
   const chatPanel = (
     <ChannelChatPanel
@@ -904,7 +906,7 @@ export function ChannelDashboardTabs(props: Props) {
           </TabsList>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_minmax(300px,380px)]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0">
         <TabsContent value="chat" className="mt-5">
           {chatPanel}
@@ -1036,10 +1038,16 @@ export function ChannelDashboardTabs(props: Props) {
           </Card>
         </TabsContent>
           </div>
-          <aside className="hidden lg:flex lg:flex-col lg:gap-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Up next</p>
-            {queuePanel}
-          </aside>
+          <ChannelUpNextSidebar
+            className="hidden lg:block"
+            currentTrackId={currentTrackId}
+            accent={experience.accent}
+            canManage={canManageChannel && channelIsActive}
+            onManageQueue={() => {
+              selectTabGroup("listen");
+              selectTab("queue");
+            }}
+          />
         </div>
 
       <ChannelMobileBar

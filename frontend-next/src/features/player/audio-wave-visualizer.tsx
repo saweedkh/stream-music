@@ -21,6 +21,21 @@ type GraphEntry = {
 const graphByMedia = new WeakMap<HTMLMediaElement, GraphEntry>();
 const teardownTimers = new WeakMap<HTMLMediaElement, ReturnType<typeof setTimeout>>();
 
+let sharedAudioContext: AudioContext | null = null;
+
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (sharedAudioContext?.state === "closed") sharedAudioContext = null;
+  if (!sharedAudioContext) {
+    try {
+      sharedAudioContext = new AudioContext();
+    } catch {
+      return null;
+    }
+  }
+  return sharedAudioContext;
+}
+
 function cancelTeardown(media: HTMLMediaElement) {
   const t = teardownTimers.get(media);
   if (t) {
@@ -38,12 +53,11 @@ function scheduleGraphTeardown(media: HTMLMediaElement) {
     try {
       g.source.disconnect();
       g.analyser.disconnect();
-      void g.ctx.close();
     } catch {
       /* ignore */
     }
     graphByMedia.delete(media);
-  }, 120);
+  }, 400);
   teardownTimers.set(media, id);
 }
 
@@ -87,7 +101,8 @@ export function AudioWaveVisualizer({ media, isActive, accent, className, varian
     let existing = graphByMedia.get(media);
     if (!existing) {
       try {
-        const ctx = new AudioContext();
+        const ctx = getSharedAudioContext();
+        if (!ctx) throw new Error("AudioContext unavailable");
         const source = ctx.createMediaElementSource(media);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = variant === "compact" ? 512 : 1024;
@@ -96,6 +111,7 @@ export function AudioWaveVisualizer({ media, isActive, accent, className, varian
         analyser.connect(ctx.destination);
         existing = { ctx, source, analyser, refCount: 0 };
         graphByMedia.set(media, existing);
+        void ctx.resume().catch(() => {});
       } catch {
         existing = undefined;
       }
@@ -112,7 +128,7 @@ export function AudioWaveVisualizer({ media, isActive, accent, className, varian
 
     const resume = () => {
       const g = graphByMedia.get(media);
-      void g?.ctx.resume();
+      void g?.ctx.resume().catch(() => {});
     };
     media.addEventListener("play", resume);
 
