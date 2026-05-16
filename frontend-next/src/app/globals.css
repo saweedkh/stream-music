@@ -117,23 +117,33 @@ select option {
 
 @layer components {
   .glass-panel {
-    @apply rounded-2xl border border-border/80 bg-[var(--surface-glass)] shadow-lg shadow-black/5 backdrop-blur-xl;
+    @apply rounded-2xl border shadow-lg shadow-black/5 backdrop-blur-xl;
+    border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    background: var(--surface-glass);
   }
 
   .glass-panel-elevated {
-    @apply rounded-2xl border border-border/90 bg-[var(--surface-elevated)] shadow-xl shadow-black/10 backdrop-blur-xl;
+    @apply rounded-2xl border shadow-xl shadow-black/10 backdrop-blur-xl;
+    border-color: color-mix(in srgb, var(--border) 90%, transparent);
+    background: var(--surface-elevated);
   }
 
   .surface-card {
-    @apply rounded-xl border border-border/80 bg-card/85 text-card-foreground shadow-sm backdrop-blur-sm;
+    @apply rounded-xl border text-card-foreground shadow-sm backdrop-blur-sm;
+    border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    background: color-mix(in srgb, var(--card) 85%, transparent);
   }
 
   .surface-inset {
-    @apply rounded-lg border border-border/70 bg-[var(--surface-inset)];
+    @apply rounded-lg border;
+    border-color: color-mix(in srgb, var(--border) 70%, transparent);
+    background: var(--surface-inset);
   }
 
   .surface-muted {
-    @apply rounded-lg border border-border/60 bg-muted/20;
+    @apply rounded-lg border;
+    border-color: color-mix(in srgb, var(--border) 60%, transparent);
+    background: color-mix(in srgb, var(--muted) 20%, transparent);
   }
 
   .text-gradient-brand {
@@ -141,11 +151,15 @@ select option {
   }
 
   .player-dock {
-    @apply border border-border/90 bg-[var(--player-chrome)] backdrop-blur-2xl backdrop-saturate-150;
+    @apply border backdrop-blur-2xl backdrop-saturate-150;
+    border-color: color-mix(in srgb, var(--border) 90%, transparent);
+    background: var(--player-chrome);
   }
 
   .status-online {
-    @apply border-brand/30 bg-[var(--success-subtle)] text-brand;
+    @apply text-brand;
+    border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+    background: var(--success-subtle);
   }
 
   .status-live {
@@ -153,7 +167,9 @@ select option {
   }
 
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    --tw-ring-color: color-mix(in srgb, var(--ring) 60%, transparent);
+    --tw-ring-offset-color: var(--background);
   }
 }
 
