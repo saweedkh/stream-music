@@ -324,7 +324,9 @@ export function ChannelDashboardTabs(props: Props) {
       if (["initial_sync", "play", "pause", "seek", "next", "prev", "add_to_queue", "enqueue_next", "queue_updated"].includes(action)) {
         if (Array.isArray(data.queue)) setWsQueue(data.queue as QueueItemSummary[]);
         setLatestPlaybackPayload(data);
-        window.dispatchEvent(new CustomEvent("channel-playback-updated", { detail: { channelId, payload: data } }));
+        window.dispatchEvent(
+          new CustomEvent("channel-playback-updated", { detail: { channelId: String(channelId), payload: data } }),
+        );
 
         const trackPayload = data as { track?: { title?: string | null; id?: number } | null; track_file?: string | null };
         const trackTitle =
@@ -535,7 +537,6 @@ export function ChannelDashboardTabs(props: Props) {
       initialIsPlaying: false,
       canControl: false,
       sendSocketMessage: undefined,
-      latestSocketPayload: null,
       experience: null,
     });
     router.replace("/dashboard");
@@ -554,7 +555,6 @@ export function ChannelDashboardTabs(props: Props) {
         initialIsPlaying: false,
         canControl: false,
         sendSocketMessage: undefined,
-        latestSocketPayload: null,
         experience: null,
       });
       showToast("You left the channel.", "success");
@@ -591,7 +591,6 @@ export function ChannelDashboardTabs(props: Props) {
       initialIsPlaying: isPlaying,
       canControl: canManageChannel && channelIsActive,
       sendSocketMessage: stableSendSocketMessage,
-      latestSocketPayload: latestPlaybackPayload,
       experience,
     });
   }, [
@@ -600,7 +599,6 @@ export function ChannelDashboardTabs(props: Props) {
     channelId,
     experience,
     isPlaying,
-    latestPlaybackPayload,
     pausedAt,
     socketState,
     stableSendSocketMessage,
@@ -620,7 +618,6 @@ export function ChannelDashboardTabs(props: Props) {
         initialIsPlaying: false,
         canControl: false,
         sendSocketMessage: undefined,
-        latestSocketPayload: null,
         experience: null,
       });
     };

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Howl } from "howler";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronUp, Pause, Play, Radio, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,35 +18,13 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
-import { expectedTimeSeconds } from "./sync-client";
+import { useChannelPlaybackEngine } from "@/features/player/use-channel-playback-engine";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
+import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
 
-/** Blend repeated clock samples to reduce jitter (WS pong / sync). */
-function blendClockOffset(prevMs: number, sampleMs: number, alpha: number): number {
-  if (!Number.isFinite(sampleMs)) return prevMs;
-  if (!Number.isFinite(prevMs) || Math.abs(prevMs) < 1) return sampleMs;
-  return prevMs + (sampleMs - prevMs) * alpha;
-}
-
-export type ChannelPlaybackEventPayload = {
-  action?: string;
-  event_seq?: number;
-  is_playing?: boolean;
-  started_at_server_time?: number | null;
-  position?: number | null;
-  track_file?: string | null;
-  queue_version?: number;
-  playlist_id?: number;
-  playlist_name?: string;
-  queue_index?: number;
-  queue_length?: number;
-  start_index?: number;
-  /** Unix seconds — refine client clock vs server on sync messages */
-  server_time?: number;
-};
+export type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
 
 type Props = {
   channelId: string;
@@ -58,7 +35,6 @@ type Props = {
   initialIsPlaying?: boolean;
   canControl?: boolean;
   sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
-  latestSocketPayload?: ChannelPlaybackEventPayload | null;
   drawerOpen: boolean;
   onDrawerOpenChange: (open: boolean) => void;
   experience?: ChannelExperience | null;
@@ -69,13 +45,6 @@ function formatTime(value: number): string {
   const minutes = Math.floor(value / 60);
   const seconds = Math.floor(value % 60);
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function getHowlHtml5Audio(howl: Howl | null): HTMLAudioElement | null {
-  if (!howl) return null;
-  const sounds = (howl as unknown as { _sounds?: Array<{ _node?: unknown }> })._sounds;
-  const node = sounds?.[0]?._node;
-  return node instanceof HTMLAudioElement ? node : null;
 }
 
 const ACCENT_PALETTE: Record<string, { ring: string; text: string }> = {
@@ -151,44 +120,66 @@ export function ChannelPlayer({
   initialIsPlaying = false,
   canControl = false,
   sendSocketMessage,
-  latestSocketPayload = null,
   drawerOpen,
   onDrawerOpenChange,
   experience = null,
 }: Props) {
   const { showToast } = useToast();
 
-  const howlRef = useRef<Howl | null>(null);
-  const loadGenerationRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const lastTransportRef = useRef({
-    playing: initialIsPlaying,
-    track: trackPath as string | undefined,
-    started: startedAt,
-    paused: pausedAt,
+  const {
+    howlRef,
+    isPlaying,
+    activeTrackPath,
+    lastSyncAt,
+    needsUserInteraction,
+    setNeedsUserInteraction,
+    position,
+    setPosition,
+    duration,
+    volume,
+    setVolume,
+    vizAudioEl,
+    isBuffering,
+    offsetMs,
+    isDraggingSeekRef,
+    applyControl,
+    commitSeek,
+    refreshChannelPlaybackState,
+  } = useChannelPlaybackEngine({
+    channelId,
+    socketState,
+    initialTrackPath: trackPath,
+    initialStartedAt: startedAt,
+    initialPausedAt: pausedAt,
+    initialIsPlaying,
+    canControl,
+    experience,
+    sendSocketMessage,
+    onToast: (message, tone) => showToast(message, tone),
   });
-  const controlRequestInFlightRef = useRef(false);
-  const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
-  const lastAppliedEventSeqRef = useRef(0);
-  const autoNextEventRef = useRef(0);
-  const isDraggingSeekRef = useRef(false);
-  const isPlayingRef = useRef(initialIsPlaying);
-  const socketConnectedRef = useRef(socketState === "connected");
-  const sendSocketMessageRef = useRef(sendSocketMessage);
 
-  const [offsetMs, setOffsetMs] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
-  const [syncStartedAt, setSyncStartedAt] = useState<number | null | undefined>(startedAt);
-  const [syncPausedAt, setSyncPausedAt] = useState<number | null | undefined>(pausedAt);
-  const [activeTrackPath, setActiveTrackPath] = useState<string | undefined>(trackPath);
-  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
-  const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.75);
-  const [queueVersion, setQueueVersion] = useState(0);
-  const [vizAudioEl, setVizAudioEl] = useState<HTMLAudioElement | null>(null);
-  const [isBuffering, setIsBuffering] = useState(false);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ channelId?: string; payload?: ChannelPlaybackEventPayload }>;
+      if (String(customEvent.detail?.channelId ?? "") !== String(channelId)) return;
+      const payload = customEvent.detail?.payload;
+      if (!payload) return;
+      if (
+        typeof payload.queue_index === "number" ||
+        typeof payload.queue_length === "number" ||
+        payload.playlist_name
+      ) {
+        setQueueMeta({
+          playlistName: typeof payload.playlist_name === "string" ? payload.playlist_name : undefined,
+          queueIndex: typeof payload.queue_index === "number" ? payload.queue_index : undefined,
+          queueLength: typeof payload.queue_length === "number" ? payload.queue_length : undefined,
+        });
+      }
+    };
+    window.addEventListener("channel-playback-updated", handler as EventListener);
+    return () => window.removeEventListener("channel-playback-updated", handler as EventListener);
+  }, [channelId]);
+
   const [queueMeta, setQueueMeta] = useState<{
     playlistName?: string;
     queueIndex?: number;
@@ -209,392 +200,6 @@ export function ChannelPlayer({
   const rehearsalMuted = Boolean(experience?.rehearsal_mode && !canControl && !rehearsalLiftActive);
   const introRemainingSec =
     !canControl && introCapSec > 0 && position < introCapSec ? Math.max(0, Math.ceil(introCapSec - position)) : null;
-
-  function teardownMainHowl() {
-    const prev = howlRef.current;
-    if (!prev) {
-      setVizAudioEl(null);
-      return;
-    }
-    try {
-      prev.stop();
-      prev.unload();
-    } catch {
-      /* ignore */
-    }
-    howlRef.current = null;
-    setVizAudioEl(null);
-  }
-
-  function startHowlTransport(howl: Howl) {
-    const expected = expectedTimeSeconds({
-      startedAt: syncStartedAt,
-      pausedAt: syncPausedAt,
-      offsetMs,
-      isPlaying: true,
-    });
-    if (typeof howl.rate === "function") howl.rate(1);
-    howl.seek(Math.max(0, expected));
-    if (!howl.playing()) howl.play();
-  }
-
-  async function refreshChannelPlaybackState(options?: { silent?: boolean }) {
-    try {
-      const data = await getChannelState(channelId);
-      setIsPlaying(data.playback.is_playing);
-      setSyncStartedAt(data.playback.started_at_server_time);
-      setSyncPausedAt(data.playback.paused_at_position);
-      setActiveTrackPath(data.playback.track?.file ?? undefined);
-      if (typeof data.playback.queue_version === "number") setQueueVersion(data.playback.queue_version);
-      setLastSyncAt(Date.now());
-    } catch (error) {
-      if (error instanceof ChannelClosedError) {
-        if (!options?.silent) showToast("This channel is closed.", "info");
-        return;
-      }
-      const message = error instanceof Error ? error.message : "Cannot refresh channel state";
-      if (!options?.silent) showToast(message, "error");
-    }
-  }
-
-  function applySocketPayload(payload: ChannelPlaybackEventPayload) {
-    if (typeof payload.is_playing === "boolean") setIsPlaying(payload.is_playing);
-    if ("started_at_server_time" in payload) setSyncStartedAt(payload.started_at_server_time ?? null);
-    if ("position" in payload && typeof payload.position === "number") setSyncPausedAt(Math.max(0, payload.position));
-    if ("track_file" in payload) setActiveTrackPath(payload.track_file ?? undefined);
-    if (typeof payload.queue_version === "number") setQueueVersion(payload.queue_version);
-    if (typeof payload.queue_index === "number" || typeof payload.queue_length === "number" || payload.playlist_name) {
-      setQueueMeta({
-        playlistName: typeof payload.playlist_name === "string" ? payload.playlist_name : undefined,
-        queueIndex: typeof payload.queue_index === "number" ? payload.queue_index : undefined,
-        queueLength: typeof payload.queue_length === "number" ? payload.queue_length : undefined,
-      });
-    }
-    setLastSyncAt(Date.now());
-  }
-
-  function handleIncomingPlaybackPayload(payload: ChannelPlaybackEventPayload) {
-    const action = String(payload.action ?? "").toLowerCase();
-    if (action === "initial_sync") {
-      applySocketPayload(payload);
-      if (typeof payload.server_time === "number" && Number.isFinite(payload.server_time)) {
-        const sample = payload.server_time * 1000 - Date.now();
-        setOffsetMs((prev) => blendClockOffset(prev, sample, 0.45));
-      }
-      const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
-      if (seq !== null) {
-        lastAppliedEventSeqRef.current = Math.max(lastAppliedEventSeqRef.current, seq);
-      }
-      return;
-    }
-
-    const seq = typeof payload.event_seq === "number" ? payload.event_seq : null;
-    if (seq !== null) {
-      if (seq <= lastAppliedEventSeqRef.current) return;
-      lastAppliedEventSeqRef.current = seq;
-    }
-    applySocketPayload(payload);
-  }
-
-  async function applyControl(action: "play" | "pause" | "seek" | "next" | "prev", payload?: Record<string, unknown>) {
-    if (!canControl || !sendSocketMessage) return;
-    if (controlRequestInFlightRef.current) return;
-    controlRequestInFlightRef.current = true;
-    try {
-      const sent = sendSocketMessage({ action, ...payload });
-      if (!sent) {
-        pendingSocketCommandRef.current = { action, ...payload };
-        showToast("Socket reconnecting... command queued.", "error");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : `Cannot ${action} playback`;
-      showToast(message, "error");
-    } finally {
-      controlRequestInFlightRef.current = false;
-    }
-  }
-
-  function commitSeek(next: number) {
-    isDraggingSeekRef.current = false;
-    const clamped = Math.max(0, next);
-    const howl = howlRef.current;
-    if (howl) howl.seek(clamped);
-    if (canControl) void applyControl("seek", { position: clamped });
-  }
-
-  useEffect(() => {
-    const sync = () => {
-      void getServerTime()
-        .then(({ offset }) => setOffsetMs((prev) => blendClockOffset(prev, offset, 0.5)))
-        .catch(() => {});
-    };
-    sync();
-    const id = window.setInterval(sync, 45_000);
-    const onVis = () => {
-      if (document.visibilityState === "visible") sync();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onClock = (ev: Event) => {
-      const e = ev as CustomEvent<{ channelId?: string; offsetMs?: number }>;
-      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
-      const next = e.detail?.offsetMs;
-      if (typeof next !== "number" || !Number.isFinite(next)) return;
-      setOffsetMs((prev) => blendClockOffset(prev, next, 0.35));
-    };
-    window.addEventListener("channel-clock-sync", onClock as EventListener);
-    return () => window.removeEventListener("channel-clock-sync", onClock as EventListener);
-  }, [channelId]);
-
-  useEffect(() => {
-    if (socketState !== "connected") return;
-    void getServerTime()
-      .then(({ offset }) => setOffsetMs((prev) => blendClockOffset(prev, offset, 0.55)))
-      .catch(() => {});
-  }, [socketState, channelId]);
-
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  useEffect(() => {
-    socketConnectedRef.current = socketState === "connected";
-  }, [socketState]);
-
-  useEffect(() => {
-    sendSocketMessageRef.current = sendSocketMessage;
-  }, [sendSocketMessage]);
-
-  useEffect(() => {
-    setActiveTrackPath(trackPath);
-    setSyncStartedAt(startedAt);
-    setSyncPausedAt(pausedAt);
-    setIsPlaying(initialIsPlaying);
-  }, [trackPath, startedAt, pausedAt, initialIsPlaying]);
-
-  useEffect(() => {
-    lastAppliedEventSeqRef.current = 0;
-    setQueueVersion(0);
-    teardownMainHowl();
-    setPosition(0);
-    setDuration(0);
-    setIsBuffering(false);
-    lastTransportRef.current = {
-      playing: initialIsPlaying,
-      track: trackPath,
-      started: startedAt,
-      paused: pausedAt,
-    };
-  }, [channelId]);
-
-  useEffect(() => {
-    if (socketState !== "closed") return;
-    void refreshChannelPlaybackState({ silent: true });
-  }, [channelId, socketState]);
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const customEvent = event as CustomEvent<{ channelId?: string; payload?: ChannelPlaybackEventPayload }>;
-      if (customEvent.detail?.channelId && customEvent.detail.channelId !== channelId) return;
-      const payload = customEvent.detail?.payload;
-      if (payload) {
-        handleIncomingPlaybackPayload(payload);
-        return;
-      }
-      void refreshChannelPlaybackState({ silent: true });
-    };
-    window.addEventListener("channel-playback-updated", handler as EventListener);
-    return () => window.removeEventListener("channel-playback-updated", handler as EventListener);
-  }, [channelId]);
-
-  useEffect(() => {
-    if (latestSocketPayload) handleIncomingPlaybackPayload(latestSocketPayload);
-  }, [latestSocketPayload]);
-
-  useEffect(() => {
-    if (socketState !== "connected") return;
-    const command = pendingSocketCommandRef.current;
-    if (!command || !sendSocketMessage) return;
-    const sent = sendSocketMessage(command);
-    if (sent) {
-      pendingSocketCommandRef.current = null;
-      showToast("Queued command sent.", "success");
-    }
-  }, [socketState, sendSocketMessage, showToast]);
-
-  useEffect(() => {
-    const src = activeTrackPath ? `${getApiBase()}${activeTrackPath}` : null;
-    const loadGen = ++loadGenerationRef.current;
-
-    if (!src) {
-      teardownMainHowl();
-      setPosition(0);
-      setDuration(0);
-      setIsBuffering(false);
-      return;
-    }
-
-    teardownMainHowl();
-    setIsBuffering(true);
-    const howl = new Howl({
-      src: [src],
-      html5: true,
-      volume,
-      onload: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        setIsBuffering(false);
-        setDuration(howl.duration() || 0);
-        setVizAudioEl(getHowlHtml5Audio(howl));
-        if (isPlayingRef.current) startHowlTransport(howl);
-      },
-      onplay: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        setIsBuffering(false);
-        setVizAudioEl(getHowlHtml5Audio(howl));
-      },
-      onplayerror: () => {
-        if (loadGen !== loadGenerationRef.current) return;
-        setIsBuffering(false);
-        setNeedsUserInteraction(true);
-      },
-      onloaderror: () => {
-        if (loadGen !== loadGenerationRef.current) return;
-        setIsBuffering(false);
-        showToast("Cannot load audio source", "error");
-      },
-      onend: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        if (!isPlayingRef.current || !socketConnectedRef.current) return;
-        const send = sendSocketMessageRef.current;
-        const clientDurationSec =
-          typeof howl.duration === "function" ? Number(howl.duration()) || 0 : 0;
-        autoNextEventRef.current += 1;
-        const payload = {
-          action: "auto_next" as const,
-          client_duration_sec: clientDurationSec,
-          client_event_id: `${channelId}:${activeTrackPath ?? "none"}:${autoNextEventRef.current}`,
-        };
-        const ok = send?.(payload);
-        if (!ok) {
-          pendingSocketCommandRef.current = payload;
-        }
-      },
-    });
-
-    howlRef.current = howl;
-
-    return () => {
-      if (loadGen !== loadGenerationRef.current) return;
-      try {
-        howl.stop();
-        howl.unload();
-      } catch {
-        /* ignore */
-      }
-      if (howlRef.current === howl) {
-        howlRef.current = null;
-      }
-      setVizAudioEl(null);
-    };
-  }, [activeTrackPath]);
-
-  useEffect(() => {
-    const tick = () => {
-      const howl = howlRef.current;
-      if (!howl) return;
-      if (!isDraggingSeekRef.current) {
-        const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-        setPosition(current);
-      }
-
-      const setHowlRate = (rate: number) => {
-        if (typeof howl.rate === "function") howl.rate(rate);
-      };
-
-      if (isPlaying) {
-        const expected = expectedTimeSeconds({
-          startedAt: syncStartedAt,
-          pausedAt: syncPausedAt,
-          offsetMs,
-          isPlaying,
-        });
-        const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-        const diff = current - expected;
-        if (!isDraggingSeekRef.current) {
-          const hardSeek = 0.38;
-          const softLo = 0.045;
-          if (Math.abs(diff) > hardSeek) {
-            howl.seek(Math.max(0, expected));
-            setHowlRate(1);
-          } else if (Math.abs(diff) > softLo) {
-            setHowlRate(diff > 0 ? 0.988 : 1.012);
-          } else {
-            setHowlRate(1);
-          }
-        }
-      } else {
-        setHowlRate(1);
-      }
-
-      const posNow = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-      const introCap = Math.max(0, Math.min(120, Number(experience?.intro_preview_seconds) || 0));
-      const introGate = !canControl && introCap > 0 && posNow >= introCap;
-      const liftActive = Boolean(
-        experience?.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now(),
-      );
-      const rehearsalMute = Boolean(experience?.rehearsal_mode && !canControl && !liftActive);
-      howl.volume(rehearsalMute || introGate ? 0 : volume);
-
-      rafRef.current = window.requestAnimationFrame(tick);
-    };
-
-    rafRef.current = window.requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) {
-        window.cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [isPlaying, syncStartedAt, syncPausedAt, offsetMs, volume, canControl, experience]);
-
-  useEffect(() => {
-    const howl = howlRef.current;
-    if (!howl) return;
-
-    const prev = lastTransportRef.current;
-    const next = {
-      playing: isPlaying,
-      track: activeTrackPath,
-      started: syncStartedAt,
-      paused: syncPausedAt,
-    };
-    const sameTransport =
-      prev.playing === next.playing &&
-      prev.track === next.track &&
-      prev.started === next.started &&
-      prev.paused === next.paused;
-    lastTransportRef.current = next;
-
-    if (isPlaying) {
-      if (sameTransport && howl.playing()) return;
-      startHowlTransport(howl);
-      return;
-    }
-
-    if (sameTransport && !howl.playing()) return;
-    if (typeof howl.rate === "function") howl.rate(1);
-    if (howl.playing()) howl.pause();
-    if (typeof syncPausedAt === "number") {
-      howl.seek(Math.max(0, syncPausedAt));
-      setPosition(Math.max(0, syncPausedAt));
-    }
-  }, [isPlaying, syncStartedAt, syncPausedAt, activeTrackPath]);
 
   type DockSize = "narrow" | "touch";
 

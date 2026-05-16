@@ -1,8 +1,13 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/outfit";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-outfit: "Outfit Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --background: #07090f;
   --foreground: #f8fafc;
   --card: #111827;

@@ -29,7 +29,6 @@ type GlobalChannelPlayerState = {
   initialIsPlaying: boolean;
   canControl: boolean;
   sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
-  latestSocketPayload?: PlaybackPayload | null;
   experience?: import("@/features/experience/room-experience-chrome").ChannelExperience | null;
 };
 
@@ -42,7 +41,6 @@ const defaultState: GlobalChannelPlayerState = {
   initialIsPlaying: false,
   canControl: false,
   sendSocketMessage: undefined,
-  latestSocketPayload: null,
   experience: null,
 };
 

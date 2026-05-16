@@ -22,13 +22,13 @@ export function applyDriftCorrection(audio: HTMLAudioElement, state: SyncState) 
   const expected = expectedTimeSeconds(state);
   const clampedExpected = Math.min(Math.max(0, expected), Math.max(0, audio.duration - 0.2));
   const diff = audio.currentTime - clampedExpected;
-  if (Math.abs(diff) > 0.1) {
+  if (Math.abs(diff) > 0.55) {
     audio.currentTime = clampedExpected;
     audio.playbackRate = 1;
     return;
   }
-  if (Math.abs(diff) > 0.04) {
-    audio.playbackRate = diff > 0 ? 0.98 : 1.02;
+  if (Math.abs(diff) > 0.12) {
+    audio.playbackRate = diff > 0 ? 0.985 : 1.015;
     return;
   }
   audio.playbackRate = 1;
