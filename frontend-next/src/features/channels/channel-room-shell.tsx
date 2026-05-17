@@ -67,13 +67,16 @@ export function ChannelRoomShell({
         </motion.div>
       ) : null}
 
-      <div className={cn("grid gap-6", sidebar && "lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[220px_minmax(0,1fr)_280px]")}>
+      <div
+        className={cn(
+          "grid gap-6",
+          sidebar && "lg:grid-cols-[minmax(0,1fr)_minmax(0,15.5rem)] xl:grid-cols-[220px_minmax(0,1fr)_minmax(0,15.5rem)]",
+        )}
+      >
         {canManage ? (
           <aside className="hidden xl:block">
             <nav className="glass-panel sticky top-4 space-y-1 p-2" aria-label="Room sections">
-              {navItems
-                .filter((item) => !item.hideOnDesktop)
-                .map((item) => {
+              {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = activeTab === item.id;
                   return (
@@ -114,7 +117,6 @@ export function ChannelRoomShell({
                         onClick={() => onTabChange(item.id)}
                         className={cn(
                           "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                          item.hideOnDesktop && "lg:hidden",
                           active ? "bg-brand text-foreground shadow-md" : "text-muted-foreground hover:bg-muted/40",
                         )}
                       >

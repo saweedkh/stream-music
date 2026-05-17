@@ -1,30 +1,22 @@
 "use client";
 
-import { Download, History, Lightbulb, Shield, ThumbsUp } from "lucide-react";
+import { Download, History, Shield, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   addTrackReaction,
-  createChannelSuggestion,
   getAuditLogExportUrl,
   listChannelAuditLog,
-  listChannelSuggestions,
   listPlaybackHistory,
   listTrackReactions,
-  listTracks,
-  reviewChannelSuggestion,
   type ChannelAuditLogRow,
-  type ChannelPlaylistSuggestion,
   type ChannelTrackReactionRow,
   type PlaybackHistoryRow,
-  type TrackSummary,
 } from "@/lib/api";
 
 type Props = {
@@ -37,26 +29,17 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
   const { showToast } = useToast();
   const [history, setHistory] = useState<PlaybackHistoryRow[]>([]);
   const [audit, setAudit] = useState<ChannelAuditLogRow[]>([]);
-  const [suggestions, setSuggestions] = useState<ChannelPlaylistSuggestion[]>([]);
   const [reactions, setReactions] = useState<ChannelTrackReactionRow[]>([]);
-  const [tracks, setTracks] = useState<TrackSummary[]>([]);
-  const [suggestTrackId, setSuggestTrackId] = useState("");
-  const [suggestNote, setSuggestNote] = useState("");
-  const [suggestionFilter, setSuggestionFilter] = useState<"" | "pending" | "approved" | "rejected">("pending");
   const [reactionEmoji, setReactionEmoji] = useState("🔥");
 
   const load = useCallback(async () => {
     try {
-      const [h, a, s, t] = await Promise.all([
+      const [h, a] = await Promise.all([
         listPlaybackHistory(channelId),
         canManage ? listChannelAuditLog(channelId) : Promise.resolve({ results: [] }),
-        listChannelSuggestions(channelId, suggestionFilter || undefined),
-        listTracks(),
       ]);
       setHistory(h.results);
       setAudit(a.results);
-      setSuggestions(s.results);
-      setTracks(t);
       if (currentTrackId) {
         const r = await listTrackReactions(channelId, currentTrackId);
         setReactions(r.results);
@@ -66,33 +49,11 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not load insights.", "error");
     }
-  }, [channelId, canManage, currentTrackId, suggestionFilter, showToast]);
+  }, [channelId, canManage, currentTrackId, showToast]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function submitSuggestion() {
-    if (!suggestTrackId) return;
-    try {
-      await createChannelSuggestion(channelId, { track_id: Number(suggestTrackId), note: suggestNote.trim() });
-      setSuggestNote("");
-      showToast("Suggestion sent to moderators.", "success");
-      await load();
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Suggestion failed.", "error");
-    }
-  }
-
-  async function review(id: number, action: "approve" | "reject") {
-    try {
-      await reviewChannelSuggestion(channelId, { suggestion_id: id, action });
-      showToast(action === "approve" ? "Added to queue." : "Suggestion rejected.", "success");
-      await load();
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Review failed.", "error");
-    }
-  }
 
   async function postReaction() {
     if (!currentTrackId) {
@@ -145,68 +106,6 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
           <Link href={`/party/${channelId}`} className="text-xs text-brand hover:underline">
             Public recap page →
           </Link>
-        </CardContent>
-      </Card>
-      <Card className="border-border/90 lg:col-span-2">
-        <CardHeader className="border-b border-border/80 pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Lightbulb className="size-5 text-amber-400" />
-            Track suggestions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="flex flex-wrap gap-2">
-            <Select value={suggestionFilter} onChange={(e) => setSuggestionFilter(e.target.value as typeof suggestionFilter)} className="w-40 border-border bg-card">
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="">All</option>
-            </Select>
-            <Button type="button" variant="secondary" size="sm" onClick={() => void load()}>
-              Refresh
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Select value={suggestTrackId} onChange={(e) => setSuggestTrackId(e.target.value)} className="min-w-[200px] flex-1 border-border bg-card">
-              <option value="">Pick a track to suggest…</option>
-              {tracks.map((t) => (
-                <option key={t.id} value={String(t.id)}>
-                  {t.title}
-                  {t.artist ? ` — ${t.artist}` : ""}
-                </option>
-              ))}
-            </Select>
-            <Input placeholder="Note (optional)" value={suggestNote} onChange={(e) => setSuggestNote(e.target.value)} className="max-w-xs border-border bg-card" maxLength={280} />
-            <Button type="button" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
-              Suggest
-            </Button>
-          </div>
-          <ScrollArea className="h-48">
-            <ul className="space-y-2 pr-3 text-sm">
-              {suggestions.length === 0 ? <li className="text-muted-foreground">No suggestions in this filter.</li> : null}
-              {suggestions.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card/40 px-3 py-2">
-                  <span>
-                    Track #{s.track}
-                    {s.note ? ` — ${s.note}` : ""}
-                    <Badge variant="secondary" className="ml-2">
-                      {s.status}
-                    </Badge>
-                  </span>
-                  {canManage && s.status === "pending" ? (
-                    <span className="flex gap-1">
-                      <Button type="button" size="sm" onClick={() => void review(s.id, "approve")}>
-                        Approve
-                      </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => void review(s.id, "reject")}>
-                        Reject
-                      </Button>
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </ScrollArea>
         </CardContent>
       </Card>
 

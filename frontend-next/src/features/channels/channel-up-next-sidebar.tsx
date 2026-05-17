@@ -1,46 +1,20 @@
 "use client";
 
-import { ListMusic, Music2 } from "lucide-react";
+import { ChevronRight, ListMusic } from "lucide-react";
 import { useContext, useMemo } from "react";
 import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { QueueItemSummary } from "@/lib/api";
 
-const ACCENT: Record<string, { ring: string; badge: string; label: string; glow: string }> = {
-  emerald: {
-    ring: "border-brand/30",
-    badge: "bg-brand/15 text-brand",
-    label: "text-brand/90",
-    glow: "shadow-[0_0_40px_-12px_rgba(16,185,129,0.35)]",
-  },
-  violet: {
-    ring: "border-violet-500/30",
-    badge: "bg-violet-500/15 text-violet-300",
-    label: "text-violet-400/90",
-    glow: "shadow-[0_0_40px_-12px_rgba(139,92,246,0.35)]",
-  },
-  rose: {
-    ring: "border-rose-500/30",
-    badge: "bg-rose-500/15 text-rose-300",
-    label: "text-rose-400/90",
-    glow: "shadow-[0_0_40px_-12px_rgba(244,63,94,0.3)]",
-  },
-  amber: {
-    ring: "border-amber-500/30",
-    badge: "bg-amber-500/15 text-amber-300",
-    label: "text-amber-400/90",
-    glow: "shadow-[0_0_40px_-12px_rgba(245,158,11,0.3)]",
-  },
-  sky: {
-    ring: "border-sky-500/30",
-    badge: "bg-sky-500/15 text-sky-300",
-    label: "text-sky-400/90",
-    glow: "shadow-[0_0_40px_-12px_rgba(14,165,233,0.3)]",
-  },
+type UpcomingItem = {
+  id: number;
+  title: string;
+  artist: string | null;
+  upvotes: number;
 };
 
-function upcomingItems(queue: QueueItemSummary[], currentTrackId?: number | null, limit = 5) {
+function upcomingItems(queue: QueueItemSummary[], currentTrackId?: number | null, limit = 6): UpcomingItem[] {
   let start = 0;
   if (currentTrackId != null) {
     const idx = queue.findIndex((q) => q.track === currentTrackId);
@@ -48,106 +22,112 @@ function upcomingItems(queue: QueueItemSummary[], currentTrackId?: number | null
   }
   return queue.slice(start, start + limit).map((q) => ({
     id: q.id,
-    title: q.track_detail?.title ?? `Track #${q.track}`,
-    artist: q.track_detail?.artist,
-    addedBy: q.added_by_username,
+    title: q.track_detail?.title?.trim() || `Track #${q.track}`,
+    artist: q.track_detail?.artist?.trim() || q.added_by_username || null,
     upvotes: q.upvote_count ?? 0,
   }));
 }
 
 type Props = {
   currentTrackId?: number | null;
-  accent?: string;
   canManage?: boolean;
-  onManageQueue?: () => void;
+  onOpenQueue?: () => void;
   className?: string;
 };
 
 export function ChannelUpNextSidebar({
   currentTrackId,
-  accent = "emerald",
   canManage = false,
-  onManageQueue,
+  onOpenQueue,
   className,
 }: Props) {
   const queueCtx = useContext(ChannelQueueContext);
   const queue = queueCtx?.queue ?? [];
   const items = useMemo(() => upcomingItems(queue, currentTrackId), [queue, currentTrackId]);
-  const pal = ACCENT[(accent || "emerald").toLowerCase()] ?? ACCENT.emerald;
-  const skipped = currentTrackId != null && queue.some((q) => q.track === currentTrackId) ? 1 : 0;
-  const remaining = Math.max(0, queue.length - skipped - items.length);
+
+  const upcomingCount = useMemo(() => {
+    if (currentTrackId == null) return queue.length;
+    const idx = queue.findIndex((q) => q.track === currentTrackId);
+    return idx >= 0 ? Math.max(0, queue.length - idx - 1) : queue.length;
+  }, [queue, currentTrackId]);
+
+  const [next, ...rest] = items;
+  const moreCount = Math.max(0, upcomingCount - items.length);
 
   return (
-    <aside className={cn("sticky top-4", className)} aria-label="Up next">
-      <div
-        className={cn(
-          "overflow-hidden rounded-2xl border bg-gradient-to-b from-card/95 via-background/98 to-background/90 backdrop-blur-md",
-          pal.ring,
-          pal.glow,
-        )}
-      >
-        <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3">
-          <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg border bg-card/60", pal.ring)}>
-            <ListMusic className={cn("size-4", pal.label)} aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tracking-tight text-foreground">Up next</p>
-            <p className="text-[11px] text-muted-foreground">
-              {queue.length === 0 ? "Queue empty" : `${items.length} track${items.length === 1 ? "" : "s"} queued`}
+    <aside className={cn("sticky top-4 w-full max-w-[15.5rem]", className)} aria-label="Up next">
+      <div className="surface-card overflow-hidden">
+        <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <ListMusic className="size-4 shrink-0 text-brand" aria-hidden />
+            <span className="text-sm font-semibold text-foreground">Coming up</span>
+          </div>
+          {upcomingCount > 0 ? (
+            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              {upcomingCount}
+            </span>
+          ) : null}
+        </div>
+
+        {items.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-sm text-muted-foreground">Nothing queued</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">
+              {canManage ? "Add tracks from Playlist or Queue." : "Tracks show here when queued."}
             </p>
           </div>
-        </div>
+        ) : (
+          <>
+            {next ? (
+              <div className="border-b border-border/60 px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">Next</p>
+                <p className="mt-1 line-clamp-2 text-sm font-medium leading-snug text-foreground">{next.title}</p>
+                {next.artist ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{next.artist}</p> : null}
+                {next.upvotes > 0 ? (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    {next.upvotes} upvote{next.upvotes === 1 ? "" : "s"}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
-        <div className="px-3 py-3">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/80 bg-card/50 px-4 py-8 text-center">
-              <Music2 className="size-8 text-muted-foreground" aria-hidden />
-              <p className="text-sm font-medium text-muted-foreground">Nothing queued yet</p>
-              <p className="max-w-[200px] text-xs leading-relaxed text-muted-foreground">
-                {canManage ? "Add tracks from Playlist or open the full queue." : "Tracks will appear here when the DJ queues them."}
-              </p>
-            </div>
-          ) : (
-            <ol className="space-y-1">
-              {items.map((item, i) => (
-                <li
-                  key={item.id}
-                  className={cn(
-                    "group flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors",
-                    i === 0 ? "bg-muted/35 ring-1 ring-inset ring-border/40" : "hover:bg-muted/25",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold tabular-nums",
-                      i === 0 ? pal.badge : "bg-muted/80 text-muted-foreground",
-                    )}
-                  >
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium leading-tight text-foreground">{item.title}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {item.artist || item.addedBy || "Unknown artist"}
-                      {item.upvotes > 0 ? ` · ${item.upvotes} vote${item.upvotes === 1 ? "" : "s"}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+            {rest.length > 0 ? (
+              <ul className="divide-y divide-border/50 px-1 py-1">
+                {rest.map((item, i) => (
+                  <li key={item.id} className="flex items-start gap-2 px-2 py-2">
+                    <span className="mt-0.5 w-4 shrink-0 text-right text-[10px] font-medium tabular-nums text-muted-foreground">
+                      {i + 2}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-foreground/90">{item.title}</p>
+                      {item.artist ? (
+                        <p className="truncate text-[10px] text-muted-foreground">{item.artist}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        )}
 
-        {(canManage || remaining > 0) && (
-          <div className="flex items-center justify-between gap-2 border-t border-border/70 px-4 py-2.5">
-            {remaining > 0 ? <p className="text-[11px] text-muted-foreground">+{remaining} more in queue</p> : <span />}
-            {canManage && onManageQueue ? (
-              <Button type="button" variant="ghost" size="sm" className={cn("h-7 px-2 text-xs", pal.label)} onClick={onManageQueue}>
-                Manage queue
+        {(canManage && onOpenQueue) || moreCount > 0 ? (
+          <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
+            {moreCount > 0 ? <span className="text-[10px] text-muted-foreground">+{moreCount} more</span> : <span />}
+            {canManage && onOpenQueue ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-0.5 px-2 text-xs text-brand hover:text-brand"
+                onClick={onOpenQueue}
+              >
+                Queue
+                <ChevronRight className="size-3.5" aria-hidden />
               </Button>
             ) : null}
           </div>
-        )}
+        ) : null}
       </div>
     </aside>
   );

@@ -124,3 +124,46 @@ def apply_track_to_session(playback_session: PlaybackSession, track: Track | Non
     playback_session.started_at_server_time = time.time()
     playback_session.paused_at_position = 0
     playback_session.queue_version += 1
+
+
+def insert_track_after_now_playing(
+    channel: Channel,
+    track: Track,
+    *,
+    added_by_id: int | None,
+) -> list[ChannelQueueItem]:
+    """
+    Insert an approved suggestion once, directly after the now-playing row.
+    Removes duplicate copies of the same track from the upcoming tail.
+    """
+    from apps.playback.services.queue_advance import find_current_queue_index
+
+    playback_session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+    rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
+    current_idx = find_current_queue_index(rows, playback_session.track_id)
+    track_id = track.id
+
+    if current_idx + 1 < len(rows) and rows[current_idx + 1].track_id == track_id:
+        return rows
+
+    head = rows[: current_idx + 1]
+    tail = [row for row in rows[current_idx + 1 :] if row.track_id != track_id]
+
+    new_row = ChannelQueueItem(channel=channel, track=track, position=0, added_by_id=added_by_id)
+    rebuilt = head + [new_row] + tail
+
+    ChannelQueueItem.objects.filter(channel=channel).delete()
+    if not rebuilt:
+        return []
+    bulk_rows = [
+        ChannelQueueItem(
+            channel=channel,
+            track=row.track,
+            position=index,
+            added_by_id=row.added_by_id,
+        )
+        for index, row in enumerate(rebuilt)
+    ]
+    for i in range(0, len(bulk_rows), _BULK_CHUNK):
+        ChannelQueueItem.objects.bulk_create(bulk_rows[i : i + _BULK_CHUNK])
+    return list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))

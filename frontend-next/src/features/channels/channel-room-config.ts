@@ -1,13 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
-  Headphones,
   HeartPulse,
   Lightbulb,
+  ListMusic,
   MessageSquare,
   Radio,
   Settings2,
-  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -17,7 +15,6 @@ export const CHANNEL_TAB_IDS = [
   "queue",
   "insights",
   "listeners",
-  "dj-booth",
   "admin",
   "health",
 ] as const;
@@ -32,7 +29,6 @@ export const CHANNEL_TAB_TO_GROUP: Record<ChannelTabId, ChannelTabGroup> = {
   queue: "listen",
   insights: "social",
   listeners: "social",
-  "dj-booth": "dj",
   admin: "dj",
   health: "dj",
 };
@@ -50,17 +46,14 @@ export type ChannelNavItem = {
   icon: LucideIcon;
   group: ChannelTabGroup;
   manageOnly?: boolean;
-  /** Hidden on lg+ (shown in sidebar instead) */
-  hideOnDesktop?: boolean;
 };
 
 export const CHANNEL_NAV_ITEMS: ChannelNavItem[] = [
   { id: "chat", label: "Chat", shortLabel: "Chat", icon: MessageSquare, group: "social" },
   { id: "player", label: "Playlist", shortLabel: "Music", icon: Radio, group: "listen" },
-  { id: "queue", label: "Queue", shortLabel: "Queue", icon: Sparkles, group: "listen", hideOnDesktop: true },
+  { id: "queue", label: "Queue", shortLabel: "Queue", icon: ListMusic, group: "listen" },
   { id: "insights", label: "Insights", shortLabel: "Tips", icon: Lightbulb, group: "social" },
   { id: "listeners", label: "Members", shortLabel: "People", icon: Users, group: "social", manageOnly: true },
-  { id: "dj-booth", label: "DJ Booth", shortLabel: "Booth", icon: Headphones, group: "dj", manageOnly: true },
   { id: "admin", label: "Control", shortLabel: "Control", icon: Settings2, group: "dj", manageOnly: true },
   { id: "health", label: "Health", shortLabel: "Sync", icon: HeartPulse, group: "dj" },
 ];
@@ -80,7 +73,7 @@ export function channelGroupForTab(tab: ChannelTabId): ChannelTabGroup {
 
 export function channelTabFromSearch(value: string | null): ChannelTabId | null {
   const raw = value ?? "";
-  if (raw === "playlist") return "player";
+  if (raw === "playlist" || raw === "dj-booth") return "queue";
   return CHANNEL_TAB_IDS.includes(raw as ChannelTabId) ? (raw as ChannelTabId) : null;
 }
 

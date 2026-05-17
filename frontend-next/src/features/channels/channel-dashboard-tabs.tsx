@@ -54,7 +54,7 @@ import {
   type ChannelTabId,
 } from "@/features/channels/channel-room-config";
 import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
-import { DjBoothPanel } from "@/features/channels/dj-booth-panel";
+import { ChannelTrackSuggestions } from "@/features/channels/channel-track-suggestions";
 import { ChannelMobileBar } from "@/components/room/channel-mobile-bar";
 import { ChannelRoomHeader } from "@/components/room/channel-room-header";
 import { RoomOnboarding } from "@/components/room/room-onboarding";
@@ -271,6 +271,15 @@ export function ChannelDashboardTabs(props: Props) {
         window.dispatchEvent(
           new CustomEvent("channel-social", {
             detail: { channelId: String(channelId), payload: data },
+          }),
+        );
+        return;
+      }
+      if (type === "queue_updated" && Array.isArray(data.queue)) {
+        setWsQueue(data.queue as QueueItemSummary[]);
+        window.dispatchEvent(
+          new CustomEvent("channel-playback-updated", {
+            detail: { channelId: String(channelId), payload: { action: "queue_updated", queue: data.queue } },
           }),
         );
         return;
@@ -698,7 +707,12 @@ export function ChannelDashboardTabs(props: Props) {
         roomActiveTab="chat"
       />
     );
-    const listenerQueuePanel = <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
+    const listenerQueuePanel = (
+      <div className="space-y-4">
+        <ChannelTrackSuggestions channelId={channelId} canManage={false} />
+        <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />
+      </div>
+    );
 
     return (
       <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
@@ -710,6 +724,7 @@ export function ChannelDashboardTabs(props: Props) {
             socketState={socketState}
             canControl={false}
             experience={experience}
+            currentTrackId={currentTrackId}
           />
           <ChannelRoomHeader
             channelName={channelName}
@@ -732,13 +747,9 @@ export function ChannelDashboardTabs(props: Props) {
             joinRequiresApproval={initialJoinRequiresApproval}
             experience={experience}
           />
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,15.5rem)]">
             <div className="min-w-0">{listenerChatPanel}</div>
-            <ChannelUpNextSidebar
-              className="hidden lg:block"
-              currentTrackId={currentTrackId}
-              accent={experience.accent}
-            />
+            <ChannelUpNextSidebar className="hidden lg:block" currentTrackId={currentTrackId} />
           </div>
           <ChannelMobileBar
             chatUnread={chatTabUnread}
@@ -783,10 +794,15 @@ export function ChannelDashboardTabs(props: Props) {
     switch (activeTab) {
       case "chat": return chatPanel;
       case "player": return (<div className="space-y-6"><ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel && channelIsActive} sendSocketMessage={sendMessage} /><Card><CardHeader className="border-b border-border/60 pb-4"><CardTitle className="flex items-center gap-2 text-lg"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10"><Activity className="h-5 w-5 text-brand" aria-hidden /></span>Player</CardTitle></CardHeader><CardContent className="pt-6 text-sm text-muted-foreground"><p>Mini player is pinned at the bottom of the screen.</p></CardContent></Card></div>);
-      case "queue": return <div className="lg:hidden">{queuePanel}</div>;
+      case "queue":
+        return (
+          <div className="space-y-6">
+            <ChannelTrackSuggestions channelId={channelId} canManage={canManageChannel} />
+            {queuePanel}
+          </div>
+        );
       case "insights": return <ChannelRoomInsights channelId={channelId} canManage={canManageChannel} currentTrackId={currentTrackId} />;
       case "listeners": return canManageChannel ? <ChannelListenersPanel channelId={channelId} canManage={canManageChannel} isOwner={isChannelOwner} channelIsActive={channelIsActive} onPreviewListenerView={() => setListenerPreviewOpen(true)} /> : null;
-      case "dj-booth": return canManageChannel ? <DjBoothPanel channelId={channelId} canManage={canManageChannel && channelIsActive} sendSocketMessage={sendMessage} nowPlayingTitle={nowPlayingLabel} /> : null;
       case "admin": return canManageChannel ? <ChannelAdminPanel channelId={channelId} initialName={channelName} initialDescription={initialDescription} initialPrivacy={(channelPrivacy as "public" | "private" | "unlisted") ?? "public"} initialMemberLimit={initialMemberLimit ?? 50} publicSlug={publicSlug} publicJoinSlug={publicJoinSlug} initialJoinRequiresApproval={initialJoinRequiresApproval ?? false} sendSocketMessage={sendMessage} channelIsActive={channelIsActive} canDeleteChannel={isChannelOwner} initialExperience={initialExperience ?? null} /> : null;
       case "health": return (<Card><CardHeader className="border-b border-border/60 pb-4"><CardTitle className="flex items-center gap-2 text-lg"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10"><HeartPulse className="h-5 w-5 text-brand" aria-hidden /></span>Sync &amp; health</CardTitle></CardHeader><CardContent className="grid gap-3 pt-6 sm:grid-cols-2">{[{ label: "Session started", value: startedAtText }, { label: "Paused position", value: pausedAtText }, { label: "RTT", value: rttMs != null ? `${rttMs}ms` : "—" }, { label: "Jitter", value: jitterMs != null ? `${jitterMs}ms` : "—" }, { label: "Reconnects", value: String(reconnectCount) }, { label: "Clock offset", value: clockOffsetMs != null ? `${clockOffsetMs}ms` : "—" }].map((row) => (<div key={row.label} className="rounded-lg border border-border/80 bg-muted/15 p-4"><p className="text-xs font-medium text-muted-foreground">{row.label}</p><p className="mt-1 font-mono text-sm">{row.value}</p></div>))}{apiMetrics ? (<div className="rounded-lg border border-border/80 bg-muted/15 p-4 sm:col-span-2"><p className="text-xs font-medium text-muted-foreground">Server</p><ul className="mt-2 grid gap-1 font-mono text-sm sm:grid-cols-2"><li>Active channels: {apiMetrics.channels_active}</li><li>Playing: {apiMetrics.channels_playing}</li><li>Tracks: {apiMetrics.tracks_total}</li><li>Users: {apiMetrics.users_active}</li></ul></div>) : null}</CardContent></Card>);
       default: return null;
@@ -803,6 +819,7 @@ export function ChannelDashboardTabs(props: Props) {
         socketState={socketState}
         canControl={Boolean(canManageChannel && channelIsActive)}
         experience={experience}
+        currentTrackId={currentTrackId}
       />
       <ChannelRoomShell
         activeTab={activeTab}
@@ -812,16 +829,17 @@ export function ChannelDashboardTabs(props: Props) {
         onGroupChange={(group) => selectTabGroup(group)}
         header={roomHeader}
         sidebar={
-          <ChannelUpNextSidebar
-            className="hidden lg:block"
-            currentTrackId={currentTrackId}
-            accent={experience.accent}
-            canManage={canManageChannel && channelIsActive}
-            onManageQueue={() => {
-              selectTabGroup("listen");
-              selectTab("queue");
-            }}
-          />
+          activeTab !== "queue" ? (
+            <ChannelUpNextSidebar
+              className="hidden lg:block"
+              currentTrackId={currentTrackId}
+              canManage={canManageChannel && channelIsActive}
+              onOpenQueue={() => {
+                selectTabGroup("listen");
+                selectTab("queue");
+              }}
+            />
+          ) : null
         }
         mobileBar={
           <ChannelMobileBar

@@ -49,11 +49,19 @@ type Props = {
   /** Owner / moderator — can always hear in rehearsal mode */
   canControl: boolean;
   experience: ChannelExperience;
+  currentTrackId?: number | null;
 };
 
 const REACTIONS = ["🔥", "❤️", "😂", "👏", "🎧", "✨"];
 
-export function RoomExperienceChrome({ channelId, sendMessage, socketState, canControl, experience }: Props) {
+export function RoomExperienceChrome({
+  channelId,
+  sendMessage,
+  socketState,
+  canControl,
+  experience,
+  currentTrackId = null,
+}: Props) {
   const { showToast } = useToast();
   const { onlineMembers: members, onlineCount: count } = useChannelPresence(channelId);
   const [lastShout, setLastShout] = useState<{ user: string; text: string } | null>(null);
@@ -63,6 +71,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
   const [skipVotes, setSkipVotes] = useState(0);
   const [skipThreshold, setSkipThreshold] = useState(0);
   const floaterId = useRef(0);
+  const lastTrackIdRef = useRef<number | null>(null);
   const liftActive =
     experience.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now();
   const rehearsalMuted = Boolean(experience.rehearsal_mode && !canControl && !liftActive);
@@ -99,21 +108,46 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       }
       if (action === "vote_skip") {
         const v = typeof p.votes === "number" ? p.votes : 0;
-        const thr = typeof p.threshold === "number" ? p.threshold : 0;
-        setSkipVotes(v);
+        const thr = typeof p.threshold === "number" ? p.threshold : experience.veto_skip_threshold ?? 0;
+        setSkipVotes(Math.max(0, v));
         setSkipThreshold(thr);
         if (thr > 0 && v >= thr) {
           showToast("Skip threshold reached — advancing track.", "success");
         }
       }
     },
-    [channelId, showToast],
+    [channelId, experience.veto_skip_threshold, showToast],
   );
 
   useEffect(() => {
     window.addEventListener("channel-social", onSocial as EventListener);
     return () => window.removeEventListener("channel-social", onSocial as EventListener);
   }, [onSocial]);
+
+  useEffect(() => {
+    const tid = currentTrackId ?? null;
+    if (lastTrackIdRef.current !== null && lastTrackIdRef.current !== tid) {
+      setSkipVotes(0);
+      setSkipThreshold(experience.veto_skip_threshold ?? 0);
+    }
+    lastTrackIdRef.current = tid;
+  }, [currentTrackId, experience.veto_skip_threshold]);
+
+  useEffect(() => {
+    const onPlayback = (ev: Event) => {
+      const e = ev as CustomEvent<{ channelId?: string; payload?: { track?: { id?: number } | null } }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      const tid = e.detail?.payload?.track?.id ?? null;
+      if (tid == null) return;
+      if (lastTrackIdRef.current !== null && lastTrackIdRef.current !== tid) {
+        setSkipVotes(0);
+        setSkipThreshold(experience.veto_skip_threshold ?? 0);
+      }
+      lastTrackIdRef.current = tid;
+    };
+    window.addEventListener("channel-playback-updated", onPlayback);
+    return () => window.removeEventListener("channel-playback-updated", onPlayback);
+  }, [channelId, experience.veto_skip_threshold]);
 
   useEffect(() => {
     const onHelp = () => setHelpOpen(true);
@@ -173,7 +207,7 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
             <span className="pl-2 text-xs text-muted-foreground">{count} online</span>
           )}
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="relative flex flex-wrap gap-1">
           {REACTIONS.map((r) => (
             <Button
               key={r}
@@ -182,10 +216,22 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
               variant="secondary"
               className="h-8 min-w-8 px-0 text-base transition-transform active:scale-90"
               onClick={() => sendReaction(r)}
+              aria-label={`React ${r}`}
             >
               {r}
             </Button>
           ))}
+          <div className="pointer-events-none absolute inset-x-0 bottom-full h-24 overflow-visible">
+            {floaters.map((f) => (
+              <span
+                key={f.id}
+                className="pointer-events-none absolute bottom-0 text-2xl opacity-90 animate-room-reaction-float"
+                style={{ left: `${f.x}%` }}
+              >
+                {f.emoji}
+              </span>
+            ))}
+          </div>
         </div>
         <Button
           type="button"
@@ -269,17 +315,6 @@ export function RoomExperienceChrome({ channelId, sendMessage, socketState, canC
       {experience.listening_party_only && !canControl ? (
         <p className="mt-1 text-xs text-muted-foreground">Listening party — only DJs control playback; you can vote and suggest tracks.</p>
       ) : null}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-        {floaters.map((f) => (
-          <span
-            key={f.id}
-            className="pointer-events-none absolute bottom-0 text-3xl opacity-90 animate-[floater_3.2s_ease-out_forwards]"
-            style={{ left: `${f.x}%` }}
-          >
-            {f.emoji}
-          </span>
-        ))}
-      </div>
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent className="border-border bg-background sm:max-w-md">
           <DialogHeader>

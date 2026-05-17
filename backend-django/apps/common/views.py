@@ -192,6 +192,26 @@ def _serialize_queue(channel_id: int, user_id: int | None = None):
     return QueueItemSerializer(queue, many=True, context=ctx).data
 
 
+def _broadcast_queue_updated(channel_id: int, user_id: int | None = None) -> list:
+    serialized = _serialize_queue(channel_id, user_id)
+    playback_state_store.save_queue_snapshot(channel_id, list(serialized))
+    channel_layer = get_channel_layer()
+    if channel_layer is not None:
+        async_to_sync(channel_layer.group_send)(
+            f"channel_{channel_id}",
+            {
+                "type": "broadcast_event",
+                "payload": {
+                    "type": "QUEUE_UPDATED",
+                    "action": "queue_updated",
+                    "channel_id": channel_id,
+                    "queue": serialized,
+                },
+            },
+        )
+    return serialized
+
+
 def _log_channel_audit(channel_id: int, action: str, actor_id: int | None, *, target_type: str = "", target_id: str = "", metadata=None) -> None:
     ChannelAuditLog.objects.create(
         channel_id=channel_id,
@@ -1719,18 +1739,14 @@ class ChannelPlaylistSuggestionView(APIView):
         row.reviewed_at = timezone.now()
         row.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         if action == "approve":
-            # Insert at end of queue as collaborative approved suggestion.
+            from apps.playback.services.channel_queue import insert_track_after_now_playing
+
             channel = get_object_or_404(Channel, id=channel_id)
-            tail = ChannelQueueItem.objects.filter(channel=channel).aggregate(mx=Max("position")).get("mx")
-            ChannelQueueItem.objects.create(
-                channel=channel,
-                track=row.track,
-                position=(tail + 1) if isinstance(tail, int) else 0,
-                added_by=request.user,
-            )
+            insert_track_after_now_playing(channel, row.track, added_by_id=request.user.id)
             session, _ = PlaybackSession.objects.get_or_create(channel=channel)
             session.queue_version += 1
             session.save(update_fields=["queue_version", "updated_at"])
+            _broadcast_queue_updated(channel_id, request.user.id)
         _log_channel_audit(channel_id, f"suggestion.{action}", request.user.id, target_type="suggestion", target_id=row.id)
         return Response(ChannelPlaylistSuggestionSerializer(row).data)
 
