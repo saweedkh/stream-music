@@ -207,6 +207,10 @@ export type TrackSharePermission = {
 
 export type ChannelControlAction = "play" | "pause" | "seek" | "next" | "prev";
 
+function rejectIfChannelClosed(res: Response): void {
+  if (res.status === 410) throw new ChannelClosedError();
+}
+
 async function extractApiError(res: Response, fallback: string): Promise<string> {
   try {
     const body = (await res.json()) as { detail?: string } | Record<string, unknown>;
@@ -1096,6 +1100,7 @@ export async function updateTrack(
 
 export async function listChannelQueue(channelId: string) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/queue`, { credentials: "include", cache: "no-store" });
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load channel queue"));
   return (await res.json()) as { results: QueueItemSummary[] };
 }
@@ -1105,16 +1110,19 @@ export async function reorderChannelQueueItem(channelId: string, itemId: number,
     `${getApiBase()}/api/channels/${channelId}/queue/${itemId}`,
     await withAuthHeaders({ method: "PATCH", body: JSON.stringify({ position }) }),
   );
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot reorder queue item"));
 }
 
 export async function removeChannelQueueItem(channelId: string, itemId: number) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/queue/${itemId}`, await withAuthHeaders({ method: "DELETE" }));
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove queue item"));
 }
 
 export async function jumpToChannelQueueItem(channelId: string, itemId: number) {
   const res = await fetch(`${getApiBase()}/api/channels/${channelId}/queue/${itemId}/jump`, await withAuthHeaders({ method: "POST", body: JSON.stringify({}) }));
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot jump queue item"));
 }
 
@@ -1123,6 +1131,7 @@ export async function upvoteChannelQueueItem(channelId: string, itemId: number) 
     `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/queue/${itemId}/upvote`,
     await withAuthHeaders({ method: "POST", body: "{}" }),
   );
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot upvote"));
 }
 
@@ -1131,6 +1140,7 @@ export async function removeQueueUpvote(channelId: string, itemId: number) {
     `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/queue/${itemId}/upvote`,
     await withAuthHeaders({ method: "DELETE" }),
   );
+  rejectIfChannelClosed(res);
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove upvote"));
 }
 

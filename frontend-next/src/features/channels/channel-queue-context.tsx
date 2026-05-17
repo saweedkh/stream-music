@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { listChannelQueue, type QueueItemSummary } from "@/lib/api";
+import { ChannelClosedError, listChannelQueue, type QueueItemSummary } from "@/lib/api";
 
 type ChannelQueueContextValue = {
   queue: QueueItemSummary[];
@@ -15,25 +15,44 @@ export function ChannelQueueProvider({
   channelId,
   children,
   wsQueue,
+  enabled = true,
 }: {
   channelId: string;
   children: ReactNode;
   wsQueue?: QueueItemSummary[] | null;
+  /** When false (closed channel), skip REST queue fetch. */
+  enabled?: boolean;
 }) {
   const [queue, setQueue] = useState<QueueItemSummary[]>([]);
 
   const refreshQueue = useCallback(async () => {
-    const data = await listChannelQueue(channelId);
-    setQueue(data.results);
-  }, [channelId]);
+    if (!enabled) {
+      setQueue([]);
+      return;
+    }
+    try {
+      const data = await listChannelQueue(channelId);
+      setQueue(data.results);
+    } catch (error) {
+      if (error instanceof ChannelClosedError) {
+        setQueue([]);
+        return;
+      }
+      throw error;
+    }
+  }, [channelId, enabled]);
 
   const setQueueFromWs = useCallback((items: QueueItemSummary[] | undefined) => {
     if (items && Array.isArray(items)) setQueue(items);
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setQueue([]);
+      return;
+    }
     void refreshQueue();
-  }, [refreshQueue]);
+  }, [refreshQueue, enabled]);
 
   useEffect(() => {
     if (wsQueue && wsQueue.length >= 0) setQueue(wsQueue);

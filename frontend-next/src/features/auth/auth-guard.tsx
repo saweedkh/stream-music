@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { getMe } from "@/lib/api";
 
 export function AuthGuard({ children }: { children: ReactNode }) {
+  const { t } = useTranslations();
   const [state, setState] = useState<"loading" | "ok" | "unauthorized">("loading");
 
   useEffect(() => {
@@ -18,16 +20,16 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (state === "loading") {
     return (
       <div className="surface-card rounded-2xl p-4 text-sm text-muted-foreground">
-        Checking session...
+        {t("guard.checkingSession")}
       </div>
     );
   }
   if (state === "unauthorized") {
     return (
       <Alert tone="error" className="space-y-3 rounded-2xl border-rose-800/70 bg-rose-950/30 p-4">
-        <p>You are not logged in. Please login to manage channels and playback.</p>
+        <p>{t("guard.notLoggedIn")}</p>
         <Link href="/login">
-          <Button>Go to login</Button>
+          <Button>{t("guard.goToLogin")}</Button>
         </Link>
       </Alert>
     );

@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  Activity,
-  Headphones,
-  HeartPulse,
-  Lightbulb,
-  MessageSquare,
-  Radio,
-  Settings2,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -23,44 +13,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
 import { ChannelChatPanel } from "@/features/channels/channel-chat-panel";
-import {
-  ChannelListenerMeta,
-  ChannelListenerView,
-  ChannelRoomLoading,
-} from "@/features/channels/channel-listener-view";
+import { ChannelListenerMeta, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
+import { ChannelListenerPanelShell } from "@/features/channels/channel-listener-panel-shell";
+import { ChannelListenerShell } from "@/features/channels/channel-listener-shell";
+import { RoomReactionProvider } from "@/features/channels/room-reaction-context";
 import { ChannelListenersPanel } from "@/features/channels/channel-listeners-panel";
-import { ChannelPlaylistPanel } from "@/features/channels/channel-playlist-panel";
+import { ChannelAdminQueuePanel } from "@/features/channels/channel-admin-queue-panel";
+import { ChannelAdminSuggestionsPanel } from "@/features/channels/channel-admin-suggestions-panel";
 import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
-import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
-import { ChannelUpNextSidebar } from "@/features/channels/channel-up-next-sidebar";
-import { ChannelRoomShell } from "@/features/channels/channel-room-shell";
-import {
-  CHANNEL_GROUP_LABELS,
-  channelGroupForTab,
-  channelTabFromSearch,
-  channelTabsInGroup,
-  type ChannelTabGroup,
-  type ChannelTabId,
-} from "@/features/channels/channel-room-config";
-import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
 import { ChannelTrackSuggestions } from "@/features/channels/channel-track-suggestions";
-import { ChannelMobileBar } from "@/components/room/channel-mobile-bar";
-import { ChannelRoomHeader } from "@/components/room/channel-room-header";
+import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
+import { ChannelAdminHealthPanel } from "@/features/channels/channel-admin-health-panel";
+import { ChannelAdminPageHeader } from "@/features/channels/channel-admin-page-header";
+import { ChannelAdminPanelShell } from "@/features/channels/channel-admin-panel-shell";
+import { ChannelAdminPlayerPanel } from "@/features/channels/channel-admin-player-panel";
+import { ChannelAdminShell } from "@/features/channels/channel-admin-shell";
+import { channelTabFromSearch, isAdminFlushTab, type ChannelTabId, type ListenerTabId } from "@/features/channels/channel-room-config";
+import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
 import { RoomOnboarding } from "@/components/room/room-onboarding";
 import { useRoomHotkeys } from "@/hooks/use-room-hotkeys";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
-import { RoomExperienceChrome, type ChannelExperience } from "@/features/experience/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { useChannelPresence } from "@/hooks/use-channel-presence";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import {
@@ -77,15 +54,6 @@ import { channelChatHref, channelPlayerHref, useNotificationStore } from "@/lib/
 import { cn } from "@/lib/utils";
 
 type TabId = ChannelTabId;
-type TabGroup = ChannelTabGroup;
-
-function tabsInGroup(group: TabGroup, canManage: boolean): TabId[] {
-  return channelTabsInGroup(group, canManage);
-}
-
-function groupForTab(tab: TabId): TabGroup {
-  return channelGroupForTab(tab);
-}
 
 function tabFromSearchValue(value: string | null): TabId | null {
   return channelTabFromSearch(value);
@@ -144,13 +112,13 @@ export function ChannelDashboardTabs(props: Props) {
     brandLogoUrl,
   } = props;
   const [experience, setExperience] = useState<ChannelExperience>((initialExperience as ChannelExperience) ?? {});
+  const { t } = useTranslations();
   const { showToast } = useToast();
   const router = useRouter();
   const { upsertState: upsertGlobalPlayerState } = useGlobalChannelPlayer();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(() => tabFromSearchValue(searchParams.get("tab")) ?? "chat");
-  const [tabGroup, setTabGroup] = useState<TabGroup>(() => groupForTab(tabFromSearchValue(searchParams.get("tab")) ?? "chat"));
   const [isChannelOnline, setIsChannelOnline] = useState(isPlaying);
   const [canManageChannel, setCanManageChannel] = useState(false);
   const [membershipLoaded, setMembershipLoaded] = useState(false);
@@ -176,7 +144,8 @@ export function ChannelDashboardTabs(props: Props) {
   const [apiMetrics, setApiMetrics] = useState<Awaited<ReturnType<typeof getApiMetrics>> | null>(null);
   const [wsQueue, setWsQueue] = useState<QueueItemSummary[] | null>(null);
   const [chatTabUnread, setChatTabUnread] = useState(0);
-  const [listenerPreviewOpen, setListenerPreviewOpen] = useState(false);
+  const [viewAsListener, setViewAsListener] = useState(false);
+  const [listenerTab, setListenerTab] = useState<ListenerTabId>("chat");
   const { onlineCount } = useChannelPresence(channelId);
   const pushNotification = useNotificationStore((s) => s.push);
   const rttSamplesRef = useRef<number[]>([]);
@@ -187,17 +156,8 @@ export function ChannelDashboardTabs(props: Props) {
   const startedAtText = startedAt == null ? "No active playback session yet" : `${startedAt}`;
   const pausedAtText = pausedAt == null ? (isChannelOnline ? "Not paused" : "No paused position available") : `${pausedAt}s`;
 
-  function selectTabGroup(group: TabGroup) {
-    setTabGroup(group);
-    const options = tabsInGroup(group, canManageChannel);
-    if (!options.includes(activeTab)) {
-      setActiveTab(options[0] ?? "chat");
-    }
-  }
-
   function selectTab(tab: TabId) {
     setActiveTab(tab);
-    setTabGroup(groupForTab(tab));
   }
 
   function shareChannel() {
@@ -361,10 +321,11 @@ export function ChannelDashboardTabs(props: Props) {
     latestSendMessageRef.current = sendMessage;
   }, [sendMessage]);
 
+  const inListenerLayout = !canManageChannel || viewAsListener;
+
   useRoomHotkeys({
-    enabled: membershipLoaded,
+    enabled: membershipLoaded && !inListenerLayout,
     canControl: canManageChannel,
-    onHelp: () => window.dispatchEvent(new CustomEvent("channel-room-help")),
     onTogglePlay: () => sendMessage({ action: isChannelOnline ? "pause" : "play" }),
   });
 
@@ -587,7 +548,7 @@ export function ChannelDashboardTabs(props: Props) {
       startedAt,
       pausedAt,
       initialIsPlaying: isPlaying,
-      canControl: canManageChannel && channelIsActive,
+      canControl: canManageChannel && channelIsActive && !viewAsListener,
       sendSocketMessage: stableSendSocketMessage,
       experience,
     });
@@ -603,6 +564,7 @@ export function ChannelDashboardTabs(props: Props) {
     startedAt,
     trackPath,
     upsertGlobalPlayerState,
+    viewAsListener,
   ]);
 
   useEffect(() => {
@@ -694,74 +656,78 @@ export function ChannelDashboardTabs(props: Props) {
     );
   }
 
-  if (!canManageChannel) {
-    const listenerChatPanel = (
-      <ChannelChatPanel
-        channelId={channelId}
-        channelIsActive={channelIsActive}
-        connectEnabled={membershipLoaded && currentUserId !== null}
-        variant="listener"
-        canModerate={false}
-        nowPlayingLabel={nowPlayingLabel}
-        channelName={channelName}
-        roomActiveTab="chat"
-      />
-    );
-    const listenerQueuePanel = (
-      <div className="space-y-4">
-        <ChannelTrackSuggestions channelId={channelId} canManage={false} />
-        <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />
-      </div>
-    );
-
-    return (
-      <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
-        <RoomOnboarding channelId={channelId} />
-        <div className="mx-auto w-full max-w-6xl space-y-6 px-3 pb-28 sm:px-6">
-          <RoomExperienceChrome
-            channelId={channelId}
-            sendMessage={sendMessage}
-            socketState={socketState}
-            canControl={false}
-            experience={experience}
-            currentTrackId={currentTrackId}
-          />
-          <ChannelRoomHeader
-            channelName={channelName}
-            channelPrivacy={channelPrivacy}
-            brandLogoUrl={brandLogoUrl}
-            isLive={isChannelOnline}
-            isPlaying={isChannelOnline}
-            socketState={socketState}
-            channelIsActive={channelIsActive}
-            nowPlayingLabel={nowPlayingLabel}
-            accent={experience.accent}
-            showLeave={!isChannelOwner && currentUserId !== null}
-            onLeave={() => setLeaveDialogOpen(true)}
-            onShare={shareChannel}
-            onlineCount={onlineCount}
-          />
+  if (!canManageChannel || viewAsListener) {
+    const listenerTabContent: Record<ListenerTabId, ReactNode> = {
+      chat: (
+        <ChannelChatPanel
+          channelId={channelId}
+          channelIsActive={channelIsActive}
+          connectEnabled={membershipLoaded && currentUserId !== null}
+          variant="listener"
+          canModerate={false}
+          nowPlayingLabel={nowPlayingLabel}
+          channelName={channelName}
+          roomActiveTab="chat"
+          fullHeight
+        />
+      ),
+      suggestions: (
+        <ChannelListenerPanelShell tab="suggestions">
+          <ChannelTrackSuggestions channelId={channelId} canManage={false} variant="listener" />
+        </ChannelListenerPanelShell>
+      ),
+      queue: (
+        <ChannelListenerPanelShell
+          tab="queue"
+          badge={
+            (wsQueue?.length ?? 0) > 0 ? (
+              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand">
+                {wsQueue?.length}
+              </span>
+            ) : null
+          }
+        >
+          <ChannelQueuePanel channelId={channelId} variant="listener" />
+        </ChannelListenerPanelShell>
+      ),
+      info: (
+        <ChannelListenerPanelShell tab="info">
           <ChannelListenerMeta
             description={initialDescription}
             memberLimit={initialMemberLimit}
             joinRequiresApproval={initialJoinRequiresApproval}
             experience={experience}
+            onlineCount={onlineCount}
           />
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,15.5rem)]">
-            <div className="min-w-0">{listenerChatPanel}</div>
-            <ChannelUpNextSidebar className="hidden lg:block" currentTrackId={currentTrackId} />
-          </div>
-          <ChannelMobileBar
-            chatUnread={chatTabUnread}
-            chatPanel={listenerChatPanel}
-            queuePanel={listenerQueuePanel}
-            onChatOpen={() => setChatTabUnread(0)}
-          />
-        </div>
+        </ChannelListenerPanelShell>
+      ),
+    };
+
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue} enabled={channelIsActive}>
+        <RoomOnboarding channelId={channelId} />
+        <ChannelListenerShell
+          channelId={channelId}
+          activeTab={listenerTab}
+          onSelectTab={setListenerTab}
+          onChatTabOpen={() => setChatTabUnread(0)}
+          onSendReaction={(emoji) => {
+            sendMessage({ action: "reaction", emoji });
+          }}
+          chatUnread={chatTabUnread}
+          onShare={shareChannel}
+          viewAsListener={viewAsListener}
+          onBackToAdmin={() => setViewAsListener(false)}
+        >
+          {listenerTabContent[listenerTab]}
+        </ChannelListenerShell>
         {leaveDialog}
       </ChannelQueueProvider>
+      </div>
     );
   }
+
 
   const chatPanel = (
     <ChannelChatPanel
@@ -773,129 +739,145 @@ export function ChannelDashboardTabs(props: Props) {
       nowPlayingLabel={nowPlayingLabel}
       channelName={channelName}
       roomActiveTab={activeTab}
+      fullHeight
     />
   );
 
-  const queuePanel = <ChannelQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
+  const queuePanel = <ChannelAdminQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
 
-  const roomHeader = (
-    <>
-      {!channelIsActive && isChannelOwner ? (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-amber-800 dark:text-amber-100/90">This channel is closed — playback and sync stay off until you reopen.</p>
-          <Button type="button" size="sm" className="shrink-0" onClick={() => { void (async () => { try { await reopenChannel(channelId); showToast("Channel reopened.", "success"); router.refresh(); } catch (e) { showToast(e instanceof Error ? e.message : "Could not reopen.", "error"); } })(); }}>Reopen channel</Button>
-        </div>
-      ) : null}
-      <ChannelRoomHeader channelName={channelName} channelPrivacy={channelPrivacy} brandLogoUrl={brandLogoUrl} isLive={isChannelOnline} isPlaying={isChannelOnline} socketState={socketState} channelIsActive={channelIsActive} nowPlayingLabel={nowPlayingLabel} accent={experience.accent} isOwner={isChannelOwner} showLeave={!isChannelOwner && currentUserId != null} onLeave={() => setLeaveDialogOpen(true)} onCloseChannel={isChannelOwner && channelIsActive ? () => setCloseChannelDialogOpen(true) : undefined} onShare={shareChannel} onlineCount={onlineCount} />
-    </>
-  );
+  const statusBanner =
+    !channelIsActive && isChannelOwner ? (
+      <div className="mb-3 flex shrink-0 flex-col gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-amber-800 dark:text-amber-100/90">{t("room.admin.closedBanner")}</p>
+        <Button
+          type="button"
+          size="sm"
+          className="shrink-0"
+          onClick={() => {
+            void (async () => {
+              try {
+                await reopenChannel(channelId);
+                showToast(t("channels.reopenSuccess"), "success");
+                router.refresh();
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : t("channels.reopenFailed"), "error");
+              }
+            })();
+          }}
+        >
+          {t("room.admin.reopenChannel")}
+        </Button>
+      </div>
+    ) : null;
 
-  function renderManagerTab() {
+  function renderManagerTabContent(): ReactNode {
     switch (activeTab) {
       case "chat": return chatPanel;
-      case "player": return (<div className="space-y-6"><ChannelPlaylistPanel channelId={channelId} canManage={canManageChannel && channelIsActive} sendSocketMessage={sendMessage} /><Card><CardHeader className="border-b border-border/60 pb-4"><CardTitle className="flex items-center gap-2 text-lg"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10"><Activity className="h-5 w-5 text-brand" aria-hidden /></span>Player</CardTitle></CardHeader><CardContent className="pt-6 text-sm text-muted-foreground"><p>Mini player is pinned at the bottom of the screen.</p></CardContent></Card></div>);
-      case "queue":
+      case "player":
         return (
-          <div className="space-y-6">
-            <ChannelTrackSuggestions channelId={channelId} canManage={canManageChannel} />
-            {queuePanel}
-          </div>
+          <ChannelAdminPlayerPanel
+            channelId={channelId}
+            canManage={canManageChannel}
+            channelIsActive={channelIsActive}
+            sendSocketMessage={sendMessage}
+          />
         );
+      case "queue":
+        return queuePanel;
+      case "suggestions":
+        return <ChannelAdminSuggestionsPanel channelId={channelId} canManage={canManageChannel} />;
       case "insights": return <ChannelRoomInsights channelId={channelId} canManage={canManageChannel} currentTrackId={currentTrackId} />;
-      case "listeners": return canManageChannel ? <ChannelListenersPanel channelId={channelId} canManage={canManageChannel} isOwner={isChannelOwner} channelIsActive={channelIsActive} onPreviewListenerView={() => setListenerPreviewOpen(true)} /> : null;
-      case "admin": return canManageChannel ? <ChannelAdminPanel channelId={channelId} initialName={channelName} initialDescription={initialDescription} initialPrivacy={(channelPrivacy as "public" | "private" | "unlisted") ?? "public"} initialMemberLimit={initialMemberLimit ?? 50} publicSlug={publicSlug} publicJoinSlug={publicJoinSlug} initialJoinRequiresApproval={initialJoinRequiresApproval ?? false} sendSocketMessage={sendMessage} channelIsActive={channelIsActive} canDeleteChannel={isChannelOwner} initialExperience={initialExperience ?? null} /> : null;
-      case "health": return (<Card><CardHeader className="border-b border-border/60 pb-4"><CardTitle className="flex items-center gap-2 text-lg"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10"><HeartPulse className="h-5 w-5 text-brand" aria-hidden /></span>Sync &amp; health</CardTitle></CardHeader><CardContent className="grid gap-3 pt-6 sm:grid-cols-2">{[{ label: "Session started", value: startedAtText }, { label: "Paused position", value: pausedAtText }, { label: "RTT", value: rttMs != null ? `${rttMs}ms` : "—" }, { label: "Jitter", value: jitterMs != null ? `${jitterMs}ms` : "—" }, { label: "Reconnects", value: String(reconnectCount) }, { label: "Clock offset", value: clockOffsetMs != null ? `${clockOffsetMs}ms` : "—" }].map((row) => (<div key={row.label} className="rounded-lg border border-border/80 bg-muted/15 p-4"><p className="text-xs font-medium text-muted-foreground">{row.label}</p><p className="mt-1 font-mono text-sm">{row.value}</p></div>))}{apiMetrics ? (<div className="rounded-lg border border-border/80 bg-muted/15 p-4 sm:col-span-2"><p className="text-xs font-medium text-muted-foreground">Server</p><ul className="mt-2 grid gap-1 font-mono text-sm sm:grid-cols-2"><li>Active channels: {apiMetrics.channels_active}</li><li>Playing: {apiMetrics.channels_playing}</li><li>Tracks: {apiMetrics.tracks_total}</li><li>Users: {apiMetrics.users_active}</li></ul></div>) : null}</CardContent></Card>);
+      case "listeners": return canManageChannel ? <ChannelListenersPanel channelId={channelId} canManage={canManageChannel} isOwner={isChannelOwner} channelIsActive={channelIsActive} onPreviewListenerView={() => setViewAsListener(true)} /> : null;
+      case "admin":
+        return canManageChannel ? (
+          <ChannelAdminPanel
+            channelId={channelId}
+            initialName={channelName}
+            initialDescription={initialDescription}
+            initialPrivacy={(channelPrivacy as "public" | "private" | "unlisted") ?? "public"}
+            initialMemberLimit={initialMemberLimit ?? 50}
+            publicSlug={publicSlug}
+            publicJoinSlug={publicJoinSlug}
+            initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
+            sendSocketMessage={sendMessage}
+            channelIsActive={channelIsActive}
+            canDeleteChannel={isChannelOwner}
+            initialExperience={initialExperience ?? null}
+            viewAsListener={viewAsListener}
+            onViewAsListenerChange={setViewAsListener}
+            embedded
+          />
+        ) : null;
+      case "health":
+        return (
+          <ChannelAdminHealthPanel
+            startedAtText={startedAtText}
+            pausedAtText={pausedAtText}
+            rttMs={rttMs}
+            jitterMs={jitterMs}
+            reconnectCount={reconnectCount}
+            clockOffsetMs={clockOffsetMs}
+            apiMetrics={apiMetrics}
+          />
+        );
       default: return null;
     }
   }
 
+  const queueBadge =
+    activeTab === "queue" && (wsQueue?.length ?? 0) > 0 ? (
+      <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand">
+        {wsQueue?.length}
+      </span>
+    ) : null;
+
   return (
-    <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue}>
-    <RoomOnboarding channelId={channelId} />
-    <div className="space-y-6 pb-28">
-      <RoomExperienceChrome
-        channelId={channelId}
-        sendMessage={sendMessage}
-        socketState={socketState}
-        canControl={Boolean(canManageChannel && channelIsActive)}
-        experience={experience}
-        currentTrackId={currentTrackId}
-      />
-      <ChannelRoomShell
-        activeTab={activeTab}
-        tabGroup={tabGroup}
-        canManage={canManageChannel}
-        onTabChange={(tab) => selectTab(tab)}
-        onGroupChange={(group) => selectTabGroup(group)}
-        header={roomHeader}
-        sidebar={
-          activeTab !== "queue" ? (
-            <ChannelUpNextSidebar
-              className="hidden lg:block"
-              currentTrackId={currentTrackId}
-              canManage={canManageChannel && channelIsActive}
-              onOpenQueue={() => {
-                selectTabGroup("listen");
-                selectTab("queue");
-              }}
-            />
-          ) : null
-        }
-        mobileBar={
-          <ChannelMobileBar
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue} enabled={channelIsActive}>
+      <RoomReactionProvider channelId={channelId}>
+        <RoomOnboarding channelId={channelId} />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <ChannelAdminShell
+            className="min-h-0 flex-1"
+            channelName={channelName}
+            isLive={isChannelOnline}
+            socketState={socketState}
+            channelIsActive={channelIsActive}
+            onlineCount={onlineCount}
+            activeTab={activeTab}
+            onSelectTab={selectTab}
+            onChatTabOpen={() => setChatTabUnread(0)}
+            onSendReaction={(emoji) => {
+              sendMessage({ action: "reaction", emoji });
+            }}
+            onShare={shareChannel}
+            onViewAsListener={() => setViewAsListener(true)}
+            showLeave={!isChannelOwner && currentUserId != null}
+            onLeave={() => setLeaveDialogOpen(true)}
+            onCloseChannel={isChannelOwner && channelIsActive ? () => setCloseChannelDialogOpen(true) : undefined}
             chatUnread={chatTabUnread}
-            chatPanel={chatPanel}
-            queuePanel={queuePanel}
-            onChatOpen={() => setChatTabUnread(0)}
-          />
-        }
-      >
-        {renderManagerTab()}
-      </ChannelRoomShell>
+            canManage={canManageChannel}
+            statusBanner={statusBanner}
+          >
+            <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+              {activeTab === "chat" ? (
+                <ChannelAdminPanelShell bare>{chatPanel}</ChannelAdminPanelShell>
+              ) : (
+                <>
+                  {!isAdminFlushTab(activeTab) ? <ChannelAdminPageHeader activeTab={activeTab} /> : null}
+                  <ChannelAdminPanelShell flush={isAdminFlushTab(activeTab)} badge={queueBadge} className="min-h-0 flex-1">
+                    {renderManagerTabContent()}
+                  </ChannelAdminPanelShell>
+                </>
+              )}
+            </div>
+          </ChannelAdminShell>
 
-      <Sheet open={listenerPreviewOpen} onOpenChange={setListenerPreviewOpen}>
-        <SheetContent side="right" className="w-full max-w-lg overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Listener view preview</SheetTitle>
-            <SheetDescription>This is what non-DJ members see in the room (read-only preview).</SheetDescription>
-          </SheetHeader>
-          <div className="mt-4 space-y-4">
-            <ChannelListenerView
-              channelId={channelId}
-              channelName={channelName}
-              channelPrivacy={channelPrivacy}
-              description={initialDescription}
-              memberLimit={initialMemberLimit}
-              joinRequiresApproval={initialJoinRequiresApproval}
-              isLive={isChannelOnline}
-              socketState={socketState}
-              nowPlayingLabel={nowPlayingLabel}
-              showLeave={false}
-              onLeaveClick={() => {}}
-              brandLogoUrl={brandLogoUrl ?? undefined}
-              channelIsActive={channelIsActive}
-              onlineCount={onlineCount}
-              onShare={shareChannel}
-              experience={experience}
-              compact
-            />
-            <ChannelChatPanel
-              channelId={channelId}
-              channelIsActive={channelIsActive}
-              connectEnabled={membershipLoaded && currentUserId !== null}
-              variant="listener"
-              canModerate={canManageChannel}
-              nowPlayingLabel={nowPlayingLabel}
-              channelName={channelName}
-              roomActiveTab="chat"
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {closeChannelDialog}
-      {leaveDialog}
-    </div>
+          {closeChannelDialog}
+          {leaveDialog}
+        </div>
+      </RoomReactionProvider>
     </ChannelQueueProvider>
+    </div>
   );
 }

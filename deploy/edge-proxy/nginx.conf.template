@@ -1,0 +1,86 @@
+# Rendered by deploy/edge-proxy/up.sh — do not edit nginx.generated.conf by hand.
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ""      close;
+}
+
+proxy_cache_path /var/cache/nginx/audio
+    levels=1:2
+    keys_zone=audio_cache:128m
+    max_size __CACHE_MAX_SIZE__
+    inactive __CACHE_INACTIVE__
+    use_temp_path=off;
+
+map $upstream_cache_status $cache_debug {
+    default $upstream_cache_status;
+    ""      "BYPASS";
+}
+
+server {
+    listen 80;
+    server_name _;
+    client_max_body_size 200M;
+
+    # Audio: cache on disk so LAN replays do not re-download from the internet.
+    location /audio/ {
+        proxy_pass __UPSTREAM_ORIGIN__;
+        proxy_http_version 1.1;
+        proxy_set_header Host __UPSTREAM_HOST__;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify __PROXY_SSL_VERIFY__;
+
+        proxy_cache audio_cache;
+        proxy_cache_key "$scheme$proxy_host$request_uri";
+        proxy_cache_valid 200 206 30d;
+        proxy_cache_lock on;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_methods GET HEAD;
+
+        add_header X-Cache-Status $cache_debug always;
+    }
+
+    location /api/ {
+        proxy_pass __UPSTREAM_ORIGIN__;
+        proxy_http_version 1.1;
+        proxy_set_header Host __UPSTREAM_HOST__;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify __PROXY_SSL_VERIFY__;
+    }
+
+    location /ws/ {
+        proxy_pass __UPSTREAM_ORIGIN__;
+        proxy_http_version 1.1;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_connect_timeout 60s;
+        proxy_buffering off;
+        proxy_set_header Host __UPSTREAM_HOST__;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify __PROXY_SSL_VERIFY__;
+    }
+
+    location / {
+        proxy_pass __UPSTREAM_ORIGIN__;
+        proxy_http_version 1.1;
+        proxy_set_header Host __UPSTREAM_HOST__;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify __PROXY_SSL_VERIFY__;
+    }
+}

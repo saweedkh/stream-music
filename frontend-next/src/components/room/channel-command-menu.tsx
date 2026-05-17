@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, MessageSquare, Radio, Search, Settings2, Sparkles } from "lucide-react";
+import { LayoutDashboard, ListMusic, MessageSquare, Radio, Search, Settings2, Sparkles } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -60,8 +60,12 @@ export function ChannelCommandMenu({ channelId, canManage }: Props) {
                 Listen &amp; playlist
               </CommandItem>
               <CommandItem onSelect={() => go(`/channel/${channelId}?tab=queue`)}>
-                <Sparkles className="h-4 w-4" />
+                <ListMusic className="h-4 w-4" />
                 Queue
+              </CommandItem>
+              <CommandItem onSelect={() => go(`/channel/${channelId}?tab=suggestions`)}>
+                <Sparkles className="h-4 w-4" />
+                Track suggestions
               </CommandItem>
               {canManage ? (
                 <CommandItem onSelect={() => go(`/channel/${channelId}?tab=admin`)}>

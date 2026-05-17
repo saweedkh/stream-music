@@ -1,6 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Radio } from "lucide-react";
+import { useTranslations } from "@/components/providers/locale-provider";
 
 type Props = {
   title: string;
@@ -9,6 +12,8 @@ type Props = {
 };
 
 export function AuthLayout({ title, description, children }: Props) {
+  const { t } = useTranslations();
+
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-lg flex-col justify-center px-1 py-8">
       <Link href="/" className="mb-8 flex items-center gap-3 transition-opacity hover:opacity-90">
@@ -17,7 +22,7 @@ export function AuthLayout({ title, description, children }: Props) {
         </span>
         <span>
           <span className="font-display text-xl font-semibold tracking-tight text-foreground">Stream Music</span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">LAN parties &amp; shared listening</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t("brand.tagline")}</span>
         </span>
       </Link>
       <div className="glass-panel-elevated p-5 sm:p-6">

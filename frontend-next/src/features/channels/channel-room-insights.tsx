@@ -1,12 +1,14 @@
 "use client";
 
-import { Download, History, Shield, ThumbsUp } from "lucide-react";
+import { Download, History, Lightbulb, Loader2, RefreshCw, Shield, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
+import { adminSegmentBtn, adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
+import { listenerFieldClass } from "@/features/channels/channel-listener-panel-styles";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   addTrackReaction,
@@ -18,21 +20,29 @@ import {
   type ChannelTrackReactionRow,
   type PlaybackHistoryRow,
 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Props = {
   channelId: string;
   canManage: boolean;
   currentTrackId?: number | null;
+  embedded?: boolean;
 };
 
-export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Props) {
+type InsightTab = "recap" | "history" | "reactions" | "audit";
+
+export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embedded = true }: Props) {
+  const { t } = useTranslations();
   const { showToast } = useToast();
   const [history, setHistory] = useState<PlaybackHistoryRow[]>([]);
   const [audit, setAudit] = useState<ChannelAuditLogRow[]>([]);
   const [reactions, setReactions] = useState<ChannelTrackReactionRow[]>([]);
   const [reactionEmoji, setReactionEmoji] = useState("🔥");
+  const [loading, setLoading] = useState(true);
+  const [insightTab, setInsightTab] = useState<InsightTab>("recap");
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [h, a] = await Promise.all([
         listPlaybackHistory(channelId),
@@ -48,6 +58,8 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not load insights.", "error");
+    } finally {
+      setLoading(false);
     }
   }, [channelId, canManage, currentTrackId, showToast]);
 
@@ -79,110 +91,155 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId }: Pr
     return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 8);
   }, [history]);
 
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-brand/30 bg-gradient-to-br from-background to-[var(--brand-subtle)] lg:col-span-2">
-        <CardHeader className="border-b border-border/80 pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="size-5 text-brand" />
-            Party recap
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 pt-4">
-          {recapTop.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Play some tracks to build tonight&apos;s recap.</p>
-          ) : (
-            <ol className="space-y-1 text-sm">
-              {recapTop.map((t, i) => (
-                <li key={t.title} className="flex justify-between gap-2">
-                  <span>
-                    {i + 1}. {t.title}
-                  </span>
-                  <span className="text-brand/90">×{t.count}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-          <Link href={`/party/${channelId}`} className="text-xs text-brand hover:underline">
-            Public recap page →
-          </Link>
-        </CardContent>
-      </Card>
+  const tabs: { id: InsightTab; labelKey: Parameters<typeof t>[0] }[] = [
+    { id: "recap", labelKey: "room.admin.insights.tab.recap" },
+    { id: "history", labelKey: "room.admin.insights.tab.history" },
+    { id: "reactions", labelKey: "room.admin.insights.tab.reactions" },
+    ...(canManage ? [{ id: "audit" as const, labelKey: "room.admin.insights.tab.audit" as const }] : []),
+  ];
 
-      <Card className="border-border/90">
-        <CardHeader className="border-b border-border/80 pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="size-5 text-sky-400" />
-            Playback history
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <ScrollArea className="h-56">
-            <ul className="space-y-1 pr-3 font-mono text-xs text-muted-foreground">
-              {history.map((row) => (
-                <li key={row.id}>
-                  {row.emitted_at?.slice(11, 19)} · {row.event_type}
-                  {row.track_title ? ` · ${row.track_title}` : ""}
-                </li>
-              ))}
-            </ul>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/90">
-        <CardHeader className="border-b border-border/80 pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ThumbsUp className="size-5 text-rose-400" />
-            Track reactions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 pt-4">
-          <div className="flex gap-2">
-            <Input value={reactionEmoji} onChange={(e) => setReactionEmoji(e.target.value)} maxLength={8} className="w-20 border-border bg-card" />
-            <Button type="button" size="sm" onClick={() => void postReaction()} disabled={!currentTrackId}>
-              React to now playing
-            </Button>
-          </div>
-          <ScrollArea className="h-40">
-            <ul className="space-y-1 text-sm text-foreground/80">
-              {reactions.map((r) => (
-                <li key={r.id}>
-                  {r.emoji} @{r.username}
-                </li>
-              ))}
-            </ul>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {canManage ? (
-        <Card className="border-border/90 lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/80 pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Shield className="size-5 text-violet-400" />
-              Audit log
-            </CardTitle>
-            <a href={getAuditLogExportUrl(channelId)} download>
-              <Button type="button" size="sm" variant="secondary" className="gap-1">
-                <Download className="size-3.5" />
-                Export CSV
-              </Button>
-            </a>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <ScrollArea className="h-48">
-              <ul className="space-y-1 pr-3 font-mono text-xs text-muted-foreground">
-                {audit.map((row) => (
-                  <li key={row.id}>
-                    {row.created_at?.slice(0, 19)} · {row.action} · {row.actor_username ?? "?"}
-                  </li>
-                ))}
-              </ul>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      ) : null}
+  const toolbar = embedded ? (
+    <div className="flex gap-1 rounded-xl bg-muted/25 p-1">
+      {tabs.map((tab) => (
+        <button key={tab.id} type="button" className={adminSegmentBtn(insightTab === tab.id)} onClick={() => setInsightTab(tab.id)}>
+          {t(tab.labelKey)}
+        </button>
+      ))}
     </div>
+  ) : null;
+
+  const recapSection = (
+    <section className="px-1">
+      {recapTop.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.insights.recapEmpty")}</p>
+      ) : (
+        <ol className="space-y-0.5">
+          {recapTop.map((row, i) => (
+            <li key={row.title} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-muted/30">
+              <span className="truncate text-sm text-foreground">
+                {i + 1}. {row.title}
+              </span>
+              <span className="shrink-0 text-sm font-medium text-brand">×{row.count}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <Link href={`/party/${channelId}`} className="mt-3 inline-block text-xs text-brand hover:underline">
+        {t("room.admin.insights.recapLink")} →
+      </Link>
+    </section>
+  );
+
+  const historySection = (
+    <section className="px-1">
+      {history.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.insights.historyEmpty")}</p>
+      ) : (
+        <ul className="space-y-0.5 font-mono text-xs">
+          {history.map((row) => (
+            <li key={row.id} className="rounded-lg px-2 py-2 text-muted-foreground hover:bg-muted/30">
+              {row.emitted_at?.slice(11, 19)} · {row.event_type}
+              {row.track_title ? ` · ${row.track_title}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  const reactionsSection = (
+    <section className="space-y-3 px-1">
+      <div className="flex flex-wrap gap-2">
+        <Input
+          value={reactionEmoji}
+          onChange={(e) => setReactionEmoji(e.target.value)}
+          maxLength={8}
+          className={cn("w-20", listenerFieldClass)}
+          valid
+        />
+        <Button type="button" size="sm" className="h-9" onClick={() => void postReaction()} disabled={!currentTrackId}>
+          {t("room.admin.insights.reactNow")}
+        </Button>
+      </div>
+      {reactions.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">{t("room.admin.insights.reactionsEmpty")}</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {reactions.map((r) => (
+            <li key={r.id} className="rounded-lg px-2 py-2 text-sm hover:bg-muted/30">
+              {r.emoji} @{r.username}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  const auditSection = (
+    <section className="px-1">
+      <div className="mb-3 flex justify-end">
+        <a href={getAuditLogExportUrl(channelId)} download>
+          <Button type="button" size="sm" variant="secondary" className="h-9 gap-2">
+            <Download className="size-4" />
+            {t("room.admin.insights.exportCsv")}
+          </Button>
+        </a>
+      </div>
+      {audit.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.insights.auditEmpty")}</p>
+      ) : (
+        <ul className="space-y-0.5 font-mono text-xs">
+          {audit.map((row) => (
+            <li key={row.id} className="rounded-lg px-2 py-2 text-muted-foreground hover:bg-muted/30">
+              {row.created_at?.slice(0, 19)} · {row.action} · {row.actor_username ?? "?"}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  const tabContent = loading ? (
+    <div className="space-y-1.5 px-2 py-1">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-10 animate-pulse rounded-lg bg-muted/40" />
+      ))}
+    </div>
+  ) : insightTab === "recap" ? (
+    recapSection
+  ) : insightTab === "history" ? (
+    historySection
+  ) : insightTab === "reactions" ? (
+    reactionsSection
+  ) : (
+    auditSection
+  );
+
+  if (!embedded) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        {recapSection}
+        {historySection}
+        {reactionsSection}
+        {canManage ? auditSection : null}
+      </div>
+    );
+  }
+
+  return (
+    <ChannelAdminInlineShell
+      icon={Lightbulb}
+      title={t("room.admin.tab.insights.title")}
+      subtitle={t("room.admin.tab.insights.description")}
+      toolbar={toolbar}
+      actions={
+        <Button type="button" variant="secondary" size="sm" className="h-9 gap-2" disabled={loading} onClick={() => void load()}>
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          {t("room.admin.insights.refresh")}
+        </Button>
+      }
+    >
+      {tabContent}
+    </ChannelAdminInlineShell>
   );
 }

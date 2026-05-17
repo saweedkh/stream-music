@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useTranslations } from "@/components/providers/locale-provider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import type { TrackSummary } from "@/lib/api";
 
 type Props = {
@@ -23,7 +25,15 @@ type Props = {
   onUploadTrack: () => void;
 };
 
+const VISIBILITY_KEYS: Record<TrackSummary["visibility"], MessageKey> = {
+  private: "tracks.visPrivate",
+  shared_with_users: "tracks.visSharedUsers",
+  shared_with_channels: "tracks.visSharedChannels",
+  public_lan: "tracks.visPublicLan",
+};
+
 export function TrackLibrarySection(props: Props) {
+  const { t } = useTranslations();
   const {
     tracks,
     trackTitle,
@@ -47,85 +57,100 @@ export function TrackLibrarySection(props: Props) {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Card className="border-border/90">
+    <div className="grid gap-5 lg:grid-cols-[minmax(280px,340px)_1fr]">
+      <Card className="h-fit">
         <CardHeader>
-          <CardTitle className="text-lg">Upload</CardTitle>
-          <CardDescription>Add audio to your library with visibility controls.</CardDescription>
+          <CardTitle>{t("tracks.uploadTitle")}</CardTitle>
+          <CardDescription>{t("tracks.uploadDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <Label>Track title</Label>
-            <Input value={trackTitle} aria-invalid={Boolean(errors.trackTitle)} valid={Boolean(trackTitle.trim())} onChange={(e) => onTrackTitleChange(e.target.value)} />
+          <div className="space-y-1.5">
+            <Label>{t("tracks.title")}</Label>
+            <Input
+              value={trackTitle}
+              aria-invalid={Boolean(errors.trackTitle)}
+              valid={Boolean(trackTitle.trim())}
+              onChange={(e) => onTrackTitleChange(e.target.value)}
+            />
             {errors.trackTitle ? <p className="text-xs text-rose-400">{errors.trackTitle}</p> : null}
           </div>
-          <div className="space-y-1">
-            <Label>Visibility</Label>
-            <Select value={trackVisibility} valid={Boolean(trackVisibility)} onChange={(e) => onTrackVisibilityChange(e.target.value as TrackSummary["visibility"])}>
-              <option value="private">private</option>
-              <option value="shared_with_users">shared_with_users</option>
-              <option value="shared_with_channels">shared_with_channels</option>
-              <option value="public_lan">public_lan</option>
+          <div className="space-y-1.5">
+            <Label>{t("tracks.visibility")}</Label>
+            <Select
+              value={trackVisibility}
+              valid={Boolean(trackVisibility)}
+              onChange={(e) => onTrackVisibilityChange(e.target.value as TrackSummary["visibility"])}
+            >
+              <option value="private">{t("tracks.visPrivate")}</option>
+              <option value="shared_with_users">{t("tracks.visSharedUsers")}</option>
+              <option value="shared_with_channels">{t("tracks.visSharedChannels")}</option>
+              <option value="public_lan">{t("tracks.visPublicLan")}</option>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Audio file</Label>
+            <Label>{t("tracks.audioFile")}</Label>
             <div
-              className="rounded-lg border border-dashed border-border/80 bg-card/60 p-5 text-center text-sm text-muted-foreground transition hover:border-brand/50"
+              className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-brand/35 hover:bg-brand/5"
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
                 onTrackFileDrop(event.dataTransfer.files?.[0] ?? null);
               }}
             >
-              Drag and drop audio file here
+              {t("tracks.dropzone")}
             </div>
             <input
-              className="w-full rounded-lg border border-border/80 bg-card/80 px-3 py-2.5 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
+              className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-sm file:me-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm"
               type="file"
               accept="audio/*"
               onChange={(e) => onTrackFileChange(e.target.files?.[0] ?? null)}
             />
-            {selectedTrackFileName ? <p className="text-xs text-muted-foreground">Selected file: {selectedTrackFileName}</p> : null}
+            {selectedTrackFileName ? (
+              <p className="text-xs text-muted-foreground">{t("tracks.selectedFile", { name: selectedTrackFileName })}</p>
+            ) : null}
             {errors.trackFile ? <p className="text-xs text-rose-400">{errors.trackFile}</p> : null}
           </div>
           {isUploading ? (
-            <div className="space-y-1">
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="space-y-1.5">
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
-              <p className="text-xs text-muted-foreground">Uploading... {uploadProgress}%</p>
+              <p className="text-xs text-muted-foreground">{t("tracks.uploading", { percent: uploadProgress })}</p>
             </div>
           ) : null}
           <Button className="w-full" onClick={onUploadTrack} disabled={isUploading}>
-            {isUploading ? "Uploading..." : "Upload track"}
+            {isUploading ? t("tracks.uploadingButton") : t("tracks.uploadButton")}
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="border-border/90">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Library ({tracks.length})</CardTitle>
-          <CardDescription>Everything you have uploaded.</CardDescription>
+          <CardTitle>{t("tracks.libraryTitle", { count: tracks.length })}</CardTitle>
+          <CardDescription>{t("tracks.libraryDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           {tracks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tracks yet. Upload your first track.</p>
+            <p className="rounded-lg border border-dashed border-border/70 py-12 text-center text-sm text-muted-foreground">
+              {t("tracks.empty")}
+            </p>
           ) : (
-            <div className="space-y-2">
+            <ul className="max-h-[min(480px,60vh)] space-y-1.5 overflow-y-auto pe-1">
               {tracks.map((track) => (
-                <div
+                <li
                   key={track.id}
-                  className="flex items-center justify-between rounded-lg border border-border/80 bg-card/40 px-3 py-2.5 transition-colors hover:border-border/90"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-border/60 hover:bg-muted/30"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
-                    <p className="text-xs text-muted-foreground">Track #{track.id}</p>
+                    <p className="truncate text-sm font-medium">{track.title}</p>
+                    <p className="text-xs text-muted-foreground">{t("tracks.trackId", { id: track.id })}</p>
                   </div>
-                  <Badge variant={visibilityTone[track.visibility]}>{track.visibility}</Badge>
-                </div>
+                  <Badge variant={visibilityTone[track.visibility]} className="shrink-0 text-[10px]">
+                    {t(VISIBILITY_KEYS[track.visibility])}
+                  </Badge>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </CardContent>
       </Card>

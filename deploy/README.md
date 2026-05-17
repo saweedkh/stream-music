@@ -25,6 +25,18 @@ cp deploy/env.production.example .env.production
 
 اسکریپت **`deploy/render-env-generated.sh`** مقدار **`ALLOWED_HOSTS`** و **`CORS_EXTRA_ORIGINS`** را از IP تشخیص‌شده + دامنه تکمیل می‌کند.
 
+## Edge LAN (کش صوتی، کم‌کردن اینترنت)
+
+اگر همکاران روی Wi‑Fi به لپ‌تاپ شما وصل می‌شوند و فقط یک خط اینترنت دارید:
+
+**[`deploy/edge-proxy/README.md`](edge-proxy/README.md)**
+
+```bash
+cp deploy/edge-proxy/env.example deploy/edge-proxy/.env.edge
+# UPSTREAM_URL = آدرس همین سرور مرکزی
+./deploy/edge-proxy/up.sh
+```
+
 ## توقف
 
 ```bash

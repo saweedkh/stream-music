@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   deleteWebPushSubscriptions,
@@ -39,6 +40,7 @@ const DEFAULT_SETTINGS: UserNotificationSettings = {
 };
 
 export function NotificationPreferencesCard() {
+  const { t } = useTranslations();
   const { showToast } = useToast();
   const setNotificationPrefs = useNotificationStore((s) => s.setPrefs);
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export function NotificationPreferencesCard() {
       setVapidPublic(key || null);
       await refreshPushState();
     } catch {
-      showToast("Could not load notification settings.", "error");
+      showToast(t("settings.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
@@ -88,9 +90,9 @@ export function NotificationPreferencesCard() {
       const next = await patchNotificationSettings(partial);
       setSettings(next);
       setNotificationPrefs(next);
-      showToast("Notification preferences saved.", "success");
+      showToast(t("settings.saved"), "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Save failed.", "error");
+      showToast(e instanceof Error ? e.message : t("settings.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -98,7 +100,7 @@ export function NotificationPreferencesCard() {
 
   async function enablePush() {
     if (!vapidPublic) {
-      showToast("Server has no VAPID public key. Restart backend after setting WEBPUSH_VAPID_* in env.", "error");
+      showToast(t("settings.noVapid"), "error");
       return;
     }
     setPushBusy(true);
@@ -106,7 +108,7 @@ export function NotificationPreferencesCard() {
       const result = await registerWebPushOnDevice({ requestPermission: true });
       if (result.status === "ok") {
         setPushEnabled(true);
-        showToast("Push enabled on this device. Send a chat message from another account to test.", "success");
+        showToast(t("settings.pushEnabled"), "success");
         return;
       }
       if (result.status === "insecure") {
@@ -122,12 +124,12 @@ export function NotificationPreferencesCard() {
         return;
       }
       if (result.status === "denied") {
-        showToast("Allow notifications in browser settings, then try again.", "error");
+        showToast(t("settings.allowNotifications"), "error");
         return;
       }
       if (result.status === "ssl_untrusted") {
         setShowCertHelp(true);
-        showToast("Install and trust the dev CA below, then reload and try again.", "error");
+        showToast(t("settings.installCert"), "error");
         return;
       }
       showToast(result.message || "Could not enable push.", "error");
@@ -145,7 +147,7 @@ export function NotificationPreferencesCard() {
       await sub?.unsubscribe();
       await deleteWebPushSubscriptions(endpoint);
       setPushEnabled(false);
-      showToast("Push disabled for this device.", "success");
+      showToast(t("settings.pushDisabled"), "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not disable push.", "error");
     } finally {
@@ -158,7 +160,7 @@ export function NotificationPreferencesCard() {
       <Card className="border-border/90 bg-card/40">
         <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="size-5 animate-spin" aria-hidden />
-          Loading notification settings…
+          {t("common.loading")}
         </CardContent>
       </Card>
     );
@@ -167,18 +169,17 @@ export function NotificationPreferencesCard() {
   const canUsePush = isPushEnvironmentSupported() && Boolean(vapidPublic);
 
   return (
-    <Card className="border-border/90 bg-card/40">
-      <CardHeader className="border-b border-border/70 pb-4">
+    <Card>
+      <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg text-foreground">
           <Bell className="size-5 text-brand/90" aria-hidden />
-          Notifications
+          {t("settings.cardTitle")}
         </CardTitle>
         <CardDescription className="text-muted-foreground">
-          Choose how channel chat reaches you, and whether moderators get alerts for reactions and skip votes. Tapping a
-          notification opens that channel with the chat tab.
+          {t("settings.cardDescription")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6">
+      <CardContent className="space-y-6">
         {envIssue ? (
           <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
             {envIssue}
@@ -352,9 +353,9 @@ export function NotificationPreferencesCard() {
               setPushBusy(true);
               try {
                 await sendPushTest();
-                showToast("Test notification sent.", "success");
+                showToast(t("settings.testSent"), "success");
               } catch (e) {
-                showToast(e instanceof Error ? e.message : "Test failed.", "error");
+                showToast(e instanceof Error ? e.message : t("settings.testFailed"), "error");
               } finally {
                 setPushBusy(false);
               }

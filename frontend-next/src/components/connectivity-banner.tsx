@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { checkApiHealth } from "@/lib/api";
 
 export function ConnectivityBanner() {
+  const { t } = useTranslations();
   const [online, setOnline] = useState(true);
   const [apiOk, setApiOk] = useState(true);
   const [checking, setChecking] = useState(false);
@@ -59,12 +61,10 @@ export function ConnectivityBanner() {
     <Alert className="mb-4 border-amber-500/40 bg-amber-950/40 text-amber-100">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm">
-          {!online
-            ? "You appear to be offline. Playback and chat will resume when the network returns."
-            : "Cannot reach the Stream Music server. Check that the stack is running and this device can reach the host."}
+          {!online ? t("connectivity.offline") : t("connectivity.serverUnreachable")}
         </p>
         <Button type="button" size="sm" variant="secondary" disabled={checking} onClick={() => void retry()}>
-          {checking ? "Checking…" : "Retry"}
+          {checking ? t("common.checking") : t("common.retry")}
         </Button>
       </div>
     </Alert>

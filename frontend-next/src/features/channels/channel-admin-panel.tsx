@@ -2,10 +2,12 @@
 
 import {
   Copy,
+  Eye,
   Link2,
   Loader2,
   Radio,
   RefreshCw,
+  Settings2,
   Shield,
   Sparkles,
   Trash2,
@@ -32,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   approveJoinRequest,
@@ -52,6 +55,8 @@ import {
   type JoinRequestRow,
   type PlaylistSummary,
 } from "@/lib/api";
+import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
+import { adminSegmentBtn } from "@/features/channels/channel-admin-panel-styles";
 import { ChannelMemberRosterActions } from "@/features/channels/channel-member-roster-actions";
 import { channelSettingsSchema } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -70,7 +75,12 @@ type Props = {
   /** Only the channel owner may permanently delete the room (matches API). */
   canDeleteChannel?: boolean;
   initialExperience?: Record<string, unknown> | null;
+  viewAsListener?: boolean;
+  onViewAsListenerChange?: (value: boolean) => void;
+  embedded?: boolean;
 };
+
+type AdminTab = "settings" | "invites" | "people";
 
 async function copyText(text: string, showToast: (m: string, t?: "success" | "error" | "info") => void) {
   try {
@@ -139,8 +149,13 @@ export function ChannelAdminPanel({
   channelIsActive = true,
   canDeleteChannel = false,
   initialExperience = null,
+  viewAsListener = false,
+  onViewAsListenerChange,
+  embedded = true,
 }: Props) {
+  const { t } = useTranslations();
   const { showToast } = useToast();
+  const [adminTab, setAdminTab] = useState<AdminTab>("settings");
   const router = useRouter();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -434,44 +449,87 @@ export function ChannelAdminPanel({
 
   const canPublicSlug = privacy === "public" || privacy === "unlisted";
 
-  return (
-    <Card className="overflow-hidden border-border/90 shadow-xl shadow-black/25">
-      <CardHeader className="border-b border-border/80 bg-gradient-to-r from-background via-card/95 to-[var(--brand-subtle)] pb-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-[var(--brand-subtle)] text-brand shadow-lg shadow-brand/20">
-              <Radio className="size-5" />
-            </span>
-            <div>
-              <CardTitle className="text-xl text-foreground">Control room</CardTitle>
-              <CardDescription className="mt-1 max-w-xl text-muted-foreground">
-                Tune the room, share short join codes, and manage members — without juggling long URLs.
-              </CardDescription>
-            </div>
+  const deleteDialog = (
+    <Dialog open={deleteChannelDialogOpen} onOpenChange={setDeleteChannelDialogOpen}>
+      <DialogContent className="border-red-900/40">
+        <DialogHeader>
+          <DialogTitle>Delete this channel?</DialogTitle>
+          <DialogDescription>
+            This removes the channel, playlists, queue state, and memberships for everyone. This action cannot be undone. Only the channel owner can
+            delete the room.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="secondary" disabled={deleteChannelBusy} onClick={() => setDeleteChannelDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" disabled={deleteChannelBusy} onClick={() => void confirmDeleteChannel()}>
+            {deleteChannelBusy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+            Delete permanently
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const adminTabToolbar = embedded ? (
+    <div className="space-y-3">
+      {onViewAsListenerChange ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
+          <div>
+            <Label htmlFor={`ch-listener-view-${channelId}`} className="text-sm font-medium text-foreground">
+              {t("channels.viewAsListener")}
+            </Label>
+            <p className="text-xs text-muted-foreground">{t("channels.viewAsListenerHint")}</p>
           </div>
-          {!channelIsActive ? (
-            <Badge variant="secondary" className="border-amber-800/50 bg-amber-950/40 text-warning">
-              Channel closed
-            </Badge>
-          ) : null}
+          <Switch
+            id={`ch-listener-view-${channelId}`}
+            checked={viewAsListener}
+            onCheckedChange={onViewAsListenerChange}
+            aria-label={t("channels.viewAsListener")}
+          />
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Tabs defaultValue="settings" className="w-full px-4 pb-6 pt-4 sm:px-6">
-          <TabsList className="mb-1 w-full justify-start gap-1">
-            <TabsTrigger value="settings" className="gap-2">
-              <Sparkles className="size-4 opacity-80" />
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="invites" className="gap-2">
-              <Link2 className="size-4 opacity-80" />
-              Invites & QR
-            </TabsTrigger>
-            <TabsTrigger value="people" className="gap-2">
-              <Users className="size-4 opacity-80" />
-              People
-            </TabsTrigger>
-          </TabsList>
+      ) : null}
+      <div className="flex gap-1 rounded-xl bg-muted/25 p-1">
+        {(
+          [
+            { id: "settings" as const, label: t("room.admin.settings.tab.settings"), icon: Sparkles },
+            { id: "invites" as const, label: t("room.admin.settings.tab.invites"), icon: Link2 },
+            { id: "people" as const, label: t("room.admin.settings.tab.people"), icon: Users },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={adminSegmentBtn(adminTab === tab.id)}
+            onClick={() => setAdminTab(tab.id)}
+          >
+            <tab.icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const roomTabs = (
+    <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as AdminTab)} className={cn("w-full", !embedded && "px-4 pb-6 pt-4 sm:px-6")}>
+      {!embedded ? (
+        <TabsList className="mb-1 w-full justify-start gap-1">
+          <TabsTrigger value="settings" className="gap-2">
+            <Sparkles className="size-4 opacity-80" />
+            {t("room.admin.settings.tab.settings")}
+          </TabsTrigger>
+          <TabsTrigger value="invites" className="gap-2">
+            <Link2 className="size-4 opacity-80" />
+            {t("room.admin.settings.tab.invites")}
+          </TabsTrigger>
+          <TabsTrigger value="people" className="gap-2">
+            <Users className="size-4 opacity-80" />
+            {t("room.admin.settings.tab.people")}
+          </TabsTrigger>
+        </TabsList>
+      ) : null}
 
           <TabsContent value="settings" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
@@ -961,29 +1019,52 @@ export function ChannelAdminPanel({
               </ScrollArea>
             </section>
           </TabsContent>
-        </Tabs>
-      </CardContent>
 
-      <Dialog open={deleteChannelDialogOpen} onOpenChange={setDeleteChannelDialogOpen}>
-        <DialogContent className="border-red-900/40">
-          <DialogHeader>
-            <DialogTitle>Delete this channel?</DialogTitle>
-            <DialogDescription>
-              This removes the channel, playlists, queue state, and memberships for everyone. This action cannot be undone. Only the channel owner
-              can delete the room.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="secondary" disabled={deleteChannelBusy} onClick={() => setDeleteChannelDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" disabled={deleteChannelBusy} onClick={() => void confirmDeleteChannel()}>
-              {deleteChannelBusy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              Delete permanently
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    </Tabs>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        <ChannelAdminInlineShell
+          icon={Settings2}
+          title={t("room.admin.tab.admin.title")}
+          subtitle={t("room.admin.tab.admin.description")}
+          toolbar={adminTabToolbar}
+        >
+          {roomTabs}
+        </ChannelAdminInlineShell>
+        {deleteDialog}
+      </>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden border-border/90 shadow-xl shadow-black/25">
+      <CardHeader className="border-b border-border/80 bg-gradient-to-r from-background via-card/95 to-[var(--brand-subtle)] pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-[var(--brand-subtle)] text-brand shadow-lg shadow-brand/20">
+              <Radio className="size-5" />
+            </span>
+            <div>
+              <CardTitle className="text-xl text-foreground">Control room</CardTitle>
+              <CardDescription className="mt-1 max-w-xl text-muted-foreground">
+                Tune the room, share short join codes, and manage members — without juggling long URLs.
+              </CardDescription>
+            </div>
+          </div>
+          {!channelIsActive ? (
+            <Badge variant="secondary" className="border-amber-800/50 bg-amber-950/40 text-warning">
+              Channel closed
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {roomTabs}
+      </CardContent>
+      {deleteDialog}
     </Card>
   );
 }

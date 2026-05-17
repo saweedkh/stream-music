@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { loginUser, registerUser } from "@/lib/api";
 import { authLoginSchema, authRegisterSchema } from "@/lib/validation";
@@ -20,6 +21,7 @@ function safeNextPath(raw: string | null): string {
 }
 
 export function AuthForm({ mode }: { mode: Mode }) {
+  const { t } = useTranslations();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [username, setUsername] = useState("");
@@ -48,7 +50,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      showToast("Please fix highlighted fields.", "error");
+      showToast(t("auth.fixFields"), "error");
       setBusy(false);
       return;
     }
@@ -64,8 +66,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         error instanceof Error
           ? error.message
           : mode === "register"
-            ? "Register failed. Username might already be taken."
-            : "Invalid username or password.";
+            ? t("auth.registerFailed")
+            : t("auth.invalidCredentials");
       setError(message);
       showToast(message, "error");
     } finally {
@@ -76,14 +78,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
   return (
     <Card className="border-border/90 bg-card/40 shadow-none">
       <CardHeader className="border-b border-border/80 bg-gradient-to-r from-[var(--brand-subtle)] to-transparent pb-4">
-        <CardTitle>{mode === "register" ? "Create account" : "Login"}</CardTitle>
+        <CardTitle>{mode === "register" ? t("auth.createAccount") : t("auth.login")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <Label htmlFor="auth-username">Username</Label>
+          <Label htmlFor="auth-username">{t("auth.username")}</Label>
           <Input
             id="auth-username"
-            placeholder="Username"
+            placeholder={t("auth.username")}
             value={username}
             aria-invalid={Boolean(fieldErrors.username)}
             valid={Boolean(touched.username && username.trim())}
@@ -94,10 +96,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
         </div>
         {mode === "register" ? (
           <div className="space-y-1">
-            <Label htmlFor="auth-email">Email (optional)</Label>
+            <Label htmlFor="auth-email">{t("auth.emailOptional")}</Label>
             <Input
               id="auth-email"
-              placeholder="Email"
+              placeholder={t("auth.email")}
               value={email}
               aria-invalid={Boolean(fieldErrors.email)}
               valid={Boolean(touched.email && email && email.includes("@"))}
@@ -108,11 +110,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </div>
         ) : null}
         <div className="space-y-1">
-          <Label htmlFor="auth-password">Password</Label>
+          <Label htmlFor="auth-password">{t("auth.password")}</Label>
           <Input
             id="auth-password"
             type="password"
-            placeholder="Password"
+            placeholder={t("auth.password")}
             value={password}
             aria-invalid={Boolean(fieldErrors.password)}
             valid={Boolean(touched.password && password.trim())}
@@ -122,17 +124,23 @@ export function AuthForm({ mode }: { mode: Mode }) {
           {fieldErrors.password ? <p className="text-xs text-rose-400">{fieldErrors.password}</p> : null}
         </div>
         <Button className="w-full" onClick={onSubmit} disabled={busy || !username || !password}>
-          {busy ? "Please wait..." : mode === "register" ? "Sign up" : "Login"}
+          {busy ? t("auth.pleaseWait") : mode === "register" ? t("auth.signUp") : t("auth.login")}
         </Button>
         {error ? <Alert tone="error">{error}</Alert> : null}
         <p className="text-center text-xs text-muted-foreground">
           {mode === "register" ? (
             <>
-              Already have an account? <Link href="/login" className="text-brand hover:text-brand">Login</Link>
+              {t("auth.alreadyHaveAccount")}{" "}
+              <Link href="/login" className="text-brand hover:text-brand">
+                {t("auth.login")}
+              </Link>
             </>
           ) : (
             <>
-              Need an account? <Link href="/register" className="text-brand hover:text-brand">Register</Link>
+              {t("auth.needAccount")}{" "}
+              <Link href="/register" className="text-brand hover:text-brand">
+                {t("auth.register")}
+              </Link>
             </>
           )}
         </p>

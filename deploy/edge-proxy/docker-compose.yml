@@ -1,0 +1,21 @@
+# LAN edge gateway: proxy API/WS/frontend + cache /audio/ from UPSTREAM_URL.
+# Usage: ./deploy/edge-proxy/up.sh
+
+services:
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${EDGE_PORT:-9080}:80"
+    volumes:
+      - ./nginx.generated.conf:/etc/nginx/conf.d/default.conf:ro
+      - audio_cache:/var/cache/nginx/audio
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/api/time || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  audio_cache:

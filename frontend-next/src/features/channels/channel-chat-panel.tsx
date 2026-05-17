@@ -93,6 +93,8 @@ type Props = {
   channelName?: string;
   /** When set, in-app chat alerts fire only if this tab is not active (or the tab is hidden). */
   roomActiveTab?: string | null;
+  /** Fill the listener shell content area (dedicated chat tab). */
+  fullHeight?: boolean;
 };
 
 export function ChannelChatPanel({
@@ -104,6 +106,7 @@ export function ChannelChatPanel({
   nowPlayingLabel = null,
   channelName,
   roomActiveTab = null,
+  fullHeight = false,
 }: Props) {
   const { showToast } = useToast();
   const searchParams = useSearchParams();
@@ -395,20 +398,33 @@ export function ChannelChatPanel({
   const shellClass =
     variant === "listener"
       ? cn(
-          "relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95",
-          "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_25px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-2xl",
-          "before:pointer-events-none before:absolute before:inset-0 before:rounded-3xl before:bg-[radial-gradient(800px_circle_at_20%_-10%,rgba(52,211,153,0.12),transparent_45%)]",
+          "relative overflow-hidden border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95 backdrop-blur-2xl",
+          fullHeight
+            ? cn(
+                "flex h-full min-h-0 max-h-full flex-1 flex-col rounded-2xl",
+                "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_20px_60px_-24px_rgba(0,0,0,0.75)]",
+                "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-[radial-gradient(700px_circle_at_20%_-10%,rgba(52,211,153,0.1),transparent_50%)]",
+              )
+            : cn(
+                "rounded-3xl",
+                "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_25px_80px_-20px_rgba(0,0,0,0.85)]",
+                "before:pointer-events-none before:absolute before:inset-0 before:rounded-3xl before:bg-[radial-gradient(800px_circle_at_20%_-10%,rgba(52,211,153,0.12),transparent_45%)]",
+              ),
         )
       : "overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-black/25";
 
   const headerTitle = variant === "listener" ? "Live room chat" : "Channel chat";
   const headerSubtitle =
-    variant === "listener" ? "Synced with the room — reactions & edits update live." : "WebSocket channel — separate from playback.";
+    variant === "listener" ? "Messages sync live with everyone in the room." : "WebSocket channel — separate from playback.";
 
-  const scrollMinH = variant === "listener" ? "min-h-[min(420px,52vh)] h-[min(420px,52vh)]" : "h-[min(280px,40vh)]";
+  const scrollMinH = fullHeight
+    ? "min-h-0 flex-1"
+    : variant === "listener"
+      ? "min-h-[min(420px,52vh)] h-[min(420px,52vh)]"
+      : "h-[min(280px,40vh)]";
   const scrollAreaClass = cn(
     "rounded-2xl border",
-    isFullscreen ? "min-h-0 flex-1 basis-0" : scrollMinH,
+    isFullscreen || fullHeight ? "min-h-0 flex-1 basis-0" : scrollMinH,
     variant === "listener" ? "border-border/40 bg-[var(--surface-inset)]" : "border-border/60 bg-card/60",
   );
 
@@ -416,11 +432,16 @@ export function ChannelChatPanel({
     <div
       ref={shellRef}
       id="channel-chat-panel"
-      className={cn(shellClass, isFullscreen && "flex max-h-none min-h-0 flex-1 flex-col rounded-none shadow-none")}
+      className={cn(
+        shellClass,
+        (isFullscreen || fullHeight) && "flex min-h-0 max-h-full flex-1 flex-col overflow-hidden shadow-none",
+        isFullscreen && "rounded-none",
+      )}
     >
       <div
         className={cn(
-          "flex items-start gap-3 border-b px-4 py-3 sm:px-5",
+          "flex shrink-0 items-start gap-3 border-b px-4 sm:px-5",
+          fullHeight ? "py-3" : "py-3",
           variant === "listener" ? "border-border/40 bg-[var(--surface-inset)]" : "border-border/70",
         )}
       >
@@ -449,16 +470,18 @@ export function ChannelChatPanel({
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{headerSubtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1 self-start pt-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9 text-muted-foreground hover:text-foreground"
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            onClick={() => void toggleFullscreen()}
-          >
-            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </Button>
+          {!fullHeight ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-9 text-muted-foreground hover:text-foreground"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              onClick={() => void toggleFullscreen()}
+            >
+              {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant={showPinsOnly ? "secondary" : "ghost"}
@@ -499,9 +522,16 @@ export function ChannelChatPanel({
         </div>
       </div>
 
-      <div className={cn("flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4", variant === "listener" && "sm:p-5", isFullscreen && "min-h-0 flex-1")}>
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-2",
+          fullHeight ? "gap-2 p-3 sm:p-4" : "p-3 sm:p-4",
+          variant === "listener" && !fullHeight && "sm:p-5",
+          (isFullscreen || fullHeight) && "min-h-0 flex-1 overflow-hidden",
+        )}
+      >
         {pinnedMessage ? (
-          <div className="rounded-xl border border-brand/25 bg-[var(--brand-subtle)] px-3 py-2 text-xs text-brand">
+          <div className="shrink-0 rounded-xl border border-brand/25 bg-[var(--brand-subtle)] px-3 py-2 text-xs text-brand">
             <p className="font-semibold uppercase tracking-wide text-brand/90">Pinned message</p>
             <p className="mt-1 line-clamp-2">{pinnedMessage.body}</p>
           </div>
@@ -511,7 +541,7 @@ export function ChannelChatPanel({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 self-center text-xs text-muted-foreground hover:text-foreground"
+            className="h-8 shrink-0 self-center text-xs text-muted-foreground hover:text-foreground"
             disabled={loadingOlder || !connected}
             onClick={() => void requestOlder()}
           >
@@ -519,7 +549,7 @@ export function ChannelChatPanel({
           </Button>
         ) : null}
 
-        <ScrollArea className={scrollAreaClass}>
+        <ScrollArea className={cn(scrollAreaClass, fullHeight && "min-h-0 flex-1")}>
           <div className="space-y-3 p-3 pr-2 sm:p-4">
             {!hydrated && connectEnabled ? (
               <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -713,7 +743,12 @@ export function ChannelChatPanel({
           </div>
         </ScrollArea>
 
-        <div className="relative flex gap-2">
+        <div
+          className={cn(
+            "relative flex gap-2",
+            fullHeight && "mt-auto shrink-0 border-t border-border/40 bg-[var(--surface-inset)] px-0.5 pt-3",
+          )}
+        >
           <Input
             ref={draftInputRef}
             value={draft}
@@ -799,7 +834,11 @@ export function ChannelChatPanel({
             Send
           </Button>
         </div>
-        {!channelIsActive ? <p className="text-center text-xs text-muted-foreground">Reopen the channel to send new messages.</p> : null}
+        {!channelIsActive ? (
+          <p className={cn("text-center text-xs text-muted-foreground", fullHeight && "shrink-0")}>
+            Reopen the channel to send new messages.
+          </p>
+        ) : null}
       </div>
     </div>
   );

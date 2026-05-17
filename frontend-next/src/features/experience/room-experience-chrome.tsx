@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast-provider";
+import { ROOM_REACTION_EMOJIS } from "@/features/channels/room-reaction-constants";
 import { useChannelPresence } from "@/hooks/use-channel-presence";
 
 export type ChannelExperience = {
@@ -52,8 +53,6 @@ type Props = {
   currentTrackId?: number | null;
 };
 
-const REACTIONS = ["🔥", "❤️", "😂", "👏", "🎧", "✨"];
-
 export function RoomExperienceChrome({
   channelId,
   sendMessage,
@@ -65,12 +64,10 @@ export function RoomExperienceChrome({
   const { showToast } = useToast();
   const { onlineMembers: members, onlineCount: count } = useChannelPresence(channelId);
   const [lastShout, setLastShout] = useState<{ user: string; text: string } | null>(null);
-  const [floaters, setFloaters] = useState<Array<{ id: number; emoji: string; x: number }>>([]);
   const [shoutDraft, setShoutDraft] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [skipVotes, setSkipVotes] = useState(0);
   const [skipThreshold, setSkipThreshold] = useState(0);
-  const floaterId = useRef(0);
   const lastTrackIdRef = useRef<number | null>(null);
   const liftActive =
     experience.rehearsal_lift_until && Date.parse(experience.rehearsal_lift_until) > Date.now();
@@ -95,14 +92,6 @@ export function RoomExperienceChrome({
       const p = e.detail?.payload;
       if (!p) return;
       const action = (p.action ?? "").toLowerCase();
-      if (action === "reaction" && p.emoji) {
-        const id = ++floaterId.current;
-        const x = 10 + Math.random() * 80;
-        setFloaters((prev) => [...prev.slice(-12), { id, emoji: p.emoji ?? "♪", x }]);
-        window.setTimeout(() => {
-          setFloaters((prev) => prev.filter((f) => f.id !== id));
-        }, 3200);
-      }
       if (action === "shout" && p.message && p.username) {
         setLastShout({ user: p.username, text: p.message });
       }
@@ -208,7 +197,7 @@ export function RoomExperienceChrome({
           )}
         </div>
         <div className="relative flex flex-wrap gap-1">
-          {REACTIONS.map((r) => (
+          {ROOM_REACTION_EMOJIS.map((r) => (
             <Button
               key={r}
               type="button"
@@ -221,17 +210,6 @@ export function RoomExperienceChrome({
               {r}
             </Button>
           ))}
-          <div className="pointer-events-none absolute inset-x-0 bottom-full h-24 overflow-visible">
-            {floaters.map((f) => (
-              <span
-                key={f.id}
-                className="pointer-events-none absolute bottom-0 text-2xl opacity-90 animate-room-reaction-float"
-                style={{ left: `${f.x}%` }}
-              >
-                {f.emoji}
-              </span>
-            ))}
-          </div>
         </div>
         <Button
           type="button"

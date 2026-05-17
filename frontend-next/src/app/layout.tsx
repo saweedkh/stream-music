@@ -2,6 +2,8 @@ import "./globals.css";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { DesignSystemProvider } from "@/components/providers/design-system-provider";
+import { LocaleInitScript } from "@/components/providers/locale-init-script";
+import { LocaleProvider } from "@/components/providers/locale-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 
 export const metadata = {
@@ -19,16 +21,19 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
+        <LocaleInitScript />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
-        <ThemeProvider>
-          <DesignSystemProvider>
-            <AppShell>{children}</AppShell>
-          </DesignSystemProvider>
-        </ThemeProvider>
+        <LocaleProvider>
+          <ThemeProvider>
+            <DesignSystemProvider>
+              <AppShell>{children}</AppShell>
+            </DesignSystemProvider>
+          </ThemeProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

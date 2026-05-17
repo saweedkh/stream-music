@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { Home, LogOut } from "lucide-react";
-import { ChannelRoomHeader } from "@/components/room/channel-room-header";
+import { Users } from "lucide-react";
+import { useTranslations } from "@/components/providers/locale-provider";
+import { listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -37,130 +36,79 @@ type MetaProps = {
   memberLimit?: number;
   joinRequiresApproval?: boolean;
   experience?: import("@/features/experience/room-experience-chrome").ChannelExperience;
+  onlineCount?: number | null;
 };
 
-/** Description, caps, and room rules — shown below the room header */
-export function ChannelListenerMeta({ description, memberLimit, joinRequiresApproval, experience }: MetaProps) {
+export function ChannelListenerMeta({
+  description,
+  memberLimit,
+  joinRequiresApproval,
+  experience,
+  onlineCount,
+}: MetaProps) {
+  const { t } = useTranslations();
   const hasMeta =
     Boolean(description?.trim()) ||
     typeof memberLimit === "number" ||
     joinRequiresApproval ||
-    Boolean(experience?.room_rules?.trim());
+    Boolean(experience?.room_rules?.trim()) ||
+    onlineCount != null;
 
-  if (!hasMeta) return null;
+  if (!hasMeta) {
+    return (
+      <p className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-10 text-center text-sm leading-relaxed text-muted-foreground">
+        {t("room.listener.tab.info.description")}
+      </p>
+    );
+  }
+
+  const sectionClass = cn("p-4 sm:p-5", listenerItemClass);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {onlineCount != null ? (
+        <section className={cn("flex items-center gap-3", sectionClass)}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
+            <Users className="h-5 w-5" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {onlineCount} {t("room.listener.online")}
+            </p>
+            <p className="text-xs text-muted-foreground">{t("room.listener.syncHint")}</p>
+          </div>
+        </section>
+      ) : null}
+
       {description?.trim() ? (
-        <p className="rounded-xl border border-border/80 bg-card/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">{description.trim()}</p>
+        <section className={sectionClass}>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {t("room.listener.tab.info.title")}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-foreground">{description.trim()}</p>
+        </section>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
         {typeof memberLimit === "number" ? (
           <Badge variant="outline" className="text-muted-foreground">
-            Cap {memberLimit}
+            {t("channels.cap", { count: memberLimit })}
           </Badge>
         ) : null}
         {joinRequiresApproval ? (
           <Badge variant="warning" className="text-[10px] sm:text-xs">
-            Approval required
+            {t("channels.approvalRequired")}
           </Badge>
         ) : null}
       </div>
 
       {experience?.room_rules?.trim() ? (
-        <section className="rounded-2xl border border-border/80 bg-background/55 p-4 sm:p-5">
-          <h2 className="text-sm font-medium text-muted-foreground">Room rules</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{experience.room_rules.trim()}</p>
+        <section className={sectionClass}>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("room.listener.roomRules")}</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {experience.room_rules.trim()}
+          </p>
         </section>
-      ) : null}
-    </div>
-  );
-}
-
-type ListenerProps = MetaProps & {
-  channelId: string;
-  channelName: string;
-  channelPrivacy: string;
-  isLive: boolean;
-  socketState: string;
-  channelIsActive?: boolean;
-  nowPlayingLabel: string | null;
-  showLeave: boolean;
-  onLeaveClick: () => void;
-  brandLogoUrl?: string;
-  onShare?: () => void;
-  onlineCount?: number | null;
-  sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
-  /** Hide bottom nav when embedded in admin preview sheet */
-  compact?: boolean;
-};
-
-export function ChannelListenerView({
-  channelName,
-  channelPrivacy,
-  description,
-  memberLimit,
-  joinRequiresApproval,
-  isLive,
-  socketState,
-  channelIsActive = true,
-  nowPlayingLabel,
-  showLeave,
-  onLeaveClick,
-  brandLogoUrl,
-  onShare,
-  onlineCount,
-  experience,
-  compact = false,
-}: ListenerProps) {
-  const accent = (experience?.accent || "emerald").toLowerCase();
-
-  return (
-    <div className={cn("mx-auto w-full max-w-2xl space-y-5", compact ? "px-0 pb-4 pt-0" : "px-4 pb-4 pt-2 sm:px-6 sm:pt-4")}>
-      <ChannelRoomHeader
-        channelName={channelName}
-        channelPrivacy={channelPrivacy}
-        brandLogoUrl={brandLogoUrl}
-        isLive={isLive}
-        isPlaying={isLive}
-        socketState={socketState}
-        channelIsActive={channelIsActive}
-        nowPlayingLabel={nowPlayingLabel}
-        accent={accent}
-        showLeave={showLeave}
-        onLeave={onLeaveClick}
-        onShare={onShare}
-        onlineCount={onlineCount}
-      />
-
-      <ChannelListenerMeta
-        description={description}
-        memberLimit={memberLimit}
-        joinRequiresApproval={joinRequiresApproval}
-        experience={experience}
-      />
-
-      {!compact ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-between">
-          <Button variant="secondary" className="w-full gap-2 sm:w-auto" asChild>
-            <Link href="/dashboard">
-              <Home className="size-4" aria-hidden />
-              Dashboard
-            </Link>
-          </Button>
-          {showLeave ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2 border-red-900/55 text-destructive hover:bg-red-950/35 sm:ml-auto sm:w-auto"
-              onClick={onLeaveClick}
-            >
-              <LogOut className="size-4" aria-hidden />
-              Leave channel
-            </Button>
-          ) : null}
-        </div>
       ) : null}
     </div>
   );

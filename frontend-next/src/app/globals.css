@@ -156,6 +156,65 @@ select option {
     background: var(--player-chrome);
   }
 
+  .player-shell {
+    @apply border-t backdrop-blur-2xl backdrop-saturate-150;
+    border-color: color-mix(in srgb, var(--border) 85%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--player-chrome) 96%, transparent) 0%,
+      color-mix(in srgb, var(--player-chrome) 99%, transparent) 100%
+    );
+    box-shadow:
+      0 -1px 0 color-mix(in srgb, var(--foreground) 6%, transparent),
+      0 -24px 48px -28px rgba(0, 0, 0, 0.55);
+  }
+
+  .player-shell--expanded {
+    box-shadow:
+      0 -1px 0 color-mix(in srgb, var(--border) 90%, transparent),
+      0 -12px 32px -24px rgba(0, 0, 0, 0.45);
+  }
+
+  .player-full-panel {
+    height: auto !important;
+    max-height: min(34rem, 82dvh) !important;
+    border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    background: color-mix(in srgb, var(--background) 96%, transparent);
+    box-shadow: 0 -20px 56px -28px rgba(0, 0, 0, 0.55);
+  }
+
+  .player-ambient {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 120% at 50% 100%, var(--player-glow, var(--glow-brand)), transparent 68%);
+    opacity: 0.55;
+  }
+
+  .player-ambient--strong {
+    opacity: 0.75;
+  }
+
+  .player-full-sheet {
+    @apply border-t backdrop-blur-2xl;
+    border-color: color-mix(in srgb, var(--border) 70%, transparent);
+    background: color-mix(in srgb, var(--background) 88%, transparent);
+  }
+
+  .player-art-pulse {
+    animation: player-art-pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes player-art-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+  }
+
   .status-online {
     @apply text-brand;
     border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
@@ -228,7 +287,7 @@ select option {
   }
   100% {
     opacity: 0;
-    transform: translateY(-72px) scale(1.1);
+    transform: translateY(-96px) scale(1.08);
   }
 }
 

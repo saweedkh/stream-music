@@ -367,6 +367,7 @@ class ChannelViewSet(viewsets.ModelViewSet):
         return (
             self.queryset.filter(memberships__user=user)
             .filter(Q(is_active=True) | Q(owner=user))
+            .select_related("playback_session")
             .distinct()
         )
 

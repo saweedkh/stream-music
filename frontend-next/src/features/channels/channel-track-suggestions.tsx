@@ -1,7 +1,7 @@
 "use client";
 
-import { Lightbulb } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, Loader2, Music2, RefreshCw, Search, Send, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,42 +9,249 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/components/providers/locale-provider";
+import { listenerFieldClass, listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
 import { useChannelQueue } from "@/features/channels/channel-queue-context";
 import {
   createChannelSuggestion,
+  getMe,
   listChannelSuggestions,
   listTracks,
   reviewChannelSuggestion,
   type ChannelPlaylistSuggestion,
   type TrackSummary,
 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Props = {
   channelId: string;
   canManage: boolean;
+  variant?: "admin" | "listener";
+  /** Admin tab layout — skip duplicate card chrome (page header provides title). */
+  embedded?: boolean;
 };
 
-export function ChannelTrackSuggestions({ channelId, canManage }: Props) {
+function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
+  const { t } = useTranslations();
+  const { showToast } = useToast();
+  const [tracks, setTracks] = useState<TrackSummary[]>([]);
+  const [mySuggestions, setMySuggestions] = useState<ChannelPlaylistSuggestion[]>([]);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const [trackList, suggestions, me] = await Promise.all([
+      listTracks(),
+      listChannelSuggestions(channelId),
+      getMe(),
+    ]);
+    const uid = me?.user?.id ?? null;
+    setMyUserId(uid);
+    setTracks(trackList);
+    setMySuggestions(uid != null ? suggestions.results.filter((s) => s.user === uid) : []);
+  }, [channelId]);
+
+  useEffect(() => {
+    setLoading(true);
+    void load()
+      .catch((e) => showToast(e instanceof Error ? e.message : "Could not load suggestions.", "error"))
+      .finally(() => setLoading(false));
+  }, [load, showToast]);
+
+  const filteredTracks = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? tracks.filter((track) => {
+          const title = track.title.toLowerCase();
+          const artist = (track.artist ?? "").toLowerCase();
+          return title.includes(q) || artist.includes(q);
+        })
+      : tracks;
+    return list.slice(0, 80);
+  }, [tracks, search]);
+
+  const selectedTrack = selectedTrackId != null ? tracks.find((t) => t.id === selectedTrackId) : null;
+
+  async function submitSuggestion() {
+    if (selectedTrackId == null) return;
+    setSubmitting(true);
+    try {
+      await createChannelSuggestion(channelId, { track_id: selectedTrackId, note: note.trim() });
+      setNote("");
+      setSelectedTrackId(null);
+      setSearch("");
+      showToast(t("room.listener.suggestions.sent"), "success");
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Suggestion failed.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-xl border border-border/50 bg-gradient-to-b from-card/40 to-card/15">
+        <div className="border-b border-border/40 bg-[var(--surface-inset)]/80 px-4 py-3">
+          <h3 className="text-sm font-semibold text-foreground">{t("room.listener.suggestions.composeTitle")}</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("room.listener.suggestions.composeHint")}</p>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("room.listener.suggestions.searchPlaceholder")}
+              className={cn("ps-9", listenerFieldClass)}
+            />
+          </div>
+
+          <ScrollArea className="h-[min(12rem,32vh)] rounded-xl border border-border/40 bg-background/30">
+            <ul className="p-1">
+              {loading ? (
+                <li className="px-3 py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</li>
+              ) : filteredTracks.length === 0 ? (
+                <li className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  {t("room.listener.suggestions.noTracks")}
+                </li>
+              ) : (
+                filteredTracks.map((track) => {
+                  const isSelected = selectedTrackId === track.id;
+                  return (
+                    <li key={track.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTrackId(track.id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start text-sm transition-colors",
+                          isSelected
+                            ? "bg-brand/15 text-brand ring-1 ring-brand/30"
+                            : "text-foreground hover:bg-muted/40",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-8 shrink-0 items-center justify-center rounded-lg border",
+                            isSelected ? "border-brand/30 bg-brand/10" : "border-border/50 bg-muted/20",
+                          )}
+                        >
+                          <Music2 className="size-4" aria-hidden />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{track.title}</span>
+                          {track.artist ? (
+                            <span className="block truncate text-xs text-muted-foreground">{track.artist}</span>
+                          ) : null}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </ScrollArea>
+
+          {selectedTrack ? (
+            <p className="text-xs text-muted-foreground">
+              {t("room.listener.suggestions.selected")}:{" "}
+              <span className="font-medium text-foreground">{selectedTrack.title}</span>
+            </p>
+          ) : null}
+
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t("room.listener.suggestions.notePlaceholder")}
+            className={listenerFieldClass}
+            maxLength={280}
+          />
+
+          <Button
+            type="button"
+            className="w-full gap-2 bg-brand text-brand-foreground hover:bg-brand-strong"
+            disabled={selectedTrackId == null || submitting}
+            onClick={() => void submitSuggestion()}
+          >
+            <Send className="size-4" aria-hidden />
+            {submitting ? t("common.loading") : t("room.listener.suggestions.submit")}
+          </Button>
+        </div>
+      </section>
+
+      {mySuggestions.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {t("room.listener.suggestions.yourSuggestions")}
+          </h3>
+          <ul className="space-y-2">
+            {mySuggestions.map((s) => {
+              const title = tracks.find((tr) => tr.id === s.track)?.title ?? s.track_title ?? `#${s.track}`;
+              return (
+                <li key={s.id} className={cn("px-3 py-2.5", listenerItemClass)}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0 font-medium text-foreground">{title}</span>
+                    <Badge
+                      variant={
+                        s.status === "approved" ? "success" : s.status === "rejected" ? "destructive" : "secondary"
+                      }
+                      className="shrink-0 capitalize"
+                    >
+                      {s.status}
+                    </Badge>
+                  </div>
+                  {s.note ? <p className="mt-1 text-xs text-muted-foreground">{s.note}</p> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : myUserId != null && !loading ? (
+        <p className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
+          {t("room.listener.suggestions.emptyYours")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type SuggestionFilter = "" | "pending" | "approved" | "rejected";
+
+export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin", embedded = false }: Props) {
+  const { t } = useTranslations();
   const { showToast } = useToast();
   const { refreshQueue } = useChannelQueue();
   const [suggestions, setSuggestions] = useState<ChannelPlaylistSuggestion[]>([]);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [suggestTrackId, setSuggestTrackId] = useState("");
   const [suggestNote, setSuggestNote] = useState("");
-  const [suggestionFilter, setSuggestionFilter] = useState<"" | "pending" | "approved" | "rejected">("pending");
+  const [suggestionFilter, setSuggestionFilter] = useState<SuggestionFilter>("pending");
+  const [loading, setLoading] = useState(true);
+  const isListener = variant === "listener";
 
   const load = useCallback(async () => {
-    const [s, t] = await Promise.all([
-      listChannelSuggestions(channelId, suggestionFilter || undefined),
-      listTracks(),
-    ]);
-    setSuggestions(s.results);
-    setTracks(t);
+    setLoading(true);
+    try {
+      const [s, trackList] = await Promise.all([
+        listChannelSuggestions(channelId, suggestionFilter || undefined),
+        listTracks(),
+      ]);
+      setSuggestions(s.results);
+      setTracks(trackList);
+    } finally {
+      setLoading(false);
+    }
   }, [channelId, suggestionFilter]);
 
   useEffect(() => {
+    if (isListener) return;
     void load().catch((e) => showToast(e instanceof Error ? e.message : "Could not load suggestions.", "error"));
-  }, [load, showToast]);
+  }, [load, showToast, isListener]);
 
   async function submitSuggestion() {
     if (!suggestTrackId) return;
@@ -69,88 +276,215 @@ export function ChannelTrackSuggestions({ channelId, canManage }: Props) {
     }
   }
 
+  if (isListener) {
+    return <ListenerTrackSuggestions channelId={channelId} />;
+  }
+
+  const segmentBtn = (active: boolean) =>
+    cn(
+      "flex flex-1 items-center justify-center rounded-lg px-2 py-2 text-xs font-medium transition-colors sm:text-sm",
+      active ? "bg-brand/12 text-brand" : "text-muted-foreground hover:bg-muted/35 hover:text-foreground",
+    );
+
+  const filterTabs: { id: SuggestionFilter; labelKey: "room.admin.suggestions.filter.pending" | "room.admin.suggestions.filter.approved" | "room.admin.suggestions.filter.rejected" | "room.admin.suggestions.filter.all" }[] = [
+    { id: "pending", labelKey: "room.admin.suggestions.filter.pending" },
+    { id: "approved", labelKey: "room.admin.suggestions.filter.approved" },
+    { id: "rejected", labelKey: "room.admin.suggestions.filter.rejected" },
+    { id: "", labelKey: "room.admin.suggestions.filter.all" },
+  ];
+
+  const suggestionRows = (
+    <ul className="space-y-0.5 text-sm">
+      {suggestions.map((s) => {
+        const title = tracks.find((tr) => tr.id === s.track)?.title ?? `Track #${s.track}`;
+        return (
+          <li
+            key={s.id}
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors",
+              embedded ? "hover:bg-muted/30" : "border border-border/80 bg-card/40",
+            )}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium text-foreground">{title}</p>
+              {s.note ? <p className="truncate text-xs text-muted-foreground">{s.note}</p> : null}
+            </div>
+            <Badge variant="secondary" className="shrink-0 text-[10px] capitalize">
+              {s.status}
+            </Badge>
+            {canManage && s.status === "pending" ? (
+              <span className="flex shrink-0 gap-1">
+                <Button type="button" size="sm" className="h-8" onClick={() => void review(s.id, "approve")}>
+                  {t("room.admin.suggestions.approve")}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => void review(s.id, "reject")}>
+                  {t("room.admin.suggestions.reject")}
+                </Button>
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-brand/25 bg-[var(--brand-subtle)] text-brand">
+              <Sparkles className="size-5" aria-hidden />
+            </div>
+            <div>
+              <h2 className="truncate text-sm font-semibold tracking-tight text-foreground sm:text-base">
+                {t("room.admin.tab.suggestions.title")}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("room.admin.suggestions.count", { count: suggestions.length })}</p>
+            </div>
+          </div>
+          <Button type="button" variant="secondary" size="sm" className="h-9 shrink-0 gap-2" disabled={loading} onClick={() => void load()}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            {t("room.admin.suggestions.refresh")}
+          </Button>
+        </div>
+
+        <div className="shrink-0 space-y-3 border-b border-border/40 px-4 py-3">
+          <div className="flex gap-1 rounded-xl bg-muted/25 p-1">
+            {filterTabs.map((tab) => (
+              <button
+                key={tab.id || "all"}
+                type="button"
+                className={segmentBtn(suggestionFilter === tab.id)}
+                onClick={() => setSuggestionFilter(tab.id)}
+              >
+                {t(tab.labelKey)}
+              </button>
+            ))}
+          </div>
+
+          <details className="group rounded-xl border border-border/50 bg-muted/15">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+              <Send className="size-4 text-muted-foreground" aria-hidden />
+              {t("room.admin.suggestions.compose")}
+              <ChevronDown className="ms-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 border-t border-border/40 px-3 py-3">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select
+                  value={suggestTrackId}
+                  onChange={(e) => setSuggestTrackId(e.target.value)}
+                  className={cn("min-w-0 flex-1", listenerFieldClass)}
+                >
+                  <option value="">{t("room.admin.suggestions.pickTrack")}</option>
+                  {tracks.map((tr) => (
+                    <option key={tr.id} value={String(tr.id)}>
+                      {tr.title}
+                      {tr.artist ? ` — ${tr.artist}` : ""}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  placeholder={t("room.admin.suggestions.notePlaceholder")}
+                  value={suggestNote}
+                  onChange={(e) => setSuggestNote(e.target.value)}
+                  className={cn("sm:max-w-xs", listenerFieldClass)}
+                  maxLength={280}
+                  valid
+                />
+                <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
+                  {t("room.admin.suggestions.submit")}
+                </Button>
+              </div>
+            </div>
+          </details>
+
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {t("room.admin.suggestions.listLabel")}
+          </p>
+        </div>
+
+        <ScrollArea className="min-h-0 flex-1 px-2 py-3 sm:px-3">
+          {loading ? (
+            <div className="space-y-1.5 px-2 py-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/40" />
+              ))}
+            </div>
+          ) : suggestions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+              <Sparkles className="size-10 text-muted-foreground/50" aria-hidden />
+              <p className="text-sm text-muted-foreground">{t("room.admin.suggestions.empty")}</p>
+            </div>
+          ) : (
+            <div className="px-1">{suggestionRows}</div>
+          )}
+        </ScrollArea>
+      </div>
+    );
+  }
+
+  const body = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <Select
+          value={suggestionFilter}
+          onChange={(e) => setSuggestionFilter(e.target.value as SuggestionFilter)}
+          className="w-40 border-border bg-card"
+        >
+          <option value="pending">{t("room.admin.suggestions.filter.pending")}</option>
+          <option value="approved">{t("room.admin.suggestions.filter.approved")}</option>
+          <option value="rejected">{t("room.admin.suggestions.filter.rejected")}</option>
+          <option value="">{t("room.admin.suggestions.filter.all")}</option>
+        </Select>
+        <Button type="button" variant="secondary" size="sm" onClick={() => void load()} disabled={loading}>
+          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+          {t("room.admin.suggestions.refresh")}
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Select
+          value={suggestTrackId}
+          onChange={(e) => setSuggestTrackId(e.target.value)}
+          className="min-w-[200px] flex-1 border-border bg-card"
+        >
+          <option value="">{t("room.admin.suggestions.pickTrack")}</option>
+          {tracks.map((tr) => (
+            <option key={tr.id} value={String(tr.id)}>
+              {tr.title}
+              {tr.artist ? ` — ${tr.artist}` : ""}
+            </option>
+          ))}
+        </Select>
+        <Input
+          placeholder={t("room.admin.suggestions.notePlaceholder")}
+          value={suggestNote}
+          onChange={(e) => setSuggestNote(e.target.value)}
+          className="max-w-xs border-border bg-card"
+          maxLength={280}
+        />
+        <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
+          {t("room.admin.suggestions.submit")}
+        </Button>
+      </div>
+
+      {suggestions.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center text-muted-foreground">
+          {t("room.admin.suggestions.empty")}
+        </p>
+      ) : (
+        suggestionRows
+      )}
+    </div>
+  );
+
   return (
     <Card className="border-border/90">
       <CardHeader className="border-b border-border/80 pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Lightbulb className="size-5 text-amber-400" />
-          Track suggestions
-        </CardTitle>
+        <CardTitle className="text-lg">{t("room.admin.tab.suggestions.title")}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 pt-4">
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={suggestionFilter}
-            onChange={(e) => setSuggestionFilter(e.target.value as typeof suggestionFilter)}
-            className="w-40 border-border bg-card"
-          >
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="">All</option>
-          </Select>
-          <Button type="button" variant="secondary" size="sm" onClick={() => void load()}>
-            Refresh
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={suggestTrackId}
-            onChange={(e) => setSuggestTrackId(e.target.value)}
-            className="min-w-[200px] flex-1 border-border bg-card"
-          >
-            <option value="">Pick a track to suggest…</option>
-            {tracks.map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.title}
-                {t.artist ? ` — ${t.artist}` : ""}
-              </option>
-            ))}
-          </Select>
-          <Input
-            placeholder="Note (optional)"
-            value={suggestNote}
-            onChange={(e) => setSuggestNote(e.target.value)}
-            className="max-w-xs border-border bg-card"
-            maxLength={280}
-          />
-          <Button type="button" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
-            Suggest
-          </Button>
-        </div>
-        <ScrollArea className="max-h-56">
-          <ul className="space-y-2 pr-3 text-sm">
-            {suggestions.length === 0 ? <li className="text-muted-foreground">No suggestions in this filter.</li> : null}
-            {suggestions.map((s) => {
-              const title = tracks.find((t) => t.id === s.track)?.title ?? `Track #${s.track}`;
-              return (
-                <li
-                  key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card/40 px-3 py-2"
-                >
-                  <span>
-                    {title}
-                    {s.note ? ` — ${s.note}` : ""}
-                    <Badge variant="secondary" className="ml-2">
-                      {s.status}
-                    </Badge>
-                  </span>
-                  {canManage && s.status === "pending" ? (
-                    <span className="flex gap-1">
-                      <Button type="button" size="sm" onClick={() => void review(s.id, "approve")}>
-                        Approve
-                      </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => void review(s.id, "reject")}>
-                        Reject
-                      </Button>
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </ScrollArea>
-      </CardContent>
+      <CardContent className="space-y-4 pt-4">{body}</CardContent>
     </Card>
   );
 }

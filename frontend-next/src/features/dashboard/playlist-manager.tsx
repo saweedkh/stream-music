@@ -29,7 +29,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,
@@ -54,11 +56,11 @@ import { uploadTrackResumable } from "@/lib/resumable-upload";
 
 const CHUNK = 50;
 const DEBOUNCE_MS = 300;
-const VIS_LABELS: Record<TrackSummary["visibility"], string> = {
-  private: "Private",
-  shared_with_users: "Shared",
-  shared_with_channels: "Channel",
-  public_lan: "Public LAN",
+const VISIBILITY_KEYS: Record<TrackSummary["visibility"], MessageKey> = {
+  private: "tracks.visPrivate",
+  shared_with_users: "tracks.visSharedUsers",
+  shared_with_channels: "tracks.visSharedChannels",
+  public_lan: "tracks.visPublicLan",
 };
 const VIS_TONE: Record<TrackSummary["visibility"], "default" | "warning" | "success"> = {
   private: "default",
@@ -77,6 +79,7 @@ function useDebounce<T>(value: T, ms: number) {
 }
 
 export function PlaylistManager() {
+  const { t } = useTranslations();
   const { showToast } = useToast();
 
   // ─── raw data ────────────────────────────────────────────────────────────────
@@ -163,7 +166,7 @@ export function PlaylistManager() {
           setLibraryTotal(r.total);
         }
       } catch {
-        showToast("Cannot load tracks", "error");
+        showToast(t("playlists.cannotLoadTracks"), "error");
       } finally {
         setLibLoading(false);
       }
@@ -182,7 +185,7 @@ export function PlaylistManager() {
       setChannels(c);
       setPlaylists(p);
     } catch {
-      showToast("Cannot refresh data", "error");
+      showToast(t("playlists.cannotRefresh"), "error");
     }
   }, [showToast]);
 
@@ -191,7 +194,7 @@ export function PlaylistManager() {
       const items = await listPlaylistItems();
       setAllItems(items);
     } catch {
-      showToast("Cannot refresh playlist items", "error");
+      showToast(t("playlists.cannotRefreshItems"), "error");
     }
   }, [showToast]);
 
@@ -221,14 +224,14 @@ export function PlaylistManager() {
         name: newPlaylistName.trim(),
         channel: newPlaylistChannel !== "none" ? Number(newPlaylistChannel) : null,
       });
-      showToast("Playlist created", "success");
+      showToast(t("playlists.created"), "success");
       setNewPlaylistName("");
       setNewPlaylistChannel("none");
       setShowCreatePlaylist(false);
       await refreshMeta();
       setSelectedPlaylistId(pl.id);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot create playlist", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.createFailed"), "error");
     } finally {
       setCreateBusy(false);
     }
@@ -246,10 +249,10 @@ export function PlaylistManager() {
     }
     try {
       await updatePlaylist(renamingPlaylistId, { name: renameValue.trim() });
-      showToast("Playlist renamed", "success");
+      showToast(t("playlists.renamed"), "success");
       await refreshMeta();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot rename playlist", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.renameFailed"), "error");
     } finally {
       setRenamingPlaylistId(null);
     }
@@ -261,11 +264,11 @@ export function PlaylistManager() {
     setDeletePlBusy(true);
     try {
       await deletePlaylist(deletePlaylistId);
-      showToast("Playlist deleted", "success");
+      showToast(t("playlists.deleted"), "success");
       if (selectedPlaylistId === deletePlaylistId) setSelectedPlaylistId(null);
       await Promise.all([refreshMeta(), refreshItems()]);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot delete playlist", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.deleteFailed"), "error");
     } finally {
       setDeletePlBusy(false);
       setDeletePlaylistId(null);
@@ -285,11 +288,11 @@ export function PlaylistManager() {
         done = Math.min(i + CHUNK, ids.length);
         setBulkProgress(Math.round((done / ids.length) * 100));
       }
-      showToast(`${ids.length} track(s) added to playlist`, "success");
+      showToast(t("playlists.bulkAdded", { count: ids.length }), "success");
       setSelectedTrackIds(new Set());
       await refreshItems();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Bulk add failed", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.bulkAddFailed"), "error");
     } finally {
       setBulkAdding(false);
       setBulkProgress(0);
@@ -299,16 +302,16 @@ export function PlaylistManager() {
   // ─── single add ───────────────────────────────────────────────────────────
   async function handleAddSingle(trackId: number) {
     if (!selectedPlaylistId) {
-      showToast("Select a playlist first", "error");
+      showToast(t("playlists.selectFirst"), "error");
       return;
     }
     try {
       const position = playlistItems.length;
       await addPlaylistItem({ playlist: selectedPlaylistId, track: trackId, position });
-      showToast("Track added", "success");
+      showToast(t("playlists.trackAdded"), "success");
       await refreshItems();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot add track", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.addTrackFailed"), "error");
     }
   }
 
@@ -316,10 +319,10 @@ export function PlaylistManager() {
   async function handleRemoveItem(itemId: number) {
     try {
       await deletePlaylistItem(itemId);
-      showToast("Track removed from playlist", "success");
+      showToast(t("playlists.trackRemoved"), "success");
       await refreshItems();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot remove track", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.removeTrackFailed"), "error");
     }
   }
 
@@ -330,7 +333,7 @@ export function PlaylistManager() {
       await reorderPlaylistItem(draggingItemId, dropIndex);
       await refreshItems();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot reorder", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.reorderFailed"), "error");
     } finally {
       setDraggingItemId(null);
     }
@@ -355,11 +358,11 @@ export function PlaylistManager() {
         album: editAlbum.trim() || undefined,
         visibility: editVisibility,
       });
-      showToast("Track updated", "success");
+      showToast(t("playlists.trackUpdated"), "success");
       setEditTrack(null);
       await fetchLibrary(debouncedLibQuery, libOffset);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot update track", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.updateTrackFailed"), "error");
     } finally {
       setEditTrackBusy(false);
     }
@@ -371,11 +374,11 @@ export function PlaylistManager() {
     setDeleteTrackBusy(true);
     try {
       await deleteTrack(deleteTrackTarget.id);
-      showToast("Track deleted", "success");
+      showToast(t("playlists.trackDeleted"), "success");
       setDeleteTrackTarget(null);
       await Promise.all([fetchLibrary(debouncedLibQuery, libOffset), refreshItems()]);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Cannot delete track", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.deleteTrackFailed"), "error");
     } finally {
       setDeleteTrackBusy(false);
     }
@@ -391,7 +394,7 @@ export function PlaylistManager() {
 
   async function handleUpload() {
     if (!uploadFile || !uploadTitle.trim()) {
-      showToast("Title and file are required", "error");
+      showToast(t("playlists.titleFileRequired"), "error");
       return;
     }
     setUploading(true);
@@ -402,14 +405,14 @@ export function PlaylistManager() {
         { title: uploadTitle.trim(), visibility: uploadVisibility, file: uploadFile },
         { onProgress: setUploadProgress },
       );
-      showToast("Track uploaded", "success");
+      showToast(t("playlists.trackUploaded"), "success");
       setUploadTitle("");
       setUploadFile(null);
       setUploadProgress(100);
       setShowUpload(false);
       await fetchLibrary(debouncedLibQuery, libOffset);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Upload failed", "error");
+      showToast(e instanceof Error ? e.message : t("playlists.uploadFailed"), "error");
     } finally {
       setUploading(false);
     }
@@ -432,8 +435,9 @@ export function PlaylistManager() {
   // ─────────────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+        {t("playlists.loading")}
       </div>
     );
   }
@@ -443,18 +447,18 @@ export function PlaylistManager() {
   return (
     <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
-      <aside className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Playlists</h2>
+      <Card className="flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-brand hover:text-brand" onClick={() => setShowCreatePlaylist(true)}>
             <Plus className="h-4 w-4" />
-            New
+            {t("playlists.new")}
           </Button>
-        </div>
-
-        <ScrollArea className="h-[calc(100vh-260px)] min-h-[200px]">
+        </CardHeader>
+        <CardContent className="min-h-0 flex-1 pt-0">
+        <ScrollArea className="h-[calc(100vh-280px)] min-h-[200px]">
           <div className="space-y-1 pr-1">
-            {playlists.length === 0 && <p className="px-2 text-xs text-muted-foreground">No playlists yet.</p>}
+            {playlists.length === 0 && <p className="px-2 text-xs text-muted-foreground">{t("playlists.emptyList")}</p>}
             {playlists.map((pl) => (
               <div
                 key={pl.id}
@@ -493,7 +497,7 @@ export function PlaylistManager() {
                       setRenamingPlaylistId(pl.id);
                       setRenameValue(pl.name);
                     }}
-                    title="Rename"
+                    title={t("playlists.rename")}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -503,7 +507,7 @@ export function PlaylistManager() {
                       e.stopPropagation();
                       setDeletePlaylistId(pl.id);
                     }}
-                    title="Delete"
+                    title={t("playlists.delete")}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -512,7 +516,8 @@ export function PlaylistManager() {
             ))}
           </div>
         </ScrollArea>
-      </aside>
+        </CardContent>
+      </Card>
 
       {/* ── Main panel ──────────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-col gap-4">
@@ -522,13 +527,15 @@ export function PlaylistManager() {
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-base">
                 <Music className="mr-1.5 inline h-4 w-4 opacity-60" />
-                Track Library
-                {libraryTotal > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">({libraryTotal} tracks)</span>}
+                {t("playlists.libraryTitle")}
+                {libraryTotal > 0 && (
+                  <span className="ms-2 text-xs font-normal text-muted-foreground">{t("playlists.tracksCount", { count: libraryTotal })}</span>
+                )}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-muted-foreground hover:text-foreground" onClick={() => setShowUpload((v) => !v)}>
                   <Plus className="h-4 w-4" />
-                  Upload
+                  {t("playlists.upload")}
                   <ChevronDown className={`h-3 w-3 transition-transform ${showUpload ? "rotate-180" : ""}`} />
                 </Button>
               </div>
@@ -537,21 +544,21 @@ export function PlaylistManager() {
             {showUpload && (
               <div className="mt-3 grid gap-3 rounded-xl border border-border/80 bg-card/60 p-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label className="text-xs">Title</Label>
-                  <Input className="h-8 text-sm" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="Track title" />
+                  <Label className="text-xs">{t("playlists.titleLabel")}</Label>
+                  <Input className="h-8 text-sm" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder={t("playlists.titlePlaceholder")} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Visibility</Label>
+                  <Label className="text-xs">{t("playlists.visibilityLabel")}</Label>
                   <Select
                     className="h-8 text-sm"
                     value={uploadVisibility}
                     valid={Boolean(uploadVisibility)}
                     onChange={(e) => setUploadVisibility(e.target.value as TrackSummary["visibility"])}
                   >
-                    <option value="private">Private</option>
-                    <option value="shared_with_users">Shared with users</option>
-                    <option value="shared_with_channels">Shared with channels</option>
-                    <option value="public_lan">Public LAN</option>
+                    <option value="private">{t("tracks.visPrivate")}</option>
+                    <option value="shared_with_users">{t("tracks.visSharedUsers")}</option>
+                    <option value="shared_with_channels">{t("tracks.visSharedChannels")}</option>
+                    <option value="public_lan">{t("tracks.visPublicLan")}</option>
                   </Select>
                 </div>
                 <div className="sm:col-span-2">
@@ -563,7 +570,7 @@ export function PlaylistManager() {
                       handleFileSelect(e.dataTransfer.files?.[0] ?? null);
                     }}
                   >
-                    {uploadFile ? uploadFile.name : "Drag & drop audio file here"}
+                    {uploadFile ? uploadFile.name : t("playlists.dropOrSelect")}
                   </div>
                   <input
                     type="file"
@@ -578,7 +585,7 @@ export function PlaylistManager() {
                   )}
                   <Button size="sm" className="w-full" disabled={uploading} onClick={handleUpload}>
                     {uploading ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-                    {uploading ? "Uploading…" : "Upload"}
+                    {uploading ? t("playlists.uploading") : t("playlists.upload")}
                   </Button>
                 </div>
               </div>
@@ -591,7 +598,7 @@ export function PlaylistManager() {
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-8 pl-8 text-sm"
-                  placeholder="Search by title or artist…"
+                  placeholder={t("playlists.searchLibrary")}
                   value={libQuery}
                   onChange={(e) => setLibQuery(e.target.value)}
                 />
@@ -604,7 +611,7 @@ export function PlaylistManager() {
               {libraryTracks.length > 0 && (
                 <button
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-card/60 transition hover:border-brand/50"
-                  title={allLibSelected ? "Deselect all" : "Select all on page"}
+                  title={allLibSelected ? t("playlists.deselectAllPage") : t("playlists.selectAllPage")}
                   onClick={() => {
                     if (allLibSelected) {
                       setSelectedTrackIds((prev) => {
@@ -667,7 +674,7 @@ export function PlaylistManager() {
               </div>
             ) : libraryTracks.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                {libQuery ? "No tracks match your search." : "No tracks yet. Upload your first track."}
+                {libQuery ? t("playlists.noSearchResults") : t("playlists.libraryEmpty")}
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -709,27 +716,27 @@ export function PlaylistManager() {
                       </div>
 
                       <Badge variant={VIS_TONE[track.visibility]} className="hidden shrink-0 text-xs sm:flex">
-                        {VIS_LABELS[track.visibility]}
+                        {t(VISIBILITY_KEYS[track.visibility])}
                       </Badge>
 
                       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
                           className="rounded p-1 text-muted-foreground hover:text-brand"
-                          title="Add to selected playlist"
+                          title={t("playlists.addToPlaylist")}
                           onClick={() => void handleAddSingle(track.id)}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                         <button
                           className="rounded p-1 text-muted-foreground hover:text-foreground"
-                          title="Edit track"
+                          title={t("playlists.editTrack")}
                           onClick={() => openEditTrack(track)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           className="rounded p-1 text-muted-foreground hover:text-rose-400"
-                          title="Delete track"
+                          title={t("playlists.deleteTrack")}
                           onClick={() => setDeleteTrackTarget(track)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -768,8 +775,8 @@ export function PlaylistManager() {
                 <CardTitle className="flex-1 text-base">
                   <ListMusic className="mr-1.5 inline h-4 w-4 opacity-60" />
                   {selectedPlaylist.name}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    ({playlistItems.length} track{playlistItems.length !== 1 ? "s" : ""})
+                  <span className="ms-2 text-xs font-normal text-muted-foreground">
+                    {t("playlists.tracksCount", { count: playlistItems.length })}
                   </span>
                 </CardTitle>
               </div>
@@ -777,7 +784,7 @@ export function PlaylistManager() {
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-8 pl-8 text-sm"
-                  placeholder="Search in playlist…"
+                  placeholder={t("playlists.searchInPlaylist")}
                   value={playlistQuery}
                   onChange={(e) => setPlaylistQuery(e.target.value)}
                 />
@@ -791,12 +798,12 @@ export function PlaylistManager() {
             <CardContent className="pt-0">
               {filteredPlaylistItems.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  {isFiltering ? "No tracks match your search." : "No tracks in this playlist. Add some from the library above."}
+                  {isFiltering ? t("playlists.noSearchResults") : t("playlists.playlistEmpty")}
                 </p>
               ) : (
                 <div className="space-y-1.5">
                   {filteredPlaylistItems.map((item, index) => {
-                    const t = item.track_detail;
+                    const trackDetail = item.track_detail;
                     return (
                       <div
                         key={item.id}
@@ -809,17 +816,19 @@ export function PlaylistManager() {
                         <GripVertical className={`h-4 w-4 shrink-0 text-muted-foreground ${isFiltering ? "opacity-20" : "cursor-grab"}`} />
                         <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{item.position + 1}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{t ? t.title : `Track #${item.track}`}</p>
-                          {t && (
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {trackDetail ? trackDetail.title : t("tracks.trackId", { id: item.track })}
+                          </p>
+                          {trackDetail ? (
                             <p className="truncate text-xs text-muted-foreground">
-                              {t.artist || <span className="italic">No artist</span>}
-                              {t.album ? ` · ${t.album}` : ""}
+                              {trackDetail.artist || <span className="italic">{t("playlists.noArtist")}</span>}
+                              {trackDetail.album ? ` · ${trackDetail.album}` : ""}
                             </p>
-                          )}
+                          ) : null}
                         </div>
                         <button
                           className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
-                          title="Remove from playlist"
+                          title={t("playlists.removeFromPlaylist")}
                           onClick={() => void handleRemoveItem(item.id)}
                         >
                           <X className="h-4 w-4" />
@@ -833,7 +842,7 @@ export function PlaylistManager() {
           </Card>
         ) : (
           <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground">
-            Select a playlist to see its tracks
+            {t("playlists.selectPlaylistHint")}
           </div>
         )}
       </div>
@@ -844,27 +853,27 @@ export function PlaylistManager() {
       <Dialog open={showCreatePlaylist} onOpenChange={setShowCreatePlaylist}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>New Playlist</DialogTitle>
-            <DialogDescription>Give your playlist a name and optionally attach it to a channel.</DialogDescription>
+            <DialogTitle>{t("playlists.newDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("playlists.newDialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1">
-              <Label>Name</Label>
+              <Label>{t("playlists.nameLabel")}</Label>
               <Input
-                placeholder="My playlist"
+                placeholder={t("playlists.namePlaceholder")}
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handleCreatePlaylist(); }}
               />
             </div>
             <div className="space-y-1">
-              <Label>Channel (optional)</Label>
+              <Label>{t("playlists.channelOptional")}</Label>
               <Select
                 value={newPlaylistChannel}
                 valid={newPlaylistChannel !== "none"}
                 onChange={(e) => setNewPlaylistChannel(e.target.value)}
               >
-                <option value="none">No channel (private)</option>
+                <option value="none">{t("playlists.noChannelPrivate")}</option>
                 {channels.map((ch) => (
                   <option key={ch.id} value={String(ch.id)}>
                     {ch.name}
@@ -875,11 +884,11 @@ export function PlaylistManager() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowCreatePlaylist(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button disabled={!newPlaylistName.trim() || createBusy} onClick={handleCreatePlaylist}>
-              {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create
+              {createBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+              {t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -889,20 +898,20 @@ export function PlaylistManager() {
       <Dialog open={deletePlaylistId !== null} onOpenChange={(open) => { if (!open) setDeletePlaylistId(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Playlist</DialogTitle>
+            <DialogTitle>{t("playlists.deleteDialogTitle")}</DialogTitle>
             <DialogDescription>
-              This will permanently delete{" "}
-              <strong>{playlists.find((p) => p.id === deletePlaylistId)?.name}</strong> and remove all its tracks. This
-              action cannot be undone.
+              {t("playlists.deleteDialogDescription", {
+                name: playlists.find((p) => p.id === deletePlaylistId)?.name ?? "",
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeletePlaylistId(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" disabled={deletePlBusy} onClick={confirmDeletePlaylist}>
-              {deletePlBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
+              {deletePlBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -912,38 +921,38 @@ export function PlaylistManager() {
       <Dialog open={editTrack !== null} onOpenChange={(open) => { if (!open) setEditTrack(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Track</DialogTitle>
+            <DialogTitle>{t("playlists.editTrackDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1">
-              <Label>Title</Label>
+              <Label>{t("playlists.titleLabel")}</Label>
               <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Artist</Label>
+              <Label>{t("playlists.artistLabel")}</Label>
               <Input value={editArtist} onChange={(e) => setEditArtist(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Album</Label>
+              <Label>{t("playlists.albumLabel")}</Label>
               <Input value={editAlbum} onChange={(e) => setEditAlbum(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Visibility</Label>
+              <Label>{t("playlists.visibilityLabel")}</Label>
               <Select value={editVisibility} valid onChange={(e) => setEditVisibility(e.target.value as TrackSummary["visibility"])}>
-                <option value="private">Private</option>
-                <option value="shared_with_users">Shared with users</option>
-                <option value="shared_with_channels">Shared with channels</option>
-                <option value="public_lan">Public LAN</option>
+                <option value="private">{t("tracks.visPrivate")}</option>
+                <option value="shared_with_users">{t("tracks.visSharedUsers")}</option>
+                <option value="shared_with_channels">{t("tracks.visSharedChannels")}</option>
+                <option value="public_lan">{t("tracks.visPublicLan")}</option>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditTrack(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button disabled={editTrackBusy} onClick={saveEditTrack}>
-              {editTrackBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save
+              {editTrackBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -953,18 +962,18 @@ export function PlaylistManager() {
       <Dialog open={deleteTrackTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTrackTarget(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Track</DialogTitle>
+            <DialogTitle>{t("playlists.deleteTrackDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Permanently delete <strong>{deleteTrackTarget?.title}</strong>? This will also remove it from all playlists.
+              {t("playlists.deleteTrackDialogDescription", { title: deleteTrackTarget?.title ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteTrackTarget(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" disabled={deleteTrackBusy} onClick={confirmDeleteTrack}>
-              {deleteTrackBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
+              {deleteTrackBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

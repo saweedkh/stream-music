@@ -36,6 +36,7 @@ class TrackSharePermissionSerializer(serializers.ModelSerializer):
 class ChannelSerializer(serializers.ModelSerializer):
     membership_is_active = serializers.SerializerMethodField()
     brand_logo_url = serializers.SerializerMethodField()
+    is_playing = serializers.SerializerMethodField()
 
     class Meta:
         model = Channel
@@ -78,6 +79,12 @@ class ChannelSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(url)
         return url
+
+    def get_is_playing(self, obj):
+        session = getattr(obj, "playback_session", None)
+        if session is None:
+            return False
+        return bool(session.is_playing)
 
     def get_membership_is_active(self, obj):
         request = self.context.get("request")
