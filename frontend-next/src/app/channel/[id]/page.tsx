@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { AuthGuard } from "@/features/auth/auth-guard";
+import { ChannelClosedView } from "@/features/channels/channel-closed-view";
 import { ChannelDashboardTabs } from "@/features/channels/channel-dashboard-tabs";
-import { Button } from "@/components/ui/button";
 import { ChannelClosedError, getChannelState } from "@/lib/api";
 
 type Props = {
@@ -20,13 +19,7 @@ export default async function ChannelPage({ params }: Props) {
     if (e instanceof ChannelClosedError) {
       return (
         <AuthGuard>
-          <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-            <h1 className="text-xl font-semibold text-foreground">This channel is closed</h1>
-            <p className="text-sm text-muted-foreground">The owner ended the room. You cannot listen or sync here anymore.</p>
-            <Button asChild variant="secondary">
-              <Link href="/dashboard">Back to dashboard</Link>
-            </Button>
-          </div>
+          <ChannelClosedView />
         </AuthGuard>
       );
     }

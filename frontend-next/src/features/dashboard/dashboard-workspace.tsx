@@ -148,7 +148,7 @@ export function DashboardWorkspace() {
   }, [activeTab, pathname, searchParams]);
 
   async function handleCreateChannel() {
-    const result = createChannelSchema.safeParse({ channelName, memberLimit });
+    const result = createChannelSchema(t).safeParse({ channelName, memberLimit });
     const nextErrors: Record<string, string> = {};
     if (!result.success) {
       for (const issue of result.error.issues) {
@@ -175,7 +175,7 @@ export function DashboardWorkspace() {
 
   async function handleUploadTrack() {
     const normalizedTitle = trackTitle.trim() || (trackFile ? deriveTitleFromFile(trackFile) : "");
-    const result = uploadTrackSchema.safeParse({ trackTitle: normalizedTitle, trackFile });
+    const result = uploadTrackSchema(t).safeParse({ trackTitle: normalizedTitle, trackFile });
     const nextErrors: Record<string, string> = {};
     if (!result.success) {
       for (const issue of result.error.issues) {
@@ -214,9 +214,9 @@ export function DashboardWorkspace() {
   }
 
   async function handleCreatePlaylist() {
-    const result = createPlaylistSchema.safeParse({ playlistName });
+    const result = createPlaylistSchema(t).safeParse({ playlistName });
     if (!result.success) {
-      setFieldErrors((prev) => ({ ...prev, playlistName: result.error.issues[0]?.message ?? "Playlist name is required" }));
+      setFieldErrors((prev) => ({ ...prev, playlistName: result.error.issues[0]?.message ?? t("validation.playlistNameRequired") }));
       showToast(t("dashboard.enterPlaylistName"), "error");
       return;
     }

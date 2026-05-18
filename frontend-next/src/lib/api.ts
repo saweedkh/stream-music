@@ -213,9 +213,14 @@ function rejectIfChannelClosed(res: Response): void {
 
 async function extractApiError(res: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as { detail?: string } | Record<string, unknown>;
+    const body = (await res.json()) as { detail?: string; max?: number } | Record<string, unknown>;
     if (typeof (body as { detail?: string })?.detail === "string") {
-      return (body as { detail: string }).detail;
+      const detail = (body as { detail: string }).detail;
+      const { localizeMessage, localizeMessageWithVars } = await import("@/lib/i18n/localize-message");
+      if (detail === "too_many_tracks" && typeof (body as { max?: number }).max === "number") {
+        return localizeMessageWithVars(detail, { max: (body as { max: number }).max });
+      }
+      return localizeMessage(detail);
     }
     if (body && typeof body === "object") {
       const firstEntry = Object.entries(body)[0];

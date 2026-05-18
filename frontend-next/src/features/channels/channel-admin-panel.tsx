@@ -82,12 +82,16 @@ type Props = {
 
 type AdminTab = "settings" | "invites" | "people";
 
-async function copyText(text: string, showToast: (m: string, t?: "success" | "error" | "info") => void) {
+async function copyText(
+  text: string,
+  showToast: (m: string, t?: "success" | "error" | "info") => void,
+  messages: { copied: string; copyFailed: string },
+) {
   try {
     await navigator.clipboard.writeText(text);
-    showToast("Copied to clipboard.", "success");
+    showToast(messages.copied, "success");
   } catch {
-    showToast("Could not copy — try selecting the text manually.", "error");
+    showToast(messages.copyFailed, "error");
   }
 }
 
@@ -97,12 +101,16 @@ function QrTile({
   value,
   disabled,
   onCopy,
+  copyLinkLabel,
+  unavailableLabel,
 }: {
   title: string;
   subtitle?: string;
   value: string | null;
   disabled?: boolean;
   onCopy: () => void;
+  copyLinkLabel: string;
+  unavailableLabel: string;
 }) {
   return (
     <div
@@ -120,16 +128,16 @@ function QrTile({
           type="button"
           onClick={onCopy}
           className="group rounded-2xl bg-white p-3 shadow-lg ring-2 ring-transparent transition hover:ring-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
-          title="Click to copy link"
+          title={copyLinkLabel}
         >
           <QRCode value={value} size={168} className="h-[168px] w-[168px]" />
           <span className="mt-2 block text-[11px] font-medium text-muted-foreground group-hover:text-brand-strong">
-            Tap to copy link
+            {copyLinkLabel}
           </span>
         </button>
       ) : (
         <div className="flex h-[196px] w-[196px] items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card/50 text-xs text-muted-foreground">
-          Not available yet
+          {unavailableLabel}
         </div>
       )}
     </div>
@@ -155,6 +163,7 @@ export function ChannelAdminPanel({
 }: Props) {
   const { t } = useTranslations();
   const { showToast } = useToast();
+  const copyMessages = { copied: t("common.copied"), copyFailed: t("common.copyFailed") };
   const [adminTab, setAdminTab] = useState<AdminTab>("settings");
   const router = useRouter();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -272,7 +281,7 @@ export function ChannelAdminPanel({
     setBusy(action);
     try {
       const sent = sendSocketMessage?.({ action, ...payload });
-      if (!sent) throw new Error("Socket is not connected");
+      if (!sent) throw new Error(t("room.socket.notConnected"));
       showToast(`Action “${action}” sent.`, "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : `Action “${action}” failed.`, "error");
@@ -283,7 +292,7 @@ export function ChannelAdminPanel({
 
   async function saveSettings() {
     setBusy("settings");
-    const result = channelSettingsSchema.safeParse({ name, memberLimit });
+    const result = channelSettingsSchema(t).safeParse({ name, memberLimit });
     const nextErrors: Record<string, string> = {};
     if (!result.success) {
       for (const issue of result.error.issues) {
@@ -293,7 +302,7 @@ export function ChannelAdminPanel({
     }
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      showToast("Please fix the highlighted fields.", "error");
+      showToast(t("room.admin.toast.fixFields"), "error");
       setBusy(null);
       return;
     }
@@ -305,9 +314,9 @@ export function ChannelAdminPanel({
         member_limit: Number(memberLimit) || 1,
         join_requires_approval: joinRequiresApproval,
       });
-      showToast("Settings saved.", "success");
+      showToast(t("room.admin.toast.settingsSaved"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Save failed.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.saveFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -315,7 +324,7 @@ export function ChannelAdminPanel({
 
   async function savePublicSlug() {
     if (privacy === "private") {
-      showToast("Custom public link only applies to public or unlisted channels.", "info");
+      showToast(t("room.admin.toast.publicLinkOnly"), "info");
       return;
     }
     setBusy("slug");
@@ -325,9 +334,9 @@ export function ChannelAdminPanel({
         public_join_slug: trimmed.length ? trimmed : null,
       });
       setPublicJoinSlugSaved(trimmed.length ? trimmed.toLowerCase() : "");
-      showToast(trimmed ? "Join code saved." : "Custom join code cleared — default link is used.", "success");
+      showToast(trimmed ? t("room.admin.toast.joinCodeSaved") : t("room.admin.toast.joinCodeCleared"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not save join code.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.joinCodeSaveFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -340,10 +349,10 @@ export function ChannelAdminPanel({
       await updateChannelSettings(channelId, {
         experience: { rehearsal_lift_until: until },
       });
-      showToast("Listeners can hear the mix for 15 minutes.", "success");
+      showToast(t("room.admin.toast.liftRehearsal"), "success");
       router.refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not lift soundcheck.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.liftRehearsalFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -376,10 +385,10 @@ export function ChannelAdminPanel({
           scheduled_start_at: expScheduledStart.trim() ? expScheduledStart.trim() : null,
         },
       });
-      showToast("Room experience saved.", "success");
+      showToast(t("room.admin.toast.experienceSaved"), "success");
       router.refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not save experience.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.experienceSaveFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -389,10 +398,10 @@ export function ChannelAdminPanel({
     setBusy("logo");
     try {
       await uploadChannelBrandLogo(channelId, file);
-      showToast("Brand logo updated.", "success");
+      showToast(t("room.admin.toast.logoUpdated"), "success");
       router.refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Logo upload failed.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.logoUploadFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -403,7 +412,7 @@ export function ChannelAdminPanel({
       const data = await getChannelMembers(channelId);
       setMembers(data.results);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Cannot load members.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.membersLoadFailed"), "error");
     }
   }
 
@@ -412,9 +421,9 @@ export function ChannelAdminPanel({
     try {
       const data = await rotatePrivateInvite(channelId);
       setInviteToken(data.token);
-      showToast("New private invite code — old links stop working.", "success");
+      showToast(t("room.admin.toast.privateInviteRotated"), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Rotate failed.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.rotateFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -424,10 +433,10 @@ export function ChannelAdminPanel({
     setBusy("rotate-public");
     try {
       await rotatePublicLink(channelId);
-      showToast("Fallback UUID link rotated. Share the new QR if you used the long link.", "success");
+      showToast(t("room.admin.toast.publicLinkRotated"), "success");
       window.location.reload();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Rotate failed.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.rotateFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -437,11 +446,11 @@ export function ChannelAdminPanel({
     setDeleteChannelBusy(true);
     try {
       await deleteChannel(channelId);
-      showToast("Channel deleted.", "success");
+      showToast(t("room.admin.toast.deleted"), "success");
       setDeleteChannelDialogOpen(false);
       router.replace("/dashboard");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not delete channel.", "error");
+      showToast(error instanceof Error ? error.message : t("room.admin.toast.deleteFailed"), "error");
     } finally {
       setDeleteChannelBusy(false);
     }
@@ -453,19 +462,16 @@ export function ChannelAdminPanel({
     <Dialog open={deleteChannelDialogOpen} onOpenChange={setDeleteChannelDialogOpen}>
       <DialogContent className="border-red-900/40">
         <DialogHeader>
-          <DialogTitle>Delete this channel?</DialogTitle>
-          <DialogDescription>
-            This removes the channel, playlists, queue state, and memberships for everyone. This action cannot be undone. Only the channel owner can
-            delete the room.
-          </DialogDescription>
+          <DialogTitle>{t("room.admin.dialog.delete.title")}</DialogTitle>
+          <DialogDescription>{t("room.admin.dialog.delete.description")}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="secondary" disabled={deleteChannelBusy} onClick={() => setDeleteChannelDialogOpen(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="button" variant="destructive" disabled={deleteChannelBusy} onClick={() => void confirmDeleteChannel()}>
             {deleteChannelBusy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-            Delete permanently
+            {t("room.admin.dialog.delete.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -534,45 +540,45 @@ export function ChannelAdminPanel({
           <TabsContent value="settings" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-5">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Room profile</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("room.admin.settings.profile.title")}</h3>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-name-${channelId}`}>Name</Label>
+                  <Label htmlFor={`ch-name-${channelId}`}>{t("channels.name")}</Label>
                   <Input
                     id={`ch-name-${channelId}`}
                     value={name}
                     aria-invalid={Boolean(fieldErrors.name)}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Channel name"
+                    placeholder={t("room.admin.settings.profile.namePlaceholder")}
                     className="border-border bg-card/80"
                   />
                   {fieldErrors.name ? <p className="text-xs text-red-400">{fieldErrors.name}</p> : null}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-desc-${channelId}`}>Description</Label>
+                  <Label htmlFor={`ch-desc-${channelId}`}>{t("room.admin.settings.profile.description")}</Label>
                   <textarea
                     id={`ch-desc-${channelId}`}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What is this room about?"
+                    placeholder={t("room.admin.settings.profile.descPlaceholder")}
                     rows={3}
                     className="flex w-full resize-none rounded-md border border-border bg-card/80 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-privacy-${channelId}`}>Privacy</Label>
+                  <Label htmlFor={`ch-privacy-${channelId}`}>{t("channels.privacy")}</Label>
                   <Select
                     id={`ch-privacy-${channelId}`}
                     value={privacy}
                     onChange={(e) => setPrivacy(e.target.value as typeof privacy)}
                     className="border-border bg-card/80"
                   >
-                    <option value="public">Public — anyone with a code can join</option>
-                    <option value="private">Private — invite code required</option>
-                    <option value="unlisted">Unlisted — link/code only</option>
+                    <option value="public">{t("room.admin.settings.privacy.public")}</option>
+                    <option value="private">{t("room.admin.settings.privacy.private")}</option>
+                    <option value="unlisted">{t("room.admin.settings.privacy.unlisted")}</option>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-limit-${channelId}`}>Member limit</Label>
+                  <Label htmlFor={`ch-limit-${channelId}`}>{t("channels.memberLimit")}</Label>
                   <Input
                     id={`ch-limit-${channelId}`}
                     type="number"
@@ -588,15 +594,13 @@ export function ChannelAdminPanel({
 
               <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border/70 bg-card/40 p-5">
                 <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Access rules</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    When enabled, new members wait in a queue until a moderator approves them.
-                  </p>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("room.admin.settings.access.title")}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{t("room.admin.settings.access.hint")}</p>
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/50 px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Require approval to join</p>
-                    <p className="text-xs text-muted-foreground">Recommended for open rooms</p>
+                    <p className="text-sm font-medium text-foreground">{t("room.admin.settings.access.approvalTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("room.admin.settings.access.approvalHint")}</p>
                   </div>
                   <Switch checked={joinRequiresApproval} onCheckedChange={setJoinRequiresApproval} id={`ch-approval-${channelId}`} />
                 </div>
@@ -606,53 +610,51 @@ export function ChannelAdminPanel({
                   onClick={() => void saveSettings()}
                 >
                   {busy === "settings" ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Save settings
+                  {t("room.admin.settings.saveSettings")}
                 </Button>
               </div>
             </div>
 
             <div className="rounded-2xl border border-border/70 bg-card/40 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Room experience</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Accent colors, soundcheck mode, queue lock, blind roulette playlist, skip-vote threshold, intro clip length, and channel logo.
-              </p>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("room.admin.settings.experience.title")}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t("room.admin.settings.experience.hint")}</p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-exp-accent-${channelId}`}>Accent</Label>
+                  <Label htmlFor={`ch-exp-accent-${channelId}`}>{t("room.admin.settings.accent")}</Label>
                   <Select
                     id={`ch-exp-accent-${channelId}`}
                     value={expAccent}
                     onChange={(e) => setExpAccent(e.target.value)}
                     className="border-border bg-card/80"
                   >
-                    <option value="emerald">Emerald</option>
-                    <option value="violet">Violet</option>
-                    <option value="rose">Rose</option>
-                    <option value="amber">Amber</option>
-                    <option value="sky">Sky</option>
+                    <option value="emerald">{t("room.admin.settings.accent.emerald")}</option>
+                    <option value="violet">{t("room.admin.settings.accent.violet")}</option>
+                    <option value="rose">{t("room.admin.settings.accent.rose")}</option>
+                    <option value="amber">{t("room.admin.settings.accent.amber")}</option>
+                    <option value="sky">{t("room.admin.settings.accent.sky")}</option>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-blind-pl-${channelId}`}>Blind roulette playlist</Label>
+                  <Label htmlFor={`ch-blind-pl-${channelId}`}>{t("room.admin.settings.blindPlaylist")}</Label>
                   <Select
                     id={`ch-blind-pl-${channelId}`}
                     value={expBlindPlaylistId}
                     onChange={(e) => setExpBlindPlaylistId(e.target.value)}
                     className="border-border bg-card/80"
                   >
-                    <option value="">— none —</option>
+                    <option value="">{t("common.none")}</option>
                     {adminPlaylists.map((p) => (
                       <option key={p.id} value={String(p.id)}>
                         {p.name}
                       </option>
                     ))}
                   </Select>
-                  <p className="text-xs text-muted-foreground">Used when DJs send a blind draw over the live socket.</p>
+                  <p className="text-xs text-muted-foreground">{t("room.admin.settings.blindPlaylistHint")}</p>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Soundcheck (rehearsal) mode</p>
-                    <p className="text-xs text-muted-foreground">Listeners hear silence until moderators disable this.</p>
+                    <p className="text-sm font-medium text-foreground">{t("room.admin.settings.rehearsalTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("room.admin.settings.rehearsalHint")}</p>
                   </div>
                   <Switch checked={expRehearsal} onCheckedChange={setExpRehearsal} id={`ch-exp-reh-${channelId}`} />
                 </div>
@@ -665,20 +667,20 @@ export function ChannelAdminPanel({
                       disabled={busy === "lift"}
                       onClick={() => void liftRehearsalMix()}
                     >
-                      Lift soundcheck 15 min
+                      {t("room.admin.settings.liftRehearsal")}
                     </Button>
-                    <p className="text-xs text-muted-foreground">Listeners hear the main mix until the lift expires.</p>
+                    <p className="text-xs text-muted-foreground">{t("room.admin.settings.liftRehearsalHint")}</p>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Lock queue adds</p>
-                    <p className="text-xs text-muted-foreground">Only the room owner can enqueue while locked.</p>
+                    <p className="text-sm font-medium text-foreground">{t("room.admin.settings.queueLockTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("room.admin.settings.queueLockHint")}</p>
                   </div>
                   <Switch checked={expQueueLocked} onCheckedChange={setExpQueueLocked} id={`ch-exp-lock-${channelId}`} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-exp-intro-${channelId}`}>Intro clip length (seconds)</Label>
+                  <Label htmlFor={`ch-exp-intro-${channelId}`}>{t("room.admin.settings.introLabel")}</Label>
                   <Input
                     id={`ch-exp-intro-${channelId}`}
                     type="number"
@@ -688,10 +690,10 @@ export function ChannelAdminPanel({
                     onChange={(e) => setExpIntro(e.target.value)}
                     className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-muted-foreground">After this point, listeners are muted locally (sync stays aligned).</p>
+                  <p className="text-xs text-muted-foreground">{t("room.admin.settings.introHint")}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-exp-veto-${channelId}`}>Skip vote threshold</Label>
+                  <Label htmlFor={`ch-exp-veto-${channelId}`}>{t("room.admin.settings.vetoLabel")}</Label>
                   <Input
                     id={`ch-exp-veto-${channelId}`}
                     type="number"
@@ -701,51 +703,51 @@ export function ChannelAdminPanel({
                     onChange={(e) => setExpVeto(e.target.value)}
                     className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-muted-foreground">0 = tally only. When reached, the room auto-advances like “next”.</p>
+                  <p className="text-xs text-muted-foreground">{t("room.admin.settings.vetoHint")}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-exp-anti-${channelId}`}>Anti-repeat window</Label>
+                  <Label htmlFor={`ch-exp-anti-${channelId}`}>{t("room.admin.settings.antiRepeat")}</Label>
                   <Input id={`ch-exp-anti-${channelId}`} type="number" min={0} value={expAntiRepeat} onChange={(e) => setExpAntiRepeat(e.target.value)} className="border-border bg-card/80" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`ch-exp-bias-${channelId}`}>Shuffle bias (0–2)</Label>
+                  <Label htmlFor={`ch-exp-bias-${channelId}`}>{t("room.admin.settings.shuffleBias")}</Label>
                   <Input id={`ch-exp-bias-${channelId}`} type="number" min={0} max={2} step={0.1} value={expShuffleBias} onChange={(e) => setExpShuffleBias(e.target.value)} className="border-border bg-card/80" />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-foreground">Track suggestions</p>
+                  <p className="text-sm font-medium text-foreground">{t("room.admin.settings.trackSuggestions")}</p>
                   <Switch checked={expSuggestions} onCheckedChange={setExpSuggestions} />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">DJ rotation</p>
+                  <p className="text-sm font-medium text-foreground">{t("room.admin.settings.djRotation")}</p>
                   <Switch checked={expDjRotation} onCheckedChange={setExpDjRotation} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Rotate every N tracks</Label>
+                  <Label>{t("room.admin.settings.djRotateEvery")}</Label>
                   <Input type="number" min={1} value={expDjEvery} onChange={(e) => setExpDjEvery(e.target.value)} className="border-border bg-card/80" />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-foreground">Listening party</p>
+                  <p className="text-sm font-medium text-foreground">{t("room.admin.settings.listeningParty")}</p>
                   <Switch checked={expListeningParty} onCheckedChange={setExpListeningParty} />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
-                  <p className="text-sm font-medium text-foreground">Radio mode</p>
+                  <p className="text-sm font-medium text-foreground">{t("room.admin.settings.radioMode")}</p>
                   <Switch checked={expRadio} onCheckedChange={setExpRadio} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor={`ch-exp-queue-end-${channelId}`}>When queue ends</Label>
+                  <Label htmlFor={`ch-exp-queue-end-${channelId}`}>{t("room.admin.settings.queueEnd")}</Label>
                   <Select
                     id={`ch-exp-queue-end-${channelId}`}
                     value={expQueueEndMode}
                     onChange={(e) => setExpQueueEndMode(e.target.value as "loop" | "stop" | "repeat_one")}
                     className="border-border bg-card/80"
                   >
-                    <option value="loop">Loop playlist</option>
-                    <option value="stop">Stop at last track</option>
-                    <option value="repeat_one">Repeat current track</option>
+                    <option value="loop">{t("room.admin.settings.queueEnd.loop")}</option>
+                    <option value="stop">{t("room.admin.settings.queueEnd.stop")}</option>
+                    <option value="repeat_one">{t("room.admin.settings.queueEnd.repeatOne")}</option>
                   </Select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor={`ch-exp-rules-${channelId}`}>Room rules (shown to listeners)</Label>
+                  <Label htmlFor={`ch-exp-rules-${channelId}`}>{t("room.admin.settings.roomRules")}</Label>
                   <textarea
                     id={`ch-exp-rules-${channelId}`}
                     value={expRoomRules}
@@ -753,11 +755,11 @@ export function ChannelAdminPanel({
                     rows={3}
                     maxLength={2000}
                     className="w-full rounded-md border border-border bg-card/80 px-3 py-2 text-sm text-foreground"
-                    placeholder="Be kind, no spoilers, request in chat…"
+                    placeholder={t("room.admin.settings.roomRulesPlaceholder")}
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor={`ch-exp-scheduled-${channelId}`}>Scheduled start (ISO, optional)</Label>
+                  <Label htmlFor={`ch-exp-scheduled-${channelId}`}>{t("room.admin.settings.scheduledStart")}</Label>
                   <Input
                     id={`ch-exp-scheduled-${channelId}`}
                     value={expScheduledStart}
@@ -765,10 +767,10 @@ export function ChannelAdminPanel({
                     placeholder="2026-05-16T21:00:00Z"
                     className="border-border bg-card/80"
                   />
-                  <p className="text-xs text-muted-foreground">Blocks play/shuffle until this time (UTC ISO string).</p>
+                  <p className="text-xs text-muted-foreground">{t("room.admin.settings.scheduledStartHint")}</p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor={`ch-brand-logo-${channelId}`}>Brand logo</Label>
+                  <Label htmlFor={`ch-brand-logo-${channelId}`}>{t("room.admin.settings.brandLogo")}</Label>
                   <Input
                     id={`ch-brand-logo-${channelId}`}
                     type="file"
@@ -791,7 +793,7 @@ export function ChannelAdminPanel({
                   onClick={() => void saveExperience()}
                 >
                   {busy === "experience" ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Save experience
+                  {t("room.admin.settings.saveExperience")}
                 </Button>
                 <Button
                   type="button"
@@ -799,11 +801,11 @@ export function ChannelAdminPanel({
                   disabled={!channelIsActive || !sendSocketMessage}
                   onClick={() => {
                     const ok = sendSocketMessage?.({ action: "blind_draw" });
-                    if (!ok) showToast("Connect to the live room first.", "error");
-                    else showToast("Blind draw sent — random track from the configured playlist.", "success");
+                    if (!ok) showToast(t("room.admin.settings.connectLiveFirst"), "error");
+                    else showToast(t("room.admin.settings.blindDrawSent"), "success");
                   }}
                 >
-                  Blind roulette draw
+                  {t("room.admin.settings.blindDraw")}
                 </Button>
               </div>
             </div>
@@ -811,11 +813,8 @@ export function ChannelAdminPanel({
             <div className="h-px bg-muted/90" />
 
             <div className="rounded-2xl border border-red-900/35 bg-red-950/15 p-5">
-              <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Permanently delete this channel and its related data. Only the channel owner sees this option — moderators and guests cannot remove
-                the room.
-              </p>
+              <h3 className="text-sm font-semibold text-destructive">{t("room.admin.danger.title")}</h3>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("room.admin.danger.hint")}</p>
               {canDeleteChannel ? (
                 <Button
                   type="button"
@@ -825,10 +824,10 @@ export function ChannelAdminPanel({
                   onClick={() => setDeleteChannelDialogOpen(true)}
                 >
                   <Trash2 className="size-4" />
-                  Delete channel
+                  {t("room.admin.danger.deleteChannel")}
                 </Button>
               ) : (
-                <p className="mt-4 text-xs text-muted-foreground">Only the room owner can delete this channel.</p>
+                <p className="mt-4 text-xs text-muted-foreground">{t("room.admin.danger.ownerOnly")}</p>
               )}
             </div>
           </TabsContent>
@@ -839,12 +838,9 @@ export function ChannelAdminPanel({
                 <div>
                   <div className="flex items-center gap-2">
                     <Shield className="size-4 text-brand" />
-                    <h3 className="font-semibold text-foreground">Private invite</h3>
+                    <h3 className="font-semibold text-foreground">{t("room.admin.invites.private.title")}</h3>
                   </div>
-                  <p className="mt-1 max-w-lg text-sm text-muted-foreground">
-                    Every room has an active invite code. Guests enter <strong className="text-foreground/80">only this code</strong> (or scan QR)
-                    — no full URL needed.
-                  </p>
+                  <p className="mt-1 max-w-lg text-sm text-muted-foreground">{t("room.admin.invites.private.hint")}</p>
                 </div>
                 <Button
                   type="button"
@@ -855,7 +851,7 @@ export function ChannelAdminPanel({
                   onClick={() => void rotatePrivate()}
                 >
                   <RefreshCw className={cn("size-3.5", busy === "rotate-private" && "animate-spin")} />
-                  New code
+                  {t("room.admin.invites.newCode")}
                 </Button>
               </div>
               {inviteToken ? (
@@ -863,13 +859,13 @@ export function ChannelAdminPanel({
                   <code className="flex-1 rounded-lg border border-border bg-[var(--surface-inset)] px-3 py-2 font-mono text-sm text-brand">
                     {inviteToken}
                   </code>
-                  <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => void copyText(inviteToken, showToast)}>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => void copyText(inviteToken, showToast, copyMessages)}>
                     <Copy className="size-3.5" />
-                    Copy code
+                    {t("room.admin.invites.copyCode")}
                   </Button>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-muted-foreground">Loading invite…</p>
+                <p className="mt-4 text-sm text-muted-foreground">{t("room.admin.invites.loading")}</p>
               )}
             </section>
 
@@ -877,20 +873,18 @@ export function ChannelAdminPanel({
               <section className="rounded-2xl border border-border/70 bg-card/40 p-5">
                 <div className="flex items-center gap-2">
                   <UserPlus className="size-4 text-sky-400" />
-                  <h3 className="font-semibold text-foreground">Public join code</h3>
+                  <h3 className="font-semibold text-foreground">{t("room.admin.invites.public.title")}</h3>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Set a short memorable code (letters, numbers, hyphens). Guests type this code to join.
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{t("room.admin.invites.public.hint")}</p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <Input
                     value={publicJoinSlugDraft}
                     onChange={(e) => setPublicJoinSlugDraft(e.target.value)}
-                    placeholder="e.g. friday-jams"
+                    placeholder={t("room.admin.invites.publicPlaceholder")}
                     className="border-border bg-card/80 font-mono sm:max-w-xs"
                   />
                   <Button type="button" disabled={!channelIsActive || busy === "slug"} onClick={() => void savePublicSlug()}>
-                    {busy === "slug" ? <Loader2 className="size-4 animate-spin" /> : "Save code"}
+                    {busy === "slug" ? <Loader2 className="size-4 animate-spin" /> : t("room.admin.invites.saveCode")}
                   </Button>
                 </div>
                 <Button
@@ -901,27 +895,35 @@ export function ChannelAdminPanel({
                   disabled={!channelIsActive || busy === "rotate-public"}
                   onClick={() => void rotatePublicUuid()}
                 >
-                  Regenerate long fallback link (UUID)
+                  {t("room.admin.invites.regenerateUuid")}
                 </Button>
               </section>
             ) : null}
 
             <div>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">QR codes</h3>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("room.admin.invites.qr.title")}</h3>
               <div className="grid gap-6 sm:grid-cols-2">
                 <QrTile
-                  title="Private invite"
-                  subtitle="Guests paste the code above"
+                  title={t("room.admin.invites.qr.privateTitle")}
+                  subtitle={t("room.admin.invites.qr.privateSubtitle")}
                   value={privateJoinUrl}
                   disabled={!privateJoinUrl}
-                  onCopy={() => privateJoinUrl && void copyText(privateJoinUrl, showToast)}
+                  copyLinkLabel={t("room.admin.invites.tapCopyLink")}
+                  unavailableLabel={t("room.admin.invites.qrUnavailable")}
+                  onCopy={() => privateJoinUrl && void copyText(privateJoinUrl, showToast, copyMessages)}
                 />
                 {publicJoinUrl ? (
                   <QrTile
-                    title="Public link"
-                    subtitle={publicJoinSlugSaved ? `Code: ${publicJoinSlugSaved}` : "UUID fallback"}
+                    title={t("room.admin.invites.qr.publicTitle")}
+                    subtitle={
+                      publicJoinSlugSaved
+                        ? t("room.admin.invites.qr.publicCode", { code: publicJoinSlugSaved })
+                        : t("room.admin.invites.qr.uuidFallback")
+                    }
                     value={publicJoinUrl}
-                    onCopy={() => void copyText(publicJoinUrl, showToast)}
+                    copyLinkLabel={t("room.admin.invites.tapCopyLink")}
+                    unavailableLabel={t("room.admin.invites.qrUnavailable")}
+                    onCopy={() => void copyText(publicJoinUrl, showToast, copyMessages)}
                   />
                 ) : null}
               </div>
@@ -931,14 +933,14 @@ export function ChannelAdminPanel({
           <TabsContent value="people" className="space-y-6">
             <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/35">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-4 py-3">
-                <h3 className="text-sm font-semibold text-foreground/80">Pending join requests</h3>
+                <h3 className="text-sm font-semibold text-foreground/80">{t("room.admin.people.pendingTitle")}</h3>
                 <Button variant="secondary" size="sm" onClick={() => void loadJoinRequests()}>
-                  Refresh
+                  {t("common.refresh")}
                 </Button>
               </div>
               <div className="p-4">
                 {joinRequests.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">No pending requests.</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground">{t("room.admin.people.pendingEmpty")}</p>
                 ) : (
                   <div className="space-y-2">
                     {joinRequests.map((jr) => (
@@ -953,15 +955,15 @@ export function ChannelAdminPanel({
                             onClick={async () => {
                               try {
                                 await approveJoinRequest(channelId, jr.id);
-                                showToast("Approved.", "success");
+                                showToast(t("room.admin.toast.approved"), "success");
                                 await loadJoinRequests();
                                 await loadMembers();
                               } catch (error) {
-                                showToast(error instanceof Error ? error.message : "Approve failed.", "error");
+                                showToast(error instanceof Error ? error.message : t("room.admin.toast.approveFailed"), "error");
                               }
                             }}
                           >
-                            Approve
+                            {t("common.approve")}
                           </Button>
                           <Button
                             variant="secondary"
@@ -969,14 +971,14 @@ export function ChannelAdminPanel({
                             onClick={async () => {
                               try {
                                 await rejectJoinRequest(channelId, jr.id);
-                                showToast("Rejected.", "info");
+                                showToast(t("room.admin.toast.rejected"), "info");
                                 await loadJoinRequests();
                               } catch (error) {
-                                showToast(error instanceof Error ? error.message : "Reject failed.", "error");
+                                showToast(error instanceof Error ? error.message : t("room.admin.toast.rejectFailed"), "error");
                               }
                             }}
                           >
-                            Reject
+                            {t("common.reject")}
                           </Button>
                         </div>
                       </div>
@@ -988,14 +990,14 @@ export function ChannelAdminPanel({
 
             <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/35">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-4 py-3">
-                <h3 className="text-sm font-semibold text-foreground/80">Members</h3>
+                <h3 className="text-sm font-semibold text-foreground/80">{t("room.admin.people.membersTitle")}</h3>
                 <Button variant="secondary" size="sm" onClick={() => void loadMembers()}>
-                  Refresh
+                  {t("common.refresh")}
                 </Button>
               </div>
               <ScrollArea className="h-[min(360px,45vh)]">
                 <div className="space-y-2 p-4 pr-3">
-                  {members.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No members yet.</p> : null}
+                  {members.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{t("room.admin.people.membersEmpty")}</p> : null}
                   {members.map((member) => (
                     <div key={member.id} className="rounded-xl border border-border/80 bg-card/40 p-3">
                       <p className="truncate text-sm font-medium text-foreground">@{member.username}</p>
@@ -1011,7 +1013,7 @@ export function ChannelAdminPanel({
                           className="mt-2 border-t-0 pt-0"
                         />
                       ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">Inactive</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{t("common.inactive")}</p>
                       )}
                     </div>
                   ))}
@@ -1048,15 +1050,15 @@ export function ChannelAdminPanel({
               <Radio className="size-5" />
             </span>
             <div>
-              <CardTitle className="text-xl text-foreground">Control room</CardTitle>
+              <CardTitle className="text-xl text-foreground">{t("room.admin.controlRoom.title")}</CardTitle>
               <CardDescription className="mt-1 max-w-xl text-muted-foreground">
-                Tune the room, share short join codes, and manage members — without juggling long URLs.
+                {t("room.admin.controlRoom.subtitle")}
               </CardDescription>
             </div>
           </div>
           {!channelIsActive ? (
             <Badge variant="secondary" className="border-amber-800/50 bg-amber-950/40 text-warning">
-              Channel closed
+              {t("room.admin.controlRoom.closedBadge")}
             </Badge>
           ) : null}
         </div>

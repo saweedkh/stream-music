@@ -36,6 +36,21 @@ function getSharedAudioContext(): AudioContext | null {
   return sharedAudioContext;
 }
 
+/** Resume Web Audio after a user gesture (autoplay / unlock). */
+export function resumeSharedAudioContext(): Promise<void> {
+  const ctx = getSharedAudioContext();
+  if (!ctx || ctx.state === "running") return Promise.resolve();
+  return ctx.resume().catch(() => {});
+}
+
+/** True when the visualizer routed this element through a suspended AudioContext (no audible output). */
+export function isMediaOutputSuspended(media: HTMLMediaElement | null): boolean {
+  if (!media) return false;
+  const entry = graphByMedia.get(media);
+  if (!entry) return false;
+  return entry.ctx.state === "suspended";
+}
+
 function cancelTeardown(media: HTMLMediaElement) {
   const t = teardownTimers.get(media);
   if (t) {
@@ -108,10 +123,9 @@ export function AudioWaveVisualizer({ media, isActive, accent, className, varian
         analyser.fftSize = variant === "compact" ? 512 : 1024;
         analyser.smoothingTimeConstant = 0.72;
         source.connect(analyser);
-        analyser.connect(ctx.destination);
+        source.connect(ctx.destination);
         existing = { ctx, source, analyser, refCount: 0 };
         graphByMedia.set(media, existing);
-        void ctx.resume().catch(() => {});
       } catch {
         existing = undefined;
       }

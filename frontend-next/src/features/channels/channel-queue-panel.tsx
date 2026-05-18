@@ -63,7 +63,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
         setStatus(null);
         return;
       }
-      const message = error instanceof Error ? error.message : "Cannot load queue.";
+      const message = error instanceof Error ? error.message : t("room.queue.loadFailed");
       setStatus(message);
       showToast(message, "error");
     } finally {
@@ -94,7 +94,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
         setQueue(data.results);
         await queueCtx?.refreshQueue();
       } catch (error) {
-        showToast(error instanceof Error ? error.message : "Upvote failed.", "error");
+        showToast(error instanceof Error ? error.message : t("room.queue.upvoteFailed"), "error");
         await loadListenerQueue();
       } finally {
         setUpvotingId(null);
@@ -127,7 +127,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
         setStatus(null);
         return;
       }
-      const message = error instanceof Error ? error.message : "Cannot load queue.";
+      const message = error instanceof Error ? error.message : t("room.queue.loadFailed");
       setStatus(message);
       showToast(message, "error");
     } finally {
@@ -158,7 +158,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
   const listContent = (
     <div className="space-y-2">
       {!isListener && readOnly ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">Reopen the channel to load or edit the queue.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">{t("room.admin.queue.reopenHint")}</p>
       ) : null}
       {loading ? <ListSkeleton rows={6} className="py-2" /> : null}
       {!loading &&
@@ -212,7 +212,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
                       await refresh();
                       await queueCtx?.refreshQueue();
                     } catch (error) {
-                      showToast(error instanceof Error ? error.message : "Upvote failed.", "error");
+                      showToast(error instanceof Error ? error.message : t("room.queue.upvoteFailed"), "error");
                     }
                   }}
                 >
@@ -414,7 +414,7 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
                             await refresh();
                             await queueCtx?.refreshQueue();
                           } catch (error) {
-                            showToast(error instanceof Error ? error.message : "Upvote failed.", "error");
+                            showToast(error instanceof Error ? error.message : t("room.queue.upvoteFailed"), "error");
                           }
                         }}
                       >
@@ -481,10 +481,10 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
                         onClick={async () => {
                           try {
                             await removeChannelQueueItem(channelId, item.id);
-                            showToast("Queue item removed.", "success");
+                            showToast(t("room.queue.removed"), "success");
                             await refresh();
                           } catch (error) {
-                            showToast(error instanceof Error ? error.message : "Cannot remove queue item.", "error");
+                            showToast(error instanceof Error ? error.message : t("room.queue.removeFailed"), "error");
                           }
                         }}
                       >
@@ -510,10 +510,10 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
   return (
     <Card className="overflow-hidden border-border/90 transition-shadow duration-300 hover:shadow-lg hover:shadow-black/20">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-border/80 pb-4">
-        <CardTitle className="text-lg">Queue</CardTitle>
+        <CardTitle className="text-lg">{t("room.admin.playlist.queue")}</CardTitle>
         <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => void refresh()} disabled={readOnly}>
           <RefreshCw className="size-3.5" />
-          Refresh
+          {t("common.refresh")}
         </Button>
       </CardHeader>
       <CardContent className="space-y-3 p-4">

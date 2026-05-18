@@ -589,12 +589,12 @@ export function ChannelDashboardTabs(props: Props) {
     <Dialog open={closeChannelDialogOpen} onOpenChange={(open) => !closeChannelBusy && setCloseChannelDialogOpen(open)}>
       <DialogContent className="border-border bg-background sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Close this channel?</DialogTitle>
-          <DialogDescription>Everyone loses access until you reopen the room.</DialogDescription>
+          <DialogTitle>{t("room.dialog.close.title")}</DialogTitle>
+          <DialogDescription>{t("room.dialog.close.description")}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="secondary" disabled={closeChannelBusy} onClick={() => setCloseChannelDialogOpen(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -605,18 +605,18 @@ export function ChannelDashboardTabs(props: Props) {
                 setCloseChannelBusy(true);
                 try {
                   await closeChannel(channelId);
-                  showToast("Channel closed.", "success");
+                  showToast(t("room.dialog.close.success"), "success");
                   setCloseChannelDialogOpen(false);
                   applyChannelClosedNavigation();
                 } catch (error) {
-                  showToast(error instanceof Error ? error.message : "Close failed.", "error");
+                  showToast(error instanceof Error ? error.message : t("room.dialog.close.failed"), "error");
                 } finally {
                   setCloseChannelBusy(false);
                 }
               })();
             }}
           >
-            {closeChannelBusy ? "Closing…" : "Close"}
+            {closeChannelBusy ? t("common.closing") : t("room.dialog.close.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -627,15 +627,15 @@ export function ChannelDashboardTabs(props: Props) {
     <Dialog open={leaveDialogOpen} onOpenChange={(open) => !leaveBusy && setLeaveDialogOpen(open)}>
       <DialogContent className="border-border bg-background sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Leave this channel?</DialogTitle>
-          <DialogDescription>You can join again later from the dashboard if you still have access.</DialogDescription>
+          <DialogTitle>{t("room.dialog.leave.title")}</DialogTitle>
+          <DialogDescription>{t("room.dialog.leave.description")}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="secondary" disabled={leaveBusy} onClick={() => setLeaveDialogOpen(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="button" variant="destructive" disabled={leaveBusy} onClick={() => void confirmLeaveChannel()}>
-            {leaveBusy ? "Leaving…" : "Leave channel"}
+            {leaveBusy ? t("common.leaving") : t("room.dialog.leave.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

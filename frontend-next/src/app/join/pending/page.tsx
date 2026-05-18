@@ -3,16 +3,18 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { joinChannel } from "@/lib/api";
 
 function JoinPendingInner() {
+  const { t } = useTranslations();
   const searchParams = useSearchParams();
   const channelId = searchParams.get("channel") ?? "";
   const [status, setStatus] = useState<"pending" | "joined" | "error">("pending");
-  const [message, setMessage] = useState("Waiting for a moderator to approve your request…");
+  const [message, setMessage] = useState(() => t("page.join.pending.waiting"));
 
   useEffect(() => {
     if (!channelId) return;
@@ -23,18 +25,18 @@ function JoinPendingInner() {
         if (cancelled) return;
         if (out.status === "joined") {
           setStatus("joined");
-          setMessage("Approved! Opening the room…");
+          setMessage(t("page.join.pending.approved"));
           window.location.href = `/channel/${out.channel}`;
           return;
         }
         if (out.status === "pending") {
           setStatus("pending");
-          setMessage("Still waiting for approval. This page checks every 8 seconds.");
+          setMessage(t("page.join.pending.stillWaiting"));
         }
       } catch {
         if (!cancelled) {
           setStatus("error");
-          setMessage("Could not check join status. You may have been rejected or the link expired.");
+          setMessage(t("page.join.pending.checkFailed"));
         }
       }
     };
@@ -44,22 +46,22 @@ function JoinPendingInner() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [channelId]);
+  }, [channelId, t]);
 
   return (
     <Card className="mx-auto max-w-md border-border/90">
       <CardHeader>
-        <CardTitle>Join request pending</CardTitle>
+        <CardTitle>{t("page.join.pending.cardTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>{message}</Alert>
         {status === "joined" ? (
           <Button asChild className="w-full">
-            <Link href={`/channel/${channelId}`}>Open channel</Link>
+            <Link href={`/channel/${channelId}`}>{t("page.join.pending.openChannel")}</Link>
           </Button>
         ) : (
           <Button asChild variant="secondary" className="w-full">
-            <Link href="/dashboard">Back to dashboard</Link>
+            <Link href="/dashboard">{t("page.join.pending.dashboard")}</Link>
           </Button>
         )}
       </CardContent>
@@ -68,8 +70,9 @@ function JoinPendingInner() {
 }
 
 export default function JoinPendingPage() {
+  const { t } = useTranslations();
   return (
-    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-muted-foreground">{t("common.loading")}</p>}>
       <JoinPendingInner />
     </Suspense>
   );

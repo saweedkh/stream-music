@@ -1,40 +1,54 @@
 import { z } from "zod";
+import type { MessageKey } from "@/lib/i18n/messages";
 
-export const authLoginSchema = z.object({
-  username: z.string().trim().min(1, "Username is required"),
-  password: z.string().trim().min(1, "Password is required"),
-});
+type T = (key: MessageKey) => string;
 
-export const authRegisterSchema = authLoginSchema.extend({
-  email: z
-    .string()
-    .trim()
-    .optional()
-    .refine((value) => !value || value.includes("@"), "Email format is invalid"),
-});
+export function authLoginSchema(t: T) {
+  return z.object({
+    username: z.string().trim().min(1, t("validation.usernameRequired")),
+    password: z.string().trim().min(1, t("validation.passwordRequired")),
+  });
+}
 
-export const createChannelSchema = z.object({
-  channelName: z.string().trim().min(1, "Channel name is required"),
-  memberLimit: z
-    .string()
-    .trim()
-    .refine((value) => Number(value) > 0, "Member limit must be greater than zero"),
-});
+export function authRegisterSchema(t: T) {
+  return authLoginSchema(t).extend({
+    email: z
+      .string()
+      .trim()
+      .optional()
+      .refine((value) => !value || value.includes("@"), t("validation.emailInvalid")),
+  });
+}
 
-export const uploadTrackSchema = z.object({
-  trackTitle: z.string().trim().min(1, "Track title is required"),
-  trackFile: z.instanceof(File, { message: "Audio file is required" }),
-});
+export function createChannelSchema(t: T) {
+  return z.object({
+    channelName: z.string().trim().min(1, t("validation.channelNameRequired")),
+    memberLimit: z
+      .string()
+      .trim()
+      .refine((value) => Number(value) > 0, t("validation.memberLimitPositive")),
+  });
+}
 
-export const createPlaylistSchema = z.object({
-  playlistName: z.string().trim().min(1, "Playlist name is required"),
-});
+export function uploadTrackSchema(t: T) {
+  return z.object({
+    trackTitle: z.string().trim().min(1, t("validation.trackTitleRequired")),
+    trackFile: z.instanceof(File, { message: t("validation.audioFileRequired") }),
+  });
+}
 
-export const channelSettingsSchema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  memberLimit: z
-    .string()
-    .trim()
-    .refine((value) => Number(value) > 0, "Member limit must be greater than zero"),
-});
+export function createPlaylistSchema(t: T) {
+  return z.object({
+    playlistName: z.string().trim().min(1, t("validation.playlistNameRequired")),
+  });
+}
 
+export function channelSettingsSchema(t: T) {
+  return z.object({
+    name: z.string().trim().min(1, t("validation.nameRequired")),
+    memberLimit: z
+      .string()
+      .trim()
+      .refine((value) => Number(value) > 0, t("validation.memberLimitPositive")),
+  });
+}

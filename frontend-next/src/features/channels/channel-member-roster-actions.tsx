@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast-provider";
@@ -31,6 +32,7 @@ export function ChannelMemberRosterActions({
   layout = "stacked",
   className,
 }: Props) {
+  const { t } = useTranslations();
   const { showToast } = useToast();
   const [role, setRole] = useState(member.role);
   const [busy, setBusy] = useState<string | null>(null);
@@ -44,10 +46,10 @@ export function ChannelMemberRosterActions({
     setBusy("role");
     try {
       await updateChannelMemberRole(channelId, member.id, role);
-      showToast(`Role updated for @${member.username}.`, "success");
+      showToast(t("room.member.roleUpdated", { username: member.username }), "success");
       await onUpdated();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Cannot update role.", "error");
+      showToast(error instanceof Error ? error.message : t("room.member.roleUpdateFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -58,10 +60,10 @@ export function ChannelMemberRosterActions({
     setBusy("remove");
     try {
       await removeChannelMember(channelId, member.id);
-      showToast(`Removed @${member.username}.`, "success");
+      showToast(t("room.member.removed", { username: member.username }), "success");
       await onUpdated();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Cannot remove member.", "error");
+      showToast(error instanceof Error ? error.message : t("room.member.removeFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -71,9 +73,9 @@ export function ChannelMemberRosterActions({
     setBusy("dj");
     try {
       await updateChannelSettings(channelId, { experience: { current_dj_user_id: member.user_id } });
-      showToast(`@${member.username} is the active DJ.`, "success");
+      showToast(t("room.member.djHandoff", { username: member.username }), "success");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "DJ handoff failed.", "error");
+      showToast(error instanceof Error ? error.message : t("room.member.djHandoffFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -82,15 +84,15 @@ export function ChannelMemberRosterActions({
   const controls = (
     <>
       <Select
-        aria-label={`Role for ${member.username}`}
+        aria-label={t("room.member.roleFor", { username: member.username })}
         value={role}
         disabled={!channelIsActive || (isOwnerMember && !isOwnerViewer)}
         className="min-w-[120px] border-border bg-card/80 text-xs"
         onChange={(e) => setRole(e.target.value as ChannelMember["role"])}
       >
-        {isOwnerViewer ? <option value="owner">Owner</option> : null}
-        <option value="moderator">Moderator</option>
-        <option value="member">Member</option>
+        {isOwnerViewer ? <option value="owner">{t("common.owner")}</option> : null}
+        <option value="moderator">{t("common.moderator")}</option>
+        <option value="member">{t("common.member")}</option>
       </Select>
       <Button
         type="button"
@@ -100,7 +102,7 @@ export function ChannelMemberRosterActions({
         disabled={!channelIsActive || busy !== null || role === member.role}
         onClick={() => void saveRole()}
       >
-        {busy === "role" ? "…" : "Save role"}
+        {busy === "role" ? "…" : t("room.member.saveRole")}
       </Button>
       <Button
         type="button"
@@ -110,7 +112,7 @@ export function ChannelMemberRosterActions({
         disabled={!channelIsActive || busy !== null}
         onClick={() => void handoffDj()}
       >
-        {busy === "dj" ? "…" : "Set DJ"}
+        {busy === "dj" ? "…" : t("room.member.setDj")}
       </Button>
       <Button
         type="button"
@@ -120,7 +122,7 @@ export function ChannelMemberRosterActions({
         disabled={!channelIsActive || busy !== null || isOwnerMember}
         onClick={() => void removeMember()}
       >
-        {busy === "remove" ? "…" : "Remove"}
+        {busy === "remove" ? "…" : t("room.member.remove")}
       </Button>
     </>
   );
@@ -138,3 +140,4 @@ export function ChannelMemberRosterActions({
     </div>
   );
 }
+

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { toast } from "sonner";
 
 import { Toaster } from "@/components/ui/sonner";
+import { localizeMessage } from "@/lib/i18n/localize-message";
 
 type ToastTone = "info" | "error" | "success";
 
@@ -15,15 +16,16 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast = useCallback((message: string, tone: ToastTone = "info") => {
+    const text = localizeMessage(message);
     if (tone === "error") {
-      toast.error(message);
+      toast.error(text);
       return;
     }
     if (tone === "success") {
-      toast.success(message);
+      toast.success(text);
       return;
     }
-    toast.message(message);
+    toast.message(text);
   }, []);
 
   const value = useMemo(() => ({ showToast }), [showToast]);

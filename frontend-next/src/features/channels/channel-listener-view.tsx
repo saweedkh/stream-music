@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function ChannelRoomLoading() {
+  const { t } = useTranslations();
   return (
     <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col gap-5 px-4 py-12 sm:px-6">
       <div className="rounded-3xl border border-border/80 bg-background/55 p-6 sm:p-8">
@@ -26,7 +27,7 @@ export function ChannelRoomLoading() {
         <Skeleton className="mt-4 h-10 w-full" />
         <Skeleton className="mt-2 h-4 w-1/2" />
       </div>
-      <p className="text-center text-sm text-muted-foreground">Loading your access…</p>
+      <p className="text-center text-sm text-muted-foreground">{t("room.loading.access")}</p>
     </div>
   );
 }

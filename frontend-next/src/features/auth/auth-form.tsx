@@ -37,8 +37,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setError(null);
     const parseResult =
       mode === "register"
-        ? authRegisterSchema.safeParse({ username, email, password })
-        : authLoginSchema.safeParse({ username, password });
+        ? authRegisterSchema(t).safeParse({ username, email, password })
+        : authLoginSchema(t).safeParse({ username, password });
     const nextErrors: { username?: string; email?: string; password?: string } = {};
     if (!parseResult.success) {
       for (const issue of parseResult.error.issues) {

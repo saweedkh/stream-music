@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
+import { ChannelAudioUnlockDialog } from "@/features/player/channel-audio-unlock-dialog";
 import { ChannelPlayerFull } from "@/features/player/channel-player-full";
 import { ChannelPlayerMini } from "@/features/player/channel-player-mini";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
@@ -45,7 +46,6 @@ export function ChannelPlayer({
     activeTrackPath,
     lastSyncAt,
     needsUserInteraction,
-    setNeedsUserInteraction,
     position,
     setPosition,
     duration,
@@ -58,6 +58,7 @@ export function ChannelPlayer({
     applyControl,
     commitSeek,
     refreshChannelPlaybackState,
+    unlockChannelAudio,
   } = useChannelPlaybackEngine({
     channelId,
     socketState,
@@ -133,8 +134,16 @@ export function ChannelPlayer({
     onSeekCommit: (value: number) => commitSeek(value),
   };
 
+  const showUnlockDialog = Boolean(needsUserInteraction && isPlaying && activeTrackPath);
+
+  const onEnableAudio = () => {
+    void unlockChannelAudio();
+  };
+
   return (
     <>
+      <ChannelAudioUnlockDialog open={showUnlockDialog} title={title} onEnable={onEnableAudio} />
+
       <ChannelPlayerFull
         open={drawerOpen}
         onOpenChange={onDrawerOpenChange}
@@ -164,12 +173,7 @@ export function ChannelPlayer({
         onPlayPause={onPlayPause}
         onNext={() => void applyControl("next")}
         onVolumeChange={setVolume}
-        onEnableAudio={() => {
-          const howl = howlRef.current;
-          if (!howl) return;
-          howl.play();
-          setNeedsUserInteraction(false);
-        }}
+        onEnableAudio={onEnableAudio}
         onRefreshSync={canControl ? () => void refreshChannelPlaybackState() : undefined}
         {...seekHandlers}
       />

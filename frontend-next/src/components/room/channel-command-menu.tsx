@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, ListMusic, MessageSquare, Radio, Search, Settings2, Sparkles } from "lucide-react";
+import { useTranslations } from "@/components/providers/locale-provider";
 import {
   CommandDialog,
   CommandEmpty,
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function ChannelCommandMenu({ channelId, canManage }: Props) {
+  const { t } = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -40,44 +42,44 @@ export function ChannelCommandMenu({ channelId, canManage }: Props) {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search actions…" />
+      <CommandInput placeholder={t("room.command.search")} />
       <CommandList>
-        <CommandEmpty>No results.</CommandEmpty>
-        <CommandGroup heading="Navigate">
+        <CommandEmpty>{t("room.command.empty")}</CommandEmpty>
+        <CommandGroup heading={t("room.command.navigate")}>
           <CommandItem onSelect={() => go("/dashboard")}>
             <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            {t("nav.dashboard")}
             <CommandShortcut>⌘K</CommandShortcut>
           </CommandItem>
           {channelId ? (
             <>
               <CommandItem onSelect={() => go(`/channel/${channelId}?tab=chat`)}>
                 <MessageSquare className="h-4 w-4" />
-                Room chat
+                {t("room.command.roomChat")}
               </CommandItem>
               <CommandItem onSelect={() => go(`/channel/${channelId}?tab=player`)}>
                 <Radio className="h-4 w-4" />
-                Listen &amp; playlist
+                {t("room.command.listenPlaylist")}
               </CommandItem>
               <CommandItem onSelect={() => go(`/channel/${channelId}?tab=queue`)}>
                 <ListMusic className="h-4 w-4" />
-                Queue
+                {t("room.admin.playlist.queue")}
               </CommandItem>
               <CommandItem onSelect={() => go(`/channel/${channelId}?tab=suggestions`)}>
                 <Sparkles className="h-4 w-4" />
-                Track suggestions
+                {t("room.admin.nav.suggestions")}
               </CommandItem>
               {canManage ? (
                 <CommandItem onSelect={() => go(`/channel/${channelId}?tab=admin`)}>
                   <Settings2 className="h-4 w-4" />
-                  Room settings
+                  {t("room.admin.tab.admin.title")}
                 </CommandItem>
               ) : null}
             </>
           ) : (
             <CommandItem onSelect={() => go("/join")}>
               <Search className="h-4 w-4" />
-              Join a channel
+              {t("room.command.joinChannel")}
             </CommandItem>
           )}
         </CommandGroup>

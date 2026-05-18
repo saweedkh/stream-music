@@ -18,7 +18,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { useReconnectingChannelChatSocket } from "@/hooks/use-reconnecting-channel-chat-socket";
 import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatReaction } from "@/lib/api";
 import { renderMessageWithMentions } from "@/lib/render-mentions";
@@ -108,7 +110,21 @@ export function ChannelChatPanel({
   roomActiveTab = null,
   fullHeight = false,
 }: Props) {
+  const { t } = useTranslations();
   const { showToast } = useToast();
+
+  const chatErrorKey = (code: string): MessageKey => {
+    const map: Record<string, MessageKey> = {
+      invalid_body: "chat.error.invalid_body",
+      channel_closed: "chat.error.channel_closed",
+      forbidden: "chat.error.forbidden",
+      not_found: "chat.error.not_found",
+      invalid_emoji: "chat.error.invalid_emoji",
+      auth: "chat.error.auth",
+      rate_limited: "chat.error.rate_limited",
+    };
+    return map[code] ?? "chat.error.generic";
+  };
   const searchParams = useSearchParams();
   const pushNotification = useNotificationStore((s) => s.push);
   const [messages, setMessages] = useState<ChannelChatMessageRow[]>([]);
@@ -193,7 +209,7 @@ export function ChannelChatPanel({
         }
       }
     } catch {
-      showToast("Fullscreen is not available in this browser or was blocked.", "error");
+      showToast(t("chat.toast.fullscreenBlocked"), "error");
     }
   }
 
@@ -203,16 +219,7 @@ export function ChannelChatPanel({
       const type = String(data.type ?? "").toUpperCase();
       if (type === "CHAT_ERROR") {
         const code = String(data.code ?? "error");
-        const human: Record<string, string> = {
-          invalid_body: "Message is empty or too long.",
-          channel_closed: "Room is closed — chat is read-only.",
-          forbidden: "You cannot do that.",
-          not_found: "Message not found.",
-          invalid_emoji: "Invalid reaction.",
-          auth: "Please sign in again.",
-          rate_limited: "You are sending messages too fast. Please wait a moment.",
-        };
-        showToast(human[code] ?? `Chat: ${code}`, "error");
+        showToast(t(chatErrorKey(code)), "error");
         return;
       }
       if (type === "CHAT_SYNC") {
@@ -274,7 +281,7 @@ export function ChannelChatPanel({
         return;
       }
     },
-    [channelId, channelName, myUserId, myUsername, pushNotification, roomActiveTab, showToast],
+    [channelId, channelName, myUserId, myUsername, pushNotification, roomActiveTab, showToast, t],
   );
 
   const { chatSocketState, sendChat } = useReconnectingChannelChatSocket({
@@ -334,9 +341,9 @@ export function ChannelChatPanel({
     const ok = sendChat({ action: "history", before: oldest.id, limit: 40 });
     if (!ok) {
       setLoadingOlder(false);
-      showToast("Chat offline — cannot load older.", "error");
+      showToast(t("chat.toast.offlineLoadOlder"), "error");
     }
-  }, [connected, loadingOlder, messages, sendChat, showToast]);
+  }, [connected, loadingOlder, messages, sendChat, showToast, t]);
 
   function submitSend() {
     const text = draft.trim();
@@ -345,7 +352,7 @@ export function ChannelChatPanel({
     try {
       const ok = sendChat({ action: "send", body: text });
       if (ok) setDraft("");
-      else showToast("Chat offline.", "error");
+      else showToast(t("chat.toast.offline"), "error");
     } finally {
       setSending(false);
     }
@@ -356,16 +363,16 @@ export function ChannelChatPanel({
     const text = editDraft.trim();
     if (!text) return;
     const ok = sendChat({ action: "edit", message_id: editingId, body: text });
-    if (!ok) showToast("Chat offline.", "error");
+    if (!ok) showToast(t("chat.toast.offline"), "error");
     setEditingId(null);
     setEditDraft("");
   }
 
   function confirmDelete(id: number) {
     if (!connected) return;
-    if (!window.confirm("Delete this message for everyone?")) return;
+    if (!window.confirm(t("chat.confirm.delete"))) return;
     const ok = sendChat({ action: "delete", message_id: id });
-    if (!ok) showToast("Chat offline.", "error");
+    if (!ok) showToast(t("chat.toast.offline"), "error");
     setOpenActionsId(null);
   }
 
@@ -379,14 +386,9 @@ export function ChannelChatPanel({
 
   function confirmPurgeAll() {
     if (!connected || !canModerate) return;
-    if (
-      !window.confirm(
-        "Delete the entire chat history for everyone in this channel? This cannot be undone.",
-      )
-    )
-      return;
+    if (!window.confirm(t("chat.confirm.purge"))) return;
     const ok = sendChat({ action: "purge_all" });
-    if (!ok) showToast("Chat offline.", "error");
+    if (!ok) showToast(t("chat.toast.offline"), "error");
   }
 
   function setPin(messageId: number | null) {
@@ -413,9 +415,8 @@ export function ChannelChatPanel({
         )
       : "overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-black/25";
 
-  const headerTitle = variant === "listener" ? "Live room chat" : "Channel chat";
-  const headerSubtitle =
-    variant === "listener" ? "Messages sync live with everyone in the room." : "WebSocket channel — separate from playback.";
+  const headerTitle = variant === "listener" ? t("chat.title.listener") : t("chat.title.admin");
+  const headerSubtitle = variant === "listener" ? t("chat.subtitle.listener") : t("chat.subtitle.admin");
 
   const scrollMinH = fullHeight
     ? "min-h-0 flex-1"
@@ -464,7 +465,11 @@ export function ChannelChatPanel({
                 connected ? "bg-brand/15 text-brand" : "bg-amber-500/15 text-warning",
               )}
             >
-              {connected ? "Live" : chatSocketState === "closed" ? "Offline" : "Connecting…"}
+              {connected
+                ? t("chat.status.live")
+                : chatSocketState === "closed"
+                  ? t("common.offline")
+                  : t("common.connecting")}
             </span>
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{headerSubtitle}</p>
@@ -476,7 +481,7 @@ export function ChannelChatPanel({
               variant="ghost"
               size="icon"
               className="size-9 text-muted-foreground hover:text-foreground"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              aria-label={isFullscreen ? t("chat.fullscreen.exit") : t("chat.fullscreen.enter")}
               onClick={() => void toggleFullscreen()}
             >
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
@@ -488,10 +493,10 @@ export function ChannelChatPanel({
             size="sm"
             className="h-9 gap-1 text-xs"
             onClick={() => setShowPinsOnly((v) => !v)}
-            title="Show pinned messages only"
+            title={t("chat.pinsOnlyTitle")}
           >
             <Pin className="size-3.5" />
-            <span className="hidden sm:inline">Pins</span>
+            <span className="hidden sm:inline">{t("chat.pinsOnly")}</span>
           </Button>
           {nowPlayingLabel ? (
             <Button
@@ -503,7 +508,7 @@ export function ChannelChatPanel({
               onClick={() => shareNowPlayingInChat()}
             >
               <Music className="size-3.5" />
-              <span className="hidden sm:inline">Now playing</span>
+              <span className="hidden sm:inline">{t("chat.nowPlaying")}</span>
             </Button>
           ) : null}
           {canModerate ? (
@@ -516,7 +521,7 @@ export function ChannelChatPanel({
               onClick={() => void confirmPurgeAll()}
             >
               <Eraser className="size-3.5" aria-hidden />
-              <span className="hidden sm:inline">Clear all</span>
+              <span className="hidden sm:inline">{t("chat.clearAll")}</span>
             </Button>
           ) : null}
         </div>
@@ -532,7 +537,7 @@ export function ChannelChatPanel({
       >
         {pinnedMessage ? (
           <div className="shrink-0 rounded-xl border border-brand/25 bg-[var(--brand-subtle)] px-3 py-2 text-xs text-brand">
-            <p className="font-semibold uppercase tracking-wide text-brand/90">Pinned message</p>
+            <p className="font-semibold uppercase tracking-wide text-brand/90">{t("chat.pinnedLabel")}</p>
             <p className="mt-1 line-clamp-2">{pinnedMessage.body}</p>
           </div>
         ) : null}
@@ -545,7 +550,7 @@ export function ChannelChatPanel({
             disabled={loadingOlder || !connected}
             onClick={() => void requestOlder()}
           >
-            {loadingOlder ? <Loader2 className="size-3.5 animate-spin" /> : "Load older messages"}
+            {loadingOlder ? <Loader2 className="size-3.5 animate-spin" /> : t("chat.loadOlder")}
           </Button>
         ) : null}
 
@@ -554,10 +559,10 @@ export function ChannelChatPanel({
             {!hydrated && connectEnabled ? (
               <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
                 <Loader2 className="size-8 animate-spin text-brand/60" />
-                <span>Joining chat…</span>
+                <span>{t("chat.joining")}</span>
               </div>
             ) : visibleMessages.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground">No messages yet — say hi to the room.</p>
+              <p className="py-16 text-center text-sm text-muted-foreground">{t("chat.empty")}</p>
             ) : (
               visibleMessages.map((m) => {
                 const mine = myUserId != null && m.user_id === myUserId;
@@ -601,21 +606,21 @@ export function ChannelChatPanel({
                             />
                             <div className="flex justify-end gap-2">
                               <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                                Cancel
+                                {t("common.cancel")}
                               </Button>
                               <Button type="button" size="sm" onClick={() => void submitEdit()}>
-                                Save
+                                {t("common.save")}
                               </Button>
                             </div>
                           </div>
                         ) : deleted ? (
-                          <p className="italic text-muted-foreground">This message was deleted.</p>
+                          <p className="italic text-muted-foreground">{t("chat.deleted")}</p>
                         ) : (
                           <p className="whitespace-pre-wrap break-words leading-relaxed">{renderMessageWithMentions(m.body)}</p>
                         )}
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                           <span>{new Date(m.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
-                          {m.edited_at ? <span className="text-muted-foreground">edited</span> : null}
+                          {m.edited_at ? <span className="text-muted-foreground">{t("common.edited")}</span> : null}
                         </div>
                       </div>
 
@@ -626,7 +631,7 @@ export function ChannelChatPanel({
                             size="icon"
                             variant="ghost"
                             className="size-8 text-muted-foreground hover:text-foreground"
-                            aria-label="Message actions"
+                            aria-label={t("chat.messageActions")}
                             onClick={() => setOpenActionsId((id) => (id === m.id ? null : m.id))}
                           >
                             <MoreHorizontal className="size-4" />
@@ -670,7 +675,7 @@ export function ChannelChatPanel({
                               setOpenActionsId(null);
                             }}
                           >
-                            <Pencil className="size-3.5" /> Edit
+                            <Pencil className="size-3.5" /> {t("chat.edit")}
                           </Button>
                         ) : null}
                         {canDelete ? (
@@ -681,7 +686,7 @@ export function ChannelChatPanel({
                             className="h-8 gap-1 text-xs text-red-300 hover:text-destructive"
                             onClick={() => confirmDelete(m.id)}
                           >
-                            <Trash2 className="size-3.5" /> Delete
+                            <Trash2 className="size-3.5" /> {t("chat.delete")}
                           </Button>
                         ) : null}
                         {canModerate && pinnedMessage?.id !== m.id ? (
@@ -695,7 +700,7 @@ export function ChannelChatPanel({
                               setOpenActionsId(null);
                             }}
                           >
-                            Pin
+                            {t("chat.pin")}
                           </Button>
                         ) : null}
                         {canModerate && pinnedMessage?.id === m.id ? (
@@ -709,7 +714,7 @@ export function ChannelChatPanel({
                               setOpenActionsId(null);
                             }}
                           >
-                            Unpin
+                            {t("chat.unpin")}
                           </Button>
                         ) : null}
                       </div>
@@ -769,7 +774,7 @@ export function ChannelChatPanel({
               setMentionQuery("");
             }}
             maxLength={2000}
-            placeholder={channelIsActive ? "Message the channel… (@ to mention)" : "Room is closed — chat is read-only."}
+            placeholder={channelIsActive ? t("chat.placeholder.active") : t("chat.placeholder.closed")}
             disabled={!channelIsActive || sending || !connected}
             className={cn(
               "border text-sm",
@@ -831,12 +836,12 @@ export function ChannelChatPanel({
             onClick={() => void submitSend()}
           >
             {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-            Send
+            {t("chat.send")}
           </Button>
         </div>
         {!channelIsActive ? (
           <p className={cn("text-center text-xs text-muted-foreground", fullHeight && "shrink-0")}>
-            Reopen the channel to send new messages.
+            {t("chat.reopenToSend")}
           </p>
         ) : null}
       </div>

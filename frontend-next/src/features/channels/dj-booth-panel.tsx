@@ -1,82 +1,52 @@
 "use client";
 
 import { Headphones, ListMusic, SkipForward } from "lucide-react";
-import { useContext } from "react";
-import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
-import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
-import { UpNextStrip, type UpNextItem } from "@/components/room/up-next-strip";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { useTranslations } from "@/components/providers/locale-provider";
 import { Button } from "@/components/ui/button";
-import type { QueueItemSummary } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Props = {
   channelId: string;
-  canManage: boolean;
-  sendSocketMessage?: (payload: Record<string, unknown>) => boolean;
   nowPlayingTitle?: string | null;
 };
 
-function toUpNext(queue: QueueItemSummary[], currentTrackId?: number | null): UpNextItem[] {
-  let start = 0;
-  if (currentTrackId != null) {
-    const idx = queue.findIndex((q) => q.track === currentTrackId);
-    if (idx >= 0) start = idx + 1;
-  }
-  return queue.slice(start, start + 3).map((q) => ({
-    id: q.id,
-    title: q.track_detail?.title ?? `Track #${q.track}`,
-    artist: q.track_detail?.artist,
-  }));
-}
-
-export function DjBoothPanel({ channelId, canManage, sendSocketMessage, nowPlayingTitle }: Props) {
-  const queueCtx = useContext(ChannelQueueContext);
-  const queue = queueCtx?.queue ?? [];
-  const upNext = toUpNext(queue);
+export function DjBoothPanel({ channelId, nowPlayingTitle }: Props) {
+  const { t } = useTranslations();
 
   return (
     <div className="space-y-4">
       <Card className="border-brand/40 bg-gradient-to-br from-background via-[var(--brand-subtle)] to-background">
-        <CardHeader className="pb-2">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Headphones className="size-5 text-brand" />
-            DJ booth
+            {t("dj.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Compact view for hosts — queue, skip, and what plays next.
-          </p>
+          <p className="text-sm text-muted-foreground">{t("dj.hint")}</p>
           {nowPlayingTitle ? (
             <p className="truncate text-base font-medium text-foreground">{nowPlayingTitle}</p>
           ) : (
-            <p className="text-sm text-muted-foreground">Nothing playing</p>
+            <p className="text-sm text-muted-foreground">{t("dj.nothingPlaying")}</p>
           )}
-          <UpNextStrip items={upNext} />
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="gap-1.5"
-              disabled={!canManage}
-              onClick={() => sendSocketMessage?.({ action: "next" })}
-            >
-              <SkipForward className="size-4" />
-              Skip
+            <Button type="button" size="sm" variant="secondary" className="gap-1.5" asChild>
+              <Link href={`/channel/${channelId}?tab=player`}>
+                <SkipForward className="size-4" />
+                {t("dj.openPlaylist")}
+              </Link>
             </Button>
             <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" asChild>
-              <a href={`#channel-queue-panel`}>
+              <Link href={`/channel/${channelId}?tab=queue`}>
                 <ListMusic className="size-4" />
-                Full queue
-              </a>
+                {t("dj.openQueue")}
+              </Link>
             </Button>
           </div>
         </CardContent>
       </Card>
-      <div id="channel-queue-panel">
-        <ChannelQueuePanel channelId={channelId} readOnly={!canManage} />
-      </div>
+      <div id="channel-queue-panel" />
     </div>
   );
 }
