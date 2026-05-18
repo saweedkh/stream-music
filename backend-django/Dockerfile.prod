@@ -6,9 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt /app/requirements.txt
-# Strip regional mirror lines so images build on any registry/PyPI mirror.
-RUN sed '/^--index-url/d;/^--trusted-host/d' /app/requirements.txt > /tmp/requirements.txt \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+# Use devneeds PyPI mirror (default in requirements.txt); override with build-arg on other networks.
+ARG PIP_INDEX_URL=https://pypi.devneeds.ir/simple/
+ARG PIP_TRUSTED_HOST=pypi.devneeds.ir
+RUN grep -vE '^--(index-url|trusted-host|extra-index-url)' /app/requirements.txt > /tmp/requirements.txt \
+    && pip install --no-cache-dir \
+      -i "${PIP_INDEX_URL}" \
+      --trusted-host "${PIP_TRUSTED_HOST}" \
+      -r /tmp/requirements.txt
 
 COPY . /app
 
