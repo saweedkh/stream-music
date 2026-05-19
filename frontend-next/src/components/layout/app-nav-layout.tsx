@@ -6,24 +6,45 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { DashboardMobileHeader } from "@/features/dashboard/dashboard-mobile-header";
 import { DashboardSidebar } from "@/features/dashboard/dashboard-sidebar";
+import type { AdminSection, ProfileSection } from "@/features/dashboard/dashboard-nav-config";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
 import { JoinChannelDialog } from "@/features/dashboard/join-channel-dialog";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { listenUserSessionRefresh } from "@/lib/user-session-events";
+import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
   activeTab: DashboardTab;
-  onSelectTab: (tab: DashboardTab) => void;
+  activeProfileSection: ProfileSection;
+  activeAdminSection: AdminSection;
+  onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => void;
+  onSelectProfileSection: (section: ProfileSection) => void;
+  onSelectAdminSection: (section: AdminSection) => void;
   children: ReactNode;
 };
 
-export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutProps) {
+export function AppNavLayout({
+  activeTab,
+  activeProfileSection,
+  activeAdminSection,
+  onSelectMainTab,
+  onSelectProfileSection,
+  onSelectAdminSection,
+  children,
+}: AppNavLayoutProps) {
   const { t } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+
+  const contentKey =
+    activeTab === "settings"
+      ? `settings-${activeProfileSection}`
+      : activeTab === "admin"
+        ? `admin-${activeAdminSection}`
+        : activeTab;
 
   useEffect(() => {
     getMe()
@@ -44,11 +65,6 @@ export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutP
     });
   }, []);
 
-  function handleSelectTab(tab: DashboardTab) {
-    onSelectTab(tab);
-    setMobileNavOpen(false);
-  }
-
   function openJoinDialog() {
     setJoinDialogOpen(true);
     setMobileNavOpen(false);
@@ -56,23 +72,32 @@ export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutP
 
   const sidebarProps = {
     activeTab,
-    onSelectTab: handleSelectTab,
+    activeProfileSection,
+    activeAdminSection,
+    onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => {
+      onSelectMainTab(tab);
+      setMobileNavOpen(false);
+    },
+    onSelectProfileSection: (section: ProfileSection) => {
+      onSelectProfileSection(section);
+      setMobileNavOpen(false);
+    },
+    onSelectAdminSection: (section: AdminSection) => {
+      onSelectAdminSection(section);
+      setMobileNavOpen(false);
+    },
     onJoinChannelClick: openJoinDialog,
     onSidebarAction: () => setMobileNavOpen(false),
     user,
   };
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/40 lg:flex-row",
-      )}
-    >
+    <div className={shellFrame}>
       <div className="hidden h-full min-h-0 lg:flex lg:shrink-0">
         <DashboardSidebar {...sidebarProps} className="h-full rounded-s-2xl" />
       </div>
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className={shellMain}>
         <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -82,16 +107,16 @@ export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutP
           </SheetContent>
         </Sheet>
 
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="relative mx-auto flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3">
+        <div className={shellBody}>
+          <div className={cn(shellContent, "gap-3 max-lg:px-0 max-lg:py-1 lg:gap-0 lg:px-0.5 lg:py-1")}>
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
+                key={contentKey}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+                className="flex w-full flex-col max-lg:flex-none max-lg:overflow-visible lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden"
               >
                 {children}
               </motion.div>

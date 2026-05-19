@@ -4,12 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTranslations } from "@/components/providers/locale-provider";
-import { DashboardMobileHeader } from "@/features/dashboard/dashboard-mobile-header";
+import { ChannelMobileHeader } from "@/features/channels/channel-mobile-header";
 import { ChannelAdminSidebar } from "@/features/channels/channel-admin-sidebar";
+import { ChannelRoomMobileTabs } from "@/features/channels/channel-room-mobile-tabs";
 import { RoomReactionOverlay } from "@/features/channels/room-reaction-overlay";
 import type { ChannelTabId } from "@/features/channels/channel-room-config";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
+import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -32,6 +34,7 @@ type Props = {
   statusBanner?: ReactNode;
   children: ReactNode;
   className?: string;
+  brandLogoUrl?: string | null;
 };
 
 export function ChannelAdminShell({
@@ -54,6 +57,7 @@ export function ChannelAdminShell({
   statusBanner,
   children,
   className,
+  brandLogoUrl,
 }: Props) {
   const { t } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -97,20 +101,21 @@ export function ChannelAdminShell({
   };
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/40 lg:flex-row",
-        className,
-      )}
-    >
+    <div className={cn(shellFrame, className)}>
       <RoomReactionOverlay />
 
       <div className="hidden h-full min-h-0 lg:flex lg:shrink-0">
         <ChannelAdminSidebar {...sidebarProps} className="h-full rounded-s-2xl" />
       </div>
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
+      <div className={shellMain}>
+        <ChannelMobileHeader
+          onMenuClick={() => setMobileNavOpen(true)}
+          user={user}
+          channelName={channelName}
+          brandLogoUrl={brandLogoUrl}
+          isLive={isLive}
+        />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent side="left" className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
@@ -119,8 +124,8 @@ export function ChannelAdminShell({
           </SheetContent>
         </Sheet>
 
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="relative mx-auto flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3">
+        <div className={shellBody}>
+          <div className={cn(shellContent, "gap-2 max-lg:px-0 max-lg:py-0 sm:gap-3")}>
             {statusBanner ? <div className="shrink-0">{statusBanner}</div> : null}
             <AnimatePresence mode="wait">
               <motion.div
@@ -129,11 +134,18 @@ export function ChannelAdminShell({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+                className="flex flex-1 flex-col max-lg:min-h-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden"
               >
                 {children}
               </motion.div>
             </AnimatePresence>
+            <ChannelRoomMobileTabs
+              mode="admin"
+              activeTab={activeTab}
+              onSelectTab={handleSelectTab}
+              canManage={canManage}
+              chatUnread={chatUnread}
+            />
           </div>
         </div>
       </div>

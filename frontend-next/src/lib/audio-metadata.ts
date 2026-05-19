@@ -12,7 +12,7 @@ export async function parseAudioFileMetadata(file: File): Promise<ParsedAudioMet
     title: file.name.replace(/\.[^/.]+$/, "").trim() || undefined,
   };
   try {
-    const { parseBlob } = await import("music-metadata");
+    const { parseBlob } = await import("music-metadata-browser");
     const meta = await parseBlob(file);
     const common = meta.common;
     return {

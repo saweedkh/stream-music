@@ -1,4 +1,13 @@
-export type DashboardTab = "channels" | "tracks" | "playlists" | "sharing" | "support" | "settings" | "admin";
+export type DashboardTab =
+  | "channels"
+  | "tracks"
+  | "playlists"
+  | "sharing"
+  | "support"
+  | "favoritePlaylists"
+  | "favoriteTracks"
+  | "settings"
+  | "admin";
 
 export const DASHBOARD_TABS: DashboardTab[] = [
   "channels",
@@ -6,6 +15,8 @@ export const DASHBOARD_TABS: DashboardTab[] = [
   "playlists",
   "sharing",
   "support",
+  "favoritePlaylists",
+  "favoriteTracks",
   "settings",
   "admin",
 ];

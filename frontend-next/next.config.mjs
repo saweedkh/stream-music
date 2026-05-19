@@ -3,7 +3,7 @@ const devRemoteOrigin = process.env.DEV_REMOTE_ORIGIN?.replace(/\/$/, "") ?? "";
 
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["vaul", "music-metadata"],
+  transpilePackages: ["vaul", "music-metadata-browser", "html5-qrcode"],
   output: "standalone",
   async rewrites() {
     const rewrites = [{ source: "/favicon.ico", destination: "/icon.svg" }];

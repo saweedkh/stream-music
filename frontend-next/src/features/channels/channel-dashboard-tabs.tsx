@@ -704,11 +704,14 @@ export function ChannelDashboardTabs(props: Props) {
     };
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden">
       <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue} enabled={channelIsActive}>
         <RoomOnboarding channelId={channelId} />
         <ChannelListenerShell
           channelId={channelId}
+          channelName={channelName}
+          brandLogoUrl={brandLogoUrl}
+          isLive={isChannelOnline}
           activeTab={listenerTab}
           onSelectTab={setListenerTab}
           onChatTabOpen={() => setChatTabUnread(0)}
@@ -832,14 +835,15 @@ export function ChannelDashboardTabs(props: Props) {
     ) : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden">
     <ChannelQueueProvider channelId={channelId} wsQueue={wsQueue} enabled={channelIsActive}>
       <RoomReactionProvider channelId={channelId}>
         <RoomOnboarding channelId={channelId} />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden">
           <ChannelAdminShell
-            className="min-h-0 flex-1"
+            className="lg:min-h-0 lg:flex-1"
             channelName={channelName}
+            brandLogoUrl={brandLogoUrl}
             isLive={isChannelOnline}
             socketState={socketState}
             channelIsActive={channelIsActive}
@@ -859,7 +863,7 @@ export function ChannelDashboardTabs(props: Props) {
             canManage={canManageChannel}
             statusBanner={statusBanner}
           >
-            <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex flex-1 flex-col max-lg:overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden">
               {activeTab === "chat" ? (
                 <ChannelAdminPanelShell bare>{chatPanel}</ChannelAdminPanelShell>
               ) : (

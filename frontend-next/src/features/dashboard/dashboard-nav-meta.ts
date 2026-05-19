@@ -14,6 +14,8 @@ export const DASHBOARD_TAB_ICONS: Record<DashboardTab, LucideIcon> = {
   playlists: ListMusic,
   sharing: Share2,
   support: LifeBuoy,
+  favoritePlaylists: ListMusic,
+  favoriteTracks: Music,
   settings: UserCircle,
   admin: Crown,
 };
@@ -38,6 +40,14 @@ export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
   support: {
     titleKey: "dashboard.page.support.title",
     descriptionKey: "dashboard.page.support.description",
+  },
+  favoritePlaylists: {
+    titleKey: "profile.favoritePlaylistsTitle",
+    descriptionKey: "profile.favoritePlaylistsDescription",
+  },
+  favoriteTracks: {
+    titleKey: "profile.favoriteTracksTitle",
+    descriptionKey: "profile.favoriteTracksDescription",
   },
   settings: {
     titleKey: "dashboard.page.settings.title",

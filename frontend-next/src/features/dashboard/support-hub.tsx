@@ -339,9 +339,9 @@ export function SupportHub({ user }: SupportHubProps) {
         : t("support.offline");
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card/30 shadow-sm">
+    <div className="flex flex-1 flex-col max-lg:overflow-visible md:rounded-xl md:border md:border-border/60 md:bg-card/30 md:shadow-sm lg:min-h-0 lg:flex-row lg:overflow-hidden">
       {/* Sidebar — ticket list */}
-      <aside className="flex w-full min-h-0 max-w-full flex-col border-b border-border/50 lg:max-w-[20rem] lg:border-b-0 lg:border-e">
+      <aside className="flex w-full shrink-0 flex-col max-lg:overflow-visible max-lg:border-b max-lg:border-border/50 lg:max-w-[20rem] lg:min-h-0 lg:overflow-hidden lg:border-b-0 lg:border-e max-lg:max-h-none md:max-h-[min(42vh,20rem)] md:overflow-hidden">
         <div className="shrink-0 space-y-3 border-b border-border/50 bg-muted/10 px-4 py-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -485,7 +485,7 @@ export function SupportHub({ user }: SupportHubProps) {
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+        <div className="flex-1 max-lg:overflow-visible lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain px-2 py-2">
           {loadingList ? (
             <div className="space-y-2 p-1">
               <Skeleton className="h-[4.5rem] rounded-xl" />
@@ -545,7 +545,7 @@ export function SupportHub({ user }: SupportHubProps) {
       </aside>
 
       {/* Main — conversation */}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-background/40">
+      <main className="flex min-w-0 flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden bg-background/40">
         {!selectedTicket ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
             <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-muted/20">
@@ -660,7 +660,7 @@ export function SupportHub({ user }: SupportHubProps) {
               ) : null}
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+            <div className="flex-1 max-lg:overflow-visible lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain px-4 py-4 sm:px-5">
               {loadingMessages ? (
                 <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />

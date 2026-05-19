@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-import { Crown, LayoutGrid, LifeBuoy, ListMusic, LogIn, Music, Radio, Share2, UserCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, Crown, LogIn, Radio } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { DashboardAccountSection } from "@/features/dashboard/dashboard-account-section";
+import {
+  type AdminSection,
+  type ProfileSection,
+  dashboardNavSections,
+  type DashboardNavSection,
+} from "@/features/dashboard/dashboard-nav-config";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { Button } from "@/components/ui/button";
@@ -12,51 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type NavItem = {
-  id: DashboardTab;
-  labelKey:
-    | "dashboard.tab.channels"
-    | "dashboard.tab.tracks"
-    | "dashboard.tab.playlists"
-    | "dashboard.tab.sharing"
-    | "dashboard.tab.support"
-    | "dashboard.tab.settings"
-    | "dashboard.tab.admin";
-  icon: LucideIcon;
-};
-
-type NavSection = {
-  titleKey:
-    | "dashboard.sidebar.section.channels"
-    | "dashboard.sidebar.section.library"
-    | "dashboard.sidebar.section.help"
-    | "dashboard.sidebar.section.settings"
-    | "dashboard.sidebar.section.admin";
-  items: NavItem[];
-};
-
-const NAV_SECTIONS_BASE: NavSection[] = [
-  {
-    titleKey: "dashboard.sidebar.section.channels",
-    items: [{ id: "channels", labelKey: "dashboard.tab.channels", icon: LayoutGrid }],
-  },
-  {
-    titleKey: "dashboard.sidebar.section.library",
-    items: [
-      { id: "tracks", labelKey: "dashboard.tab.tracks", icon: Music },
-      { id: "playlists", labelKey: "dashboard.tab.playlists", icon: ListMusic },
-      { id: "sharing", labelKey: "dashboard.tab.sharing", icon: Share2 },
-    ],
-  },
-  {
-    titleKey: "dashboard.sidebar.section.help",
-    items: [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }],
-  },
-  {
-    titleKey: "dashboard.sidebar.section.settings",
-    items: [{ id: "settings", labelKey: "dashboard.tab.settings", icon: UserCircle }],
-  },
-];
+type CollapsibleSectionId = "channels" | "library" | "help" | "favorites" | "account" | "admin";
 
 function SectionDivider() {
   return (
@@ -68,32 +30,96 @@ function SectionDivider() {
 
 type DashboardSidebarProps = {
   activeTab: DashboardTab;
-  onSelectTab: (tab: DashboardTab) => void;
+  activeProfileSection: ProfileSection;
+  activeAdminSection: AdminSection;
+  onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => void;
+  onSelectProfileSection: (section: ProfileSection) => void;
+  onSelectAdminSection: (section: AdminSection) => void;
   onJoinChannelClick?: () => void;
   user: AuthUser | null;
   onSidebarAction?: () => void;
   className?: string;
 };
 
+function sectionHasActive(
+  section: DashboardNavSection,
+  activeTab: DashboardTab,
+  activeProfileSection: ProfileSection,
+  activeAdminSection: AdminSection,
+): boolean {
+  if (section.variant === "main") {
+    return section.items.some((item) => item.id === activeTab);
+  }
+  if (section.variant === "account") {
+    return activeTab === "settings" && section.items.some((item) => item.id === activeProfileSection);
+  }
+  return activeTab === "admin" && section.items.some((item) => item.id === activeAdminSection);
+}
+
+function defaultExpanded(
+  activeTab: DashboardTab,
+  activeProfileSection: ProfileSection,
+  activeAdminSection: AdminSection,
+): Record<CollapsibleSectionId, boolean> {
+  return {
+    channels: activeTab === "channels",
+    library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
+    help: activeTab === "support",
+    favorites: activeTab === "favoritePlaylists" || activeTab === "favoriteTracks",
+    account: activeTab === "settings",
+    admin: activeTab === "admin",
+  };
+}
+
 export function DashboardSidebar({
   activeTab,
-  onSelectTab,
+  activeProfileSection,
+  activeAdminSection,
+  onSelectMainTab,
+  onSelectProfileSection,
+  onSelectAdminSection,
   onJoinChannelClick,
   user,
   onSidebarAction,
   className,
 }: DashboardSidebarProps) {
   const { t } = useTranslations();
+  const sections = dashboardNavSections(Boolean(user?.is_superuser));
 
-  const navSections: NavSection[] = user?.is_superuser
-    ? [
-        ...NAV_SECTIONS_BASE,
-        {
-          titleKey: "dashboard.sidebar.section.admin",
-          items: [{ id: "admin", labelKey: "dashboard.tab.admin", icon: Crown }],
-        },
-      ]
-    : NAV_SECTIONS_BASE;
+  const [expanded, setExpanded] = useState<Record<CollapsibleSectionId, boolean>>(() =>
+    defaultExpanded(activeTab, activeProfileSection, activeAdminSection),
+  );
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = { ...prev };
+      if (activeTab === "channels") next.channels = true;
+      if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
+      if (activeTab === "support") next.help = true;
+      if (activeTab === "favoritePlaylists" || activeTab === "favoriteTracks") next.favorites = true;
+      if (activeTab === "settings") next.account = true;
+      if (activeTab === "admin") next.admin = true;
+      return next;
+    });
+  }, [activeTab]);
+
+  function toggleSection(id: CollapsibleSectionId) {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function handleMainTab(tab: Exclude<DashboardTab, "settings" | "admin">) {
+    onSelectMainTab(tab);
+    onSidebarAction?.();
+  }
+
+  function handleProfile(section: ProfileSection) {
+    onSelectProfileSection(section);
+    onSidebarAction?.();
+  }
+
+  function handleAdmin(section: AdminSection) {
+    onSelectAdminSection(section);
+    onSidebarAction?.();
+  }
 
   return (
     <aside
@@ -141,49 +167,167 @@ export function DashboardSidebar({
         </Button>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80">
-        {navSections.map((section, sectionIndex) => (
-          <div key={section.titleKey} className={sectionIndex > 0 ? "mt-1" : ""}>
-            {sectionIndex > 0 ? <SectionDivider /> : null}
-            <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
-              {t(section.titleKey)}
-            </p>
-            <ul className="space-y-1">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectTab(item.id)}
-                      className={cn(
-                        "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                        isActive
-                          ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
-                          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                      )}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      {isActive ? (
-                        <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
-                      ) : null}
-                      <span
-                        className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                          isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
-                        )}
-                      >
-                        <Icon className="h-4 w-4" aria-hidden />
-                      </span>
-                      <span className="truncate">{t(item.labelKey)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+      <nav
+        className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80"
+        aria-label={t("dashboard.navTitle")}
+      >
+        <SectionDivider />
+        <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
+          {t("dashboard.sidebar.section.navigation")}
+        </p>
+
+        {sections.map((section, sectionIndex) => {
+          const isOpen = expanded[section.id];
+          const hasActive = sectionHasActive(section, activeTab, activeProfileSection, activeAdminSection);
+          const isAdminSection = section.variant === "admin";
+
+          return (
+            <div key={section.id} className={sectionIndex > 0 ? "mt-1" : ""}>
+              {sectionIndex > 0 ? <SectionDivider /> : null}
+
+              {isAdminSection ? (
+                <div className="mb-1 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                  <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+                  <p className="truncate text-xs font-semibold text-foreground">{t("admin.panelTitle")}</p>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => toggleSection(section.id)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                  hasActive
+                    ? isAdminSection
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-brand"
+                    : "text-muted-foreground/90 hover:text-foreground",
+                )}
+                aria-expanded={isOpen}
+              >
+                <ChevronRight
+                  className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-200", isOpen && "rotate-90")}
+                  aria-hidden
+                />
+                <span className="truncate">{t(section.titleKey)}</span>
+              </button>
+
+              {isOpen ? (
+                <ul className="mt-1 ms-2 space-y-0.5 border-s border-border/50 ps-2">
+                  {section.variant === "main"
+                    ? section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleMainTab(item.id)}
+                              className={cn(
+                                "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                                isActive
+                                  ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
+                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                              )}
+                              aria-current={isActive ? "page" : undefined}
+                            >
+                              {isActive ? (
+                                <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
+                              ) : null}
+                              <span
+                                className={cn(
+                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                                  isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
+                                )}
+                              >
+                                <Icon className="h-4 w-4" aria-hidden />
+                              </span>
+                              <span className="truncate">{t(item.labelKey)}</span>
+                            </button>
+                          </li>
+                        );
+                      })
+                    : null}
+
+                  {section.variant === "account"
+                    ? section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === "settings" && activeProfileSection === item.id;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleProfile(item.id)}
+                              className={cn(
+                                "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                                isActive
+                                  ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
+                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                              )}
+                              aria-current={isActive ? "page" : undefined}
+                            >
+                              {isActive ? (
+                                <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
+                              ) : null}
+                              <span
+                                className={cn(
+                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                                  isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
+                                )}
+                              >
+                                <Icon className="h-4 w-4" aria-hidden />
+                              </span>
+                              <span className="truncate">{t(item.labelKey)}</span>
+                            </button>
+                          </li>
+                        );
+                      })
+                    : null}
+
+                  {section.variant === "admin"
+                    ? section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === "admin" && activeAdminSection === item.id;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleAdmin(item.id)}
+                              className={cn(
+                                "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                                isActive
+                                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-100"
+                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                              )}
+                              aria-current={isActive ? "page" : undefined}
+                            >
+                              {isActive ? (
+                                <span
+                                  className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-amber-500"
+                                  aria-hidden
+                                />
+                              ) : null}
+                              <span
+                                className={cn(
+                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                                  isActive
+                                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                                    : "bg-muted/30 text-muted-foreground",
+                                )}
+                              >
+                                <Icon className="h-4 w-4" aria-hidden />
+                              </span>
+                              <span className="truncate">{t(item.labelKey)}</span>
+                            </button>
+                          </li>
+                        );
+                      })
+                    : null}
+                </ul>
+              ) : null}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="shrink-0 border-t border-border/60 bg-gradient-to-t from-card/30 to-transparent px-4 py-3">

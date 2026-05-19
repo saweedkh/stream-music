@@ -68,7 +68,7 @@ export function TrackLibrarySection(props: Props) {
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(280px,340px)_1fr]">
+    <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,17rem)_1fr] md:gap-5">
       <Card className="h-fit">
         <CardHeader>
           <CardTitle>{t("tracks.uploadTitle")}</CardTitle>

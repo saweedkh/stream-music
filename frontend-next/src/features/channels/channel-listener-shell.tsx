@@ -4,18 +4,23 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Eye } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTranslations } from "@/components/providers/locale-provider";
-import { DashboardMobileHeader } from "@/features/dashboard/dashboard-mobile-header";
+import { ChannelMobileHeader } from "@/features/channels/channel-mobile-header";
 import { ChannelListenerSidebar } from "@/features/channels/channel-listener-sidebar";
+import { ChannelRoomMobileTabs } from "@/features/channels/channel-room-mobile-tabs";
 import { RoomReactionOverlay } from "@/features/channels/room-reaction-overlay";
 import { RoomReactionProvider } from "@/features/channels/room-reaction-context";
 import type { ListenerTabId } from "@/features/channels/channel-room-config";
 import { Button } from "@/components/ui/button";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
+import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 type Props = {
   channelId: string;
+  channelName: string;
+  brandLogoUrl?: string | null;
+  isLive?: boolean;
   activeTab: ListenerTabId;
   onSelectTab: (tab: ListenerTabId) => void;
   onChatTabOpen?: () => void;
@@ -29,6 +34,9 @@ type Props = {
 
 export function ChannelListenerShell({
   channelId,
+  channelName,
+  brandLogoUrl,
+  isLive,
   activeTab,
   onSelectTab,
   onChatTabOpen,
@@ -73,19 +81,20 @@ export function ChannelListenerShell({
 
   return (
     <RoomReactionProvider channelId={channelId}>
-      <div
-        className={cn(
-          "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/40 lg:flex-row",
-          "min-h-[min(100%,28rem)]",
-        )}
-      >
+      <div className={shellFrame}>
         <RoomReactionOverlay />
         <div className="hidden lg:flex lg:min-h-0 lg:shrink-0">
           <ChannelListenerSidebar {...sidebarProps} className="rounded-s-2xl" />
         </div>
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
+        <div className={shellMain}>
+          <ChannelMobileHeader
+            onMenuClick={() => setMobileNavOpen(true)}
+            user={user}
+            channelName={channelName}
+            brandLogoUrl={brandLogoUrl}
+            isLive={isLive}
+          />
 
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetContent side="left" className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
@@ -94,10 +103,10 @@ export function ChannelListenerShell({
             </SheetContent>
           </Sheet>
 
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full flex-1 flex-col px-2 py-2 sm:px-3 sm:py-3">
+          <div className={shellBody}>
+            <div className={cn(shellContent, "gap-3 max-lg:px-0 max-lg:py-0")}>
               {viewAsListener ? (
-                <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/25 bg-brand/10 px-3 py-2.5">
                   {onBackToAdmin ? (
                     <Button
                       type="button"
@@ -113,7 +122,13 @@ export function ChannelListenerShell({
                   <p className="min-w-0 flex-1 text-sm text-foreground">{t("channels.listenerViewBanner")}</p>
                 </div>
               ) : null}
-              <div className="flex h-full min-h-0 max-h-full flex-1 flex-col">{children}</div>
+              <div className="flex flex-1 flex-col max-lg:min-h-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden">{children}</div>
+              <ChannelRoomMobileTabs
+                mode="listener"
+                activeTab={activeTab}
+                onSelectTab={handleSelectTab}
+                chatUnread={chatUnread}
+              />
             </div>
           </div>
         </div>

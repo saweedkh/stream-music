@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,9 +10,16 @@ import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
+import {
+  adminSectionFromSearch,
+  profileSectionFromSearch,
+  type AdminSection,
+  type ProfileSection,
+} from "@/features/dashboard/dashboard-nav-config";
 import { type DashboardTab, isDashboardTab } from "@/features/dashboard/dashboard-types";
 import { AdminPanelHub } from "@/features/dashboard/admin-panel-hub";
 import { SupportHub } from "@/features/dashboard/support-hub";
+import { ProfileFavoritesPanel } from "@/features/dashboard/profile-favorites-panel";
 import { UserProfileHub } from "@/features/dashboard/user-profile-hub";
 import { PlaylistManager } from "@/features/dashboard/playlist-manager";
 import { TrackLibrarySection } from "@/features/dashboard/track-library-section";
@@ -50,8 +57,54 @@ export function DashboardWorkspace() {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
+  const profileSection = useMemo(() => profileSectionFromSearch(searchParams), [searchParams]);
+  const adminSection = useMemo(() => adminSectionFromSearch(searchParams), [searchParams]);
+
+  const navigateDashboard = useCallback(
+    (params: URLSearchParams) => {
+      const qs = params.toString();
+      router.replace(qs.length ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router],
+  );
+
+  const navigateMainTab = useCallback(
+    (tab: Exclude<DashboardTab, "settings" | "admin">) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      params.delete("section");
+      params.delete("adminSection");
+      navigateDashboard(params);
+    },
+    [navigateDashboard, searchParams],
+  );
+
+  const navigateProfileSection = useCallback(
+    (section: ProfileSection) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "settings");
+      if (section === "overview") params.delete("section");
+      else params.set("section", section);
+      params.delete("adminSection");
+      navigateDashboard(params);
+    },
+    [navigateDashboard, searchParams],
+  );
+
+  const navigateAdminSection = useCallback(
+    (section: AdminSection) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "admin");
+      if (section === "overview") params.delete("adminSection");
+      else params.set("adminSection", section);
+      params.delete("section");
+      navigateDashboard(params);
+    },
+    [navigateDashboard, searchParams],
+  );
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
@@ -180,22 +233,18 @@ export function DashboardWorkspace() {
 
   useEffect(() => {
     const queryTab = searchParams.get("tab");
-    if (isDashboardTab(queryTab)) {
-      if (queryTab === "admin" && !currentUser?.is_superuser) {
-        setActiveTab("channels");
-        return;
-      }
-      setActiveTab(queryTab);
+    const legacySection = searchParams.get("section");
+    if (queryTab === "settings" && (legacySection === "favoriteTracks" || legacySection === "favoritePlaylists")) {
+      navigateMainTab(legacySection);
+      return;
     }
-  }, [searchParams, currentUser?.is_superuser]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (params.get("tab") === activeTab) return;
-    params.set("tab", activeTab);
-    const qs = params.toString();
-    window.history.replaceState(window.history.state, "", qs.length ? `${pathname}?${qs}` : pathname);
-  }, [activeTab, pathname, searchParams]);
+    if (!isDashboardTab(queryTab)) return;
+    if (queryTab === "admin" && currentUser && !currentUser.is_superuser) {
+      navigateMainTab("channels");
+      return;
+    }
+    setActiveTab(queryTab);
+  }, [searchParams, currentUser, navigateMainTab]);
 
   async function handleCreateChannel() {
     const result = createChannelSchema(t).safeParse({ channelName, memberLimit });
@@ -319,8 +368,20 @@ export function DashboardWorkspace() {
 
   if (isLoading) {
     return (
-      <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
-        <DashboardPanelShell tab={activeTab} className="min-h-0 flex-1">
+      <DashboardShell
+        activeTab={activeTab}
+        activeProfileSection={profileSection}
+        activeAdminSection={adminSection}
+        onSelectMainTab={navigateMainTab}
+        onSelectProfileSection={navigateProfileSection}
+        onSelectAdminSection={navigateAdminSection}
+      >
+        <DashboardPanelShell
+          tab={activeTab}
+          profileSection={activeTab === "settings" ? profileSection : undefined}
+          adminSection={activeTab === "admin" ? adminSection : undefined}
+          className="lg:min-h-0 lg:flex-1"
+        >
           <div className="space-y-4">
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-64 w-full rounded-xl" />
@@ -393,7 +454,7 @@ export function DashboardWorkspace() {
         onClick={() => {
           setTrackTitle(pendingUpload.title);
           setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
-          if (activeTab !== "tracks") setActiveTab("tracks");
+          if (activeTab !== "tracks") navigateMainTab("tracks");
           showToast(t("dashboard.resumeUploadHint"), "info");
         }}
       >
@@ -403,11 +464,20 @@ export function DashboardWorkspace() {
   ) : null;
 
   return (
-    <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
+    <DashboardShell
+      activeTab={activeTab}
+      activeProfileSection={profileSection}
+      activeAdminSection={adminSection}
+      onSelectMainTab={navigateMainTab}
+      onSelectProfileSection={navigateProfileSection}
+      onSelectAdminSection={navigateAdminSection}
+    >
       <DashboardPanelShell
         tab={activeTab}
-        flush={activeTab === "playlists" || activeTab === "channels" || activeTab === "support"}
-        className="min-h-0 flex-1"
+        profileSection={activeTab === "settings" ? profileSection : undefined}
+        adminSection={activeTab === "admin" ? adminSection : undefined}
+        flush={activeTab === "playlists" || activeTab === "support"}
+        className="lg:min-h-0 lg:flex-1"
       >
         {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
 
@@ -472,11 +542,22 @@ export function DashboardWorkspace() {
 
         {activeTab === "support" ? <SupportHub user={currentUser} /> : null}
 
+        {activeTab === "favoritePlaylists" ? <ProfileFavoritesPanel kind="playlists" /> : null}
+
+        {activeTab === "favoriteTracks" ? <ProfileFavoritesPanel kind="tracks" /> : null}
+
         {activeTab === "settings" ? (
-          <UserProfileHub channelCount={channels.length} trackCount={tracks.length} playlistCount={playlists.length} />
+          <UserProfileHub
+            activeSection={profileSection}
+            channelCount={channels.length}
+            trackCount={tracks.length}
+            playlistCount={playlists.length}
+          />
         ) : null}
 
-        {activeTab === "admin" && currentUser?.is_superuser ? <AdminPanelHub /> : null}
+        {activeTab === "admin" && currentUser?.is_superuser ? (
+          <AdminPanelHub activeSection={adminSection} />
+        ) : null}
       </DashboardPanelShell>
     </DashboardShell>
   );

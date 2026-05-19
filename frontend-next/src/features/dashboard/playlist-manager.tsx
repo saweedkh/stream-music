@@ -500,9 +500,9 @@ export function PlaylistManager() {
   const allLibSelected = libraryTracks.length > 0 && libraryTracks.every((t) => selectedTrackIds.has(t.id));
 
   return (
-    <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[min(100%,280px)_1fr] lg:gap-5">
+    <div className="flex flex-1 flex-col gap-3 max-lg:overflow-visible md:grid md:grid-cols-[min(100%,240px)_1fr] md:gap-4 lg:min-h-0">
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
-      <Card className="flex min-h-0 flex-col overflow-hidden">
+      <Card className="flex flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden">
         <CardHeader className="flex flex-col gap-2 space-y-0 pb-3">
           <div className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>

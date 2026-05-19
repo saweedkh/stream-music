@@ -223,13 +223,106 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
 
 type SuggestionFilter = "" | "pending" | "approved" | "rejected";
 
+function AdminSuggestTrackPicker({
+  tracks,
+  selectedTrackId,
+  onSelect,
+  loading,
+}: {
+  tracks: TrackSummary[];
+  selectedTrackId: number | null;
+  onSelect: (id: number | null) => void;
+  loading?: boolean;
+}) {
+  const { t } = useTranslations();
+  const [search, setSearch] = useState("");
+
+  const filteredTracks = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? tracks.filter((track) => {
+          const title = track.title.toLowerCase();
+          const artist = (track.artist ?? "").toLowerCase();
+          return title.includes(q) || artist.includes(q);
+        })
+      : tracks;
+    return list.slice(0, 80);
+  }, [tracks, search]);
+
+  const selectedTrack = selectedTrackId != null ? tracks.find((tr) => tr.id === selectedTrackId) : null;
+
+  return (
+    <div className="min-w-0 flex-1 space-y-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("room.listener.suggestions.searchPlaceholder")}
+          className={cn("ps-9", listenerFieldClass)}
+        />
+      </div>
+      <ScrollArea className="h-[min(10rem,24vh)] rounded-xl border border-border/40 bg-background/30">
+        <ul className="p-1">
+          {loading ? (
+            <li className="px-3 py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</li>
+          ) : filteredTracks.length === 0 ? (
+            <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+              {t("room.listener.suggestions.noTracks")}
+            </li>
+          ) : (
+            filteredTracks.map((track) => {
+              const isSelected = selectedTrackId === track.id;
+              return (
+                <li key={track.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(isSelected ? null : track.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm transition-colors",
+                      isSelected
+                        ? "bg-brand/15 text-brand ring-1 ring-brand/30"
+                        : "text-foreground hover:bg-muted/40",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-lg border",
+                        isSelected ? "border-brand/30 bg-brand/10" : "border-border/50 bg-muted/20",
+                      )}
+                    >
+                      <Music2 className="size-3.5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{track.title}</span>
+                      {track.artist ? (
+                        <span className="block truncate text-xs text-muted-foreground">{track.artist}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </ScrollArea>
+      {selectedTrack ? (
+        <p className="text-xs text-muted-foreground">
+          {t("room.listener.suggestions.selected")}:{" "}
+          <span className="font-medium text-foreground">{selectedTrack.title}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin", embedded = false }: Props) {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const { refreshQueue } = useChannelQueue();
   const [suggestions, setSuggestions] = useState<ChannelPlaylistSuggestion[]>([]);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
-  const [suggestTrackId, setSuggestTrackId] = useState("");
+  const [suggestTrackId, setSuggestTrackId] = useState<number | null>(null);
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestionFilter, setSuggestionFilter] = useState<SuggestionFilter>("pending");
   const [loading, setLoading] = useState(true);
@@ -255,10 +348,11 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
   }, [load, showToast, isListener]);
 
   async function submitSuggestion() {
-    if (!suggestTrackId) return;
+    if (suggestTrackId == null) return;
     try {
-      await createChannelSuggestion(channelId, { track_id: Number(suggestTrackId), note: suggestNote.trim() });
+      await createChannelSuggestion(channelId, { track_id: suggestTrackId, note: suggestNote.trim() });
       setSuggestNote("");
+      setSuggestTrackId(null);
       showToast("Suggestion sent to moderators.", "success");
       await load();
     } catch (e) {
@@ -371,20 +465,13 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
               <ChevronDown className="ms-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-2 border-t border-border/40 px-3 py-3">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Select
-                  value={suggestTrackId}
-                  onChange={(e) => setSuggestTrackId(e.target.value)}
-                  className={cn("min-w-0 flex-1", listenerFieldClass)}
-                >
-                  <option value="">{t("room.admin.suggestions.pickTrack")}</option>
-                  {tracks.map((tr) => (
-                    <option key={tr.id} value={String(tr.id)}>
-                      {tr.title}
-                      {tr.artist ? ` — ${tr.artist}` : ""}
-                    </option>
-                  ))}
-                </Select>
+              <AdminSuggestTrackPicker
+                tracks={tracks}
+                selectedTrackId={suggestTrackId}
+                onSelect={setSuggestTrackId}
+                loading={loading}
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <Input
                   placeholder={t("room.admin.suggestions.notePlaceholder")}
                   value={suggestNote}
@@ -393,7 +480,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
                   maxLength={280}
                   valid
                 />
-                <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
+                <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={suggestTrackId == null}>
                   {t("room.admin.suggestions.submit")}
                 </Button>
               </div>
@@ -444,20 +531,13 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Select
-          value={suggestTrackId}
-          onChange={(e) => setSuggestTrackId(e.target.value)}
-          className="min-w-[200px] flex-1 border-border bg-card"
-        >
-          <option value="">{t("room.admin.suggestions.pickTrack")}</option>
-          {tracks.map((tr) => (
-            <option key={tr.id} value={String(tr.id)}>
-              {tr.title}
-              {tr.artist ? ` — ${tr.artist}` : ""}
-            </option>
-          ))}
-        </Select>
+      <AdminSuggestTrackPicker
+        tracks={tracks}
+        selectedTrackId={suggestTrackId}
+        onSelect={setSuggestTrackId}
+        loading={loading}
+      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:flex-wrap">
         <Input
           placeholder={t("room.admin.suggestions.notePlaceholder")}
           value={suggestNote}
@@ -465,7 +545,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
           className="max-w-xs border-border bg-card"
           maxLength={280}
         />
-        <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={!suggestTrackId}>
+        <Button type="button" className="shrink-0" onClick={() => void submitSuggestion()} disabled={suggestTrackId == null}>
           {t("room.admin.suggestions.submit")}
         </Button>
       </div>

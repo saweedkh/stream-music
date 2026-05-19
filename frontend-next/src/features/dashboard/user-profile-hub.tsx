@@ -2,11 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   Calendar,
   Check,
   KeyRound,
@@ -21,6 +18,7 @@ import {
   Sun,
   User,
 } from "lucide-react";
+import type { ProfileSection } from "@/features/dashboard/dashboard-nav-config";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { UserVerifiedBadge } from "@/components/ui/user-verified-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,7 +30,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
 import { getMe, patchMeProfile, postChangePassword, type AuthUser } from "@/lib/api";
-import type { MessageKey } from "@/lib/i18n/messages";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { dispatchUserSessionRefresh } from "@/lib/user-session-events";
 import { cn } from "@/lib/utils";
@@ -42,27 +39,10 @@ const LOCALE_LABEL_KEYS = {
   fa: "lang.fa",
 } as const satisfies Record<Locale, "lang.en" | "lang.fa">;
 
-const PROFILE_SECTIONS = ["overview", "profile", "appearance", "security", "notifications"] as const;
-export type ProfileSection = (typeof PROFILE_SECTIONS)[number];
-
-function isProfileSection(value: string | null): value is ProfileSection {
-  return value !== null && (PROFILE_SECTIONS as readonly string[]).includes(value);
-}
-
-function profileSectionFromSearch(params: URLSearchParams): ProfileSection {
-  const raw = params.get("section");
-  return isProfileSection(raw) ? raw : "overview";
-}
-
-const PROFILE_NAV: { id: ProfileSection; labelKey: MessageKey; icon: LucideIcon }[] = [
-  { id: "overview", labelKey: "profile.nav.overview", icon: Sparkles },
-  { id: "profile", labelKey: "profile.nav.profile", icon: User },
-  { id: "appearance", labelKey: "profile.nav.appearance", icon: Palette },
-  { id: "security", labelKey: "profile.nav.security", icon: KeyRound },
-  { id: "notifications", labelKey: "profile.nav.notifications", icon: Bell },
-];
+export type { ProfileSection } from "@/features/dashboard/dashboard-nav-config";
 
 export type UserProfileHubProps = {
+  activeSection: ProfileSection;
   channelCount: number;
   trackCount: number;
   playlistCount: number;
@@ -79,21 +59,8 @@ function formatMemberSince(iso: string | undefined, locale: Locale): string | nu
   }).format(d);
 }
 
-function SectionHeading({ titleKey, descriptionKey }: { titleKey: MessageKey; descriptionKey: MessageKey }) {
-  const { t } = useTranslations();
-  return (
-    <div className="space-y-1">
-      <h3 className="text-base font-semibold tracking-tight text-foreground">{t(titleKey)}</h3>
-      <p className="text-sm leading-relaxed text-muted-foreground">{t(descriptionKey)}</p>
-    </div>
-  );
-}
-
-export function UserProfileHub({ channelCount, trackCount, playlistCount }: UserProfileHubProps) {
+export function UserProfileHub({ activeSection, channelCount, trackCount, playlistCount }: UserProfileHubProps) {
   const { t, locale, setLocale } = useTranslations();
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { resolvedTheme, setTheme } = useTheme();
   const { showToast } = useToast();
   const [mounted, setMounted] = useState(false);
@@ -109,19 +76,6 @@ export function UserProfileHub({ channelCount, trackCount, playlistCount }: User
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-
-  const activeSection = useMemo(() => profileSectionFromSearch(searchParams), [searchParams]);
-
-  const selectSection = useCallback(
-    (section: ProfileSection) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (section === "overview") params.delete("section");
-      else params.set("section", section);
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
 
   useEffect(() => setMounted(true), []);
 
@@ -207,9 +161,9 @@ export function UserProfileHub({ channelCount, trackCount, playlistCount }: User
 
   if (loading) {
     return (
-      <div className="grid gap-5 lg:grid-cols-[minmax(220px,260px)_1fr]">
-        <Skeleton className="h-72 rounded-2xl max-lg:order-1" />
-        <div className="flex flex-col gap-4 max-lg:order-2">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(200px,240px)_1fr] md:gap-5">
+        <Skeleton className="h-72 rounded-2xl md:order-1" />
+        <div className="flex flex-col gap-4 md:order-2">
           <Skeleton className="h-36 rounded-2xl" />
           <Skeleton className="h-48 rounded-2xl" />
         </div>
@@ -288,53 +242,8 @@ export function UserProfileHub({ channelCount, trackCount, playlistCount }: User
   );
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(220px,260px)_1fr]">
-      <nav
-        aria-label={t("profile.navAria")}
-        className={cn(
-          "flex h-fit flex-col gap-1 rounded-2xl border border-border/60 bg-card/40 p-2 shadow-sm",
-          "max-lg:flex-row max-lg:flex-wrap max-lg:gap-1.5 max-lg:overflow-x-auto max-lg:pb-1",
-          "lg:sticky lg:top-0",
-        )}
-      >
-        {PROFILE_NAV.map(({ id, labelKey, icon: Icon }) => {
-          const active = activeSection === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => selectSection(id)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex w-full shrink-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-start text-sm font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35",
-                "max-lg:min-w-[9.5rem]",
-                active
-                  ? "border-brand/35 bg-brand/12 text-foreground shadow-sm shadow-brand/10"
-                  : "border-transparent bg-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
-                  active ? "border-brand/30 bg-brand/15 text-brand" : "border-border/50 bg-muted/25 text-muted-foreground",
-                )}
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-              </span>
-              <span className="min-w-0 truncate">{t(labelKey)}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="min-w-0 space-y-5">
-        {activeSection === "overview" ? (
-          <>
-            <SectionHeading titleKey="profile.sectionOverviewTitle" descriptionKey="profile.sectionOverviewDescription" />
-            {overviewHero}
-          </>
-        ) : null}
+    <div className="min-w-0 space-y-5">
+        {activeSection === "overview" ? overviewHero : null}
 
         {activeSection === "profile" ? (
           <Card className="border-border/60 bg-card/50 shadow-sm">
@@ -511,16 +420,7 @@ export function UserProfileHub({ channelCount, trackCount, playlistCount }: User
           </Card>
         ) : null}
 
-        {activeSection === "notifications" ? (
-          <>
-            <SectionHeading
-              titleKey="profile.sectionNotificationsTitle"
-              descriptionKey="profile.sectionNotificationsDescription"
-            />
-            <NotificationPreferencesCard />
-          </>
-        ) : null}
-      </div>
+        {activeSection === "notifications" ? <NotificationPreferencesCard /> : null}
     </div>
   );
 }

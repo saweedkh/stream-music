@@ -27,6 +27,7 @@ import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatR
 import type { UserBadgeFlags } from "@/lib/user-badges";
 import { renderMessageWithMentions } from "@/lib/render-mentions";
 import { channelChatHref, useNotificationStore } from "@/lib/notifications/store";
+import { panelLgCage, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎵"] as const;
@@ -435,33 +436,39 @@ export function ChannelChatPanel({
   const shellClass =
     variant === "listener"
       ? cn(
-          "relative overflow-hidden border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95 backdrop-blur-2xl",
+          "relative flex flex-1 flex-col",
           fullHeight
             ? cn(
-                "flex h-full min-h-0 max-h-full flex-1 flex-col rounded-2xl",
-                "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_20px_60px_-24px_rgba(0,0,0,0.75)]",
-                "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-[radial-gradient(700px_circle_at_20%_-10%,rgba(52,211,153,0.1),transparent_50%)]",
+                panelMobileFlat,
+                panelLgCage,
+                "max-lg:overflow-visible lg:min-h-0 lg:max-h-full lg:overflow-hidden",
+                "lg:shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_20px_60px_-24px_rgba(0,0,0,0.75)]",
+                "lg:before:pointer-events-none lg:before:absolute lg:before:inset-0 lg:before:rounded-2xl lg:before:bg-[radial-gradient(700px_circle_at_20%_-10%,rgba(52,211,153,0.1),transparent_50%)]",
               )
             : cn(
-                "rounded-3xl",
+                "overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95 backdrop-blur-2xl",
                 "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_25px_80px_-20px_rgba(0,0,0,0.85)]",
                 "before:pointer-events-none before:absolute before:inset-0 before:rounded-3xl before:bg-[radial-gradient(800px_circle_at_20%_-10%,rgba(52,211,153,0.12),transparent_45%)]",
               ),
         )
-      : "overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-black/25";
+      : cn(
+          "overflow-hidden rounded-2xl border border-border/80 bg-card/50 shadow-lg shadow-black/25",
+          fullHeight && "max-lg:overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none",
+        );
 
   const headerTitle = variant === "listener" ? t("chat.title.listener") : t("chat.title.admin");
   const headerSubtitle = variant === "listener" ? t("chat.subtitle.listener") : t("chat.subtitle.admin");
 
   const scrollMinH = fullHeight
-    ? "min-h-0 flex-1"
+    ? "min-h-[min(320px,45vh)] max-lg:min-h-[min(280px,40vh)] lg:min-h-0 lg:flex-1"
     : variant === "listener"
       ? "min-h-[min(420px,52vh)] h-[min(420px,52vh)]"
       : "h-[min(280px,40vh)]";
   const scrollAreaClass = cn(
     "rounded-2xl border",
-    isFullscreen || fullHeight ? "min-h-0 flex-1 basis-0" : scrollMinH,
+    isFullscreen || fullHeight ? cn("flex-1 basis-0", "max-lg:min-h-[min(280px,40vh)] lg:min-h-0") : scrollMinH,
     variant === "listener" ? "border-border/40 bg-[var(--surface-inset)]" : "border-border/60 bg-card/60",
+    fullHeight && "max-lg:max-h-none max-lg:overflow-visible",
   );
 
   return (
@@ -470,7 +477,9 @@ export function ChannelChatPanel({
       id="channel-chat-panel"
       className={cn(
         shellClass,
-        (isFullscreen || fullHeight) && "flex min-h-0 max-h-full flex-1 flex-col overflow-hidden shadow-none",
+        (isFullscreen || fullHeight) &&
+          "flex flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:max-h-full lg:overflow-hidden",
+        (isFullscreen || fullHeight) && "lg:shadow-none",
         isFullscreen && "rounded-none",
       )}
     >
@@ -567,7 +576,7 @@ export function ChannelChatPanel({
           "flex min-h-0 flex-1 flex-col gap-2",
           fullHeight ? "gap-2 p-3 sm:p-4" : "p-3 sm:p-4",
           variant === "listener" && !fullHeight && "sm:p-5",
-          (isFullscreen || fullHeight) && "min-h-0 flex-1 overflow-hidden",
+          (isFullscreen || fullHeight) && "flex-1 max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden",
         )}
       >
         {pinnedMessage ? (

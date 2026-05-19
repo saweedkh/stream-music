@@ -2,6 +2,19 @@
 
 راهنمای **کامل** (معماری، TLS، عیب‌یابی، بکاپ): [`docs/production-deployment.md`](../docs/production-deployment.md).
 
+## آپدیت از لپ‌تاپ (بدون Git)
+
+```bash
+cp deploy/sync.env.example deploy/sync.env   # یک‌بار — host/user/password
+chmod +x deploy/push.sh
+./deploy/push.sh          # rsync + ./deploy/up.sh روی سرور (volumeها سالم می‌مانند)
+./deploy/push.sh --dry-run   # فقط پیش‌نمایش
+```
+
+ترجیحاً `ssh-copy-id` بزنید و `SSH_PASSWORD` را خالی بگذارید. برای پسورد: `brew install hudochenkov/sshpass/sshpass`.
+
+---
+
 یک دستور برای بالا آوردن کل استک روی سرور مرکزی:
 
 ```bash

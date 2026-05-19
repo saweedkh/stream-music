@@ -1,6 +1,6 @@
 "use client";
 
-import type { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
@@ -48,7 +48,6 @@ export function JoinQrCameraScanner({ onDecoded, onCancel }: Props) {
 
     (async () => {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
         if (cancelled) return;
         const html5 = new Html5Qrcode(regionId, false);
         html5Ref.current = html5;

@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   Award,
-  Crown,
   LayoutGrid,
   Loader2,
   Music,
@@ -42,24 +40,10 @@ import {
   type AdminOverview,
   type AdminUserRow,
 } from "@/lib/api";
-import type { MessageKey } from "@/lib/i18n/messages";
+import type { AdminSection } from "@/features/dashboard/dashboard-nav-config";
+export type { AdminSection } from "@/features/dashboard/dashboard-nav-config";
 import { manualBadgeSlugsForUser } from "@/lib/user-badges";
 import { cn } from "@/lib/utils";
-
-const ADMIN_SECTIONS = ["overview", "users", "badges", "channels", "system"] as const;
-export type AdminSection = (typeof ADMIN_SECTIONS)[number];
-
-function isAdminSection(value: string | null): value is AdminSection {
-  return value !== null && (ADMIN_SECTIONS as readonly string[]).includes(value);
-}
-
-const NAV: { id: AdminSection; labelKey: MessageKey; icon: typeof Activity }[] = [
-  { id: "overview", labelKey: "admin.nav.overview", icon: Activity },
-  { id: "users", labelKey: "admin.nav.users", icon: Users },
-  { id: "badges", labelKey: "admin.nav.badges", icon: Award },
-  { id: "channels", labelKey: "admin.nav.channels", icon: LayoutGrid },
-  { id: "system", labelKey: "admin.nav.system", icon: Server },
-];
 
 const BADGE_ICONS = ["badge-check", "crown", "sparkles", "star", "shield", "music", "heart", "zap", "gem"] as const;
 const BADGE_COLORS = ["sky", "amber", "violet", "emerald", "rose", "brand", "slate"] as const;
@@ -95,28 +79,9 @@ function StatCard({
   );
 }
 
-export function AdminPanelHub() {
+export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }) {
   const { t } = useTranslations();
   const { showToast } = useToast();
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const activeSection = useMemo(() => {
-    const raw = searchParams.get("adminSection");
-    return isAdminSection(raw) ? raw : "overview";
-  }, [searchParams]);
-
-  const selectSection = useCallback(
-    (section: AdminSection) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "admin");
-      if (section === "overview") params.delete("adminSection");
-      else params.set("adminSection", section);
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
 
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [health, setHealth] = useState<{ status: string; db: boolean; redis: boolean } | null>(null);
@@ -257,62 +222,14 @@ export function AdminPanelHub() {
   }
 
   if (loading && !overview && users.length === 0 && channels.length === 0) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(220px,260px)_1fr]">
-        <Skeleton className="h-64 rounded-2xl" />
-        <Skeleton className="h-96 rounded-2xl" />
-      </div>
-    );
+    return <Skeleton className="h-96 w-full rounded-2xl" />;
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(220px,260px)_1fr]">
-      <nav
-        aria-label={t("admin.navAria")}
-        className={cn(
-          "flex h-fit flex-col gap-1 rounded-2xl border border-amber-500/25 bg-gradient-to-b from-amber-500/[0.08] to-card/40 p-2 shadow-sm",
-          "max-lg:flex-row max-lg:flex-wrap max-lg:overflow-x-auto",
-        )}
-      >
-        <div className="mb-1 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5">
-          <Crown className="h-5 w-5 shrink-0 text-amber-500" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
-              {t("admin.panelEyebrow")}
-            </p>
-            <p className="truncate text-sm font-semibold text-foreground">{t("admin.panelTitle")}</p>
-          </div>
-        </div>
-        {NAV.map(({ id, labelKey, icon: Icon }) => {
-          const active = activeSection === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => selectSection(id)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex w-full shrink-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-start text-sm font-medium transition-colors",
-                active
-                  ? "border-amber-500/35 bg-amber-500/15 text-foreground"
-                  : "border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground",
-                "max-lg:min-w-[9rem]",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              {t(labelKey)}
-            </button>
-          );
-        })}
-      </nav>
+    <div className="min-w-0 space-y-4">
 
-      <div className="min-w-0 space-y-4">
         {activeSection === "overview" && overview ? (
           <>
-            <div>
-              <h3 className="text-base font-semibold tracking-tight">{t("admin.overviewTitle")}</h3>
-              <p className="text-sm text-muted-foreground">{t("admin.overviewDescription")}</p>
-            </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard label={t("admin.stat.users")} value={overview.users.total} sub={t("admin.stat.usersActive", { count: overview.users.active })} icon={Users} />
               <StatCard label={t("admin.stat.channels")} value={overview.channels.total} sub={t("admin.stat.channelsLive", { count: overview.channels.playing })} icon={Radio} />
@@ -634,7 +551,6 @@ export function AdminPanelHub() {
             </CardContent>
           </Card>
         ) : null}
-      </div>
     </div>
   );
 }

@@ -22,6 +22,7 @@ infra/nginx/ssl/*.crt
 infra/nginx/ssl/*.key
 
 # Production deploy (generated locally / on server)
+deploy/sync.env
 deploy/.env.generated
 deploy/.env.runtime.merged
 deploy/Caddyfile.generated

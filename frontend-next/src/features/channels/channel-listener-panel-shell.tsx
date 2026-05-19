@@ -7,6 +7,7 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { LISTENER_TAB_META } from "@/features/channels/channel-listener-nav-meta";
 import type { ListenerTabId } from "@/features/channels/channel-room-config";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { panelLgCage, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 const TAB_ICONS: Record<Exclude<ListenerTabId, "chat">, LucideIcon> = {
@@ -18,7 +19,6 @@ const TAB_ICONS: Record<Exclude<ListenerTabId, "chat">, LucideIcon> = {
 type Props = {
   tab: Exclude<ListenerTabId, "chat">;
   children: ReactNode;
-  /** Optional status chip next to title (e.g. queue count). */
   badge?: ReactNode;
   className?: string;
 };
@@ -31,16 +31,18 @@ export function ChannelListenerPanelShell({ tab, children, badge, className }: P
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-0 max-h-full flex-1 flex-col overflow-hidden rounded-2xl",
-        "border border-border/60 bg-gradient-to-br from-background/95 via-[var(--brand-subtle)] to-background/95 backdrop-blur-2xl",
-        "shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_20px_60px_-24px_rgba(0,0,0,0.75)]",
-        "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-[radial-gradient(700px_circle_at_20%_-10%,rgba(52,211,153,0.1),transparent_50%)]",
+        "relative flex flex-1 flex-col",
+        panelMobileFlat,
+        panelLgCage,
+        "lg:min-h-0 lg:max-h-full lg:overflow-hidden",
+        "lg:shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_20px_60px_-24px_rgba(0,0,0,0.75)]",
+        "lg:before:pointer-events-none lg:before:absolute lg:before:inset-0 lg:before:rounded-2xl lg:before:bg-[radial-gradient(700px_circle_at_20%_-10%,rgba(52,211,153,0.1),transparent_50%)]",
         className,
       )}
     >
-      <header className="relative z-[1] flex shrink-0 items-start gap-3 border-b border-border/40 bg-[var(--surface-inset)] px-4 py-3 sm:px-5">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10 text-brand">
-          <Icon className="size-5" aria-hidden />
+      <header className="relative z-[1] flex shrink-0 items-start gap-3 border-b border-border/40 px-3 py-2.5 sm:px-4 lg:bg-[var(--surface-inset)] lg:px-5 lg:py-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-brand/10 text-brand lg:size-10 lg:rounded-2xl">
+          <Icon className="size-4 lg:size-5" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -51,10 +53,13 @@ export function ChannelListenerPanelShell({ tab, children, badge, className }: P
         </div>
       </header>
 
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden p-2 sm:p-3">
-        <ScrollArea className="min-h-0 flex-1 rounded-2xl border border-border/40 bg-[var(--surface-inset)]">
-          <div className="p-3 sm:p-4">{children}</div>
-        </ScrollArea>
+      <div className="relative z-[1] flex flex-1 flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden lg:p-2 lg:sm:p-3">
+        <div className="flex flex-1 flex-col px-1 py-2 sm:px-2 sm:py-3 max-lg:overflow-visible lg:hidden">{children}</div>
+        <div className="hidden min-h-0 flex-1 flex-col overflow-hidden lg:flex">
+          <ScrollArea className="min-h-0 flex-1 rounded-2xl border border-border/40 bg-[var(--surface-inset)]">
+            <div className="p-3 sm:p-4">{children}</div>
+          </ScrollArea>
+        </div>
       </div>
     </div>
   );
