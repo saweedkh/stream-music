@@ -406,7 +406,7 @@ export function DashboardWorkspace() {
     <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
       <DashboardPanelShell
         tab={activeTab}
-        flush={activeTab === "playlists" || activeTab === "channels"}
+        flush={activeTab === "playlists" || activeTab === "channels" || activeTab === "support"}
         className="min-h-0 flex-1"
       >
         {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
