@@ -169,8 +169,8 @@ export function NotificationPreferencesCard() {
   const canUsePush = isPushEnvironmentSupported() && Boolean(vapidPublic);
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="w-full border-border/40 bg-[var(--surface-inset)]">
+      <CardHeader className="sr-only">
         <CardTitle className="flex items-center gap-2 text-lg text-foreground">
           <Bell className="size-5 text-brand/90" aria-hidden />
           {t("settings.cardTitle")}

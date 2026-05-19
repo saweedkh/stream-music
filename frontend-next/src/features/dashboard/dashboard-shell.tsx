@@ -12,7 +12,7 @@ type DashboardShellProps = {
 
 export function DashboardShell({ activeTab, onSelectTab, children }: DashboardShellProps) {
   return (
-    <AppNavLayout activeTab={activeTab} onSelectTab={onSelectTab} showPageHeader>
+    <AppNavLayout activeTab={activeTab} onSelectTab={onSelectTab}>
       {children}
     </AppNavLayout>
   );

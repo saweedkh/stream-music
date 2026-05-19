@@ -445,9 +445,9 @@ export function PlaylistManager() {
   const allLibSelected = libraryTracks.length > 0 && libraryTracks.every((t) => selectedTrackIds.has(t.id));
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+    <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[min(100%,280px)_1fr] lg:gap-5">
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
-      <Card className="flex flex-col">
+      <Card className="flex min-h-0 flex-col overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-brand hover:text-brand" onClick={() => setShowCreatePlaylist(true)}>
@@ -456,7 +456,7 @@ export function PlaylistManager() {
           </Button>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 pt-0">
-        <ScrollArea className="h-[calc(100vh-280px)] min-h-[200px]">
+        <ScrollArea className="min-h-[12rem] flex-1">
           <div className="space-y-1 pr-1">
             {playlists.length === 0 && <p className="px-2 text-xs text-muted-foreground">{t("playlists.emptyList")}</p>}
             {playlists.map((pl) => (

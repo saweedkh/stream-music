@@ -13,10 +13,45 @@ const ACCENT: Record<string, { stroke: string; glow: string }> = {
 
 type GraphEntry = {
   ctx: AudioContext;
-  source: MediaElementAudioSourceNode;
+  source: AudioNode;
   analyser: AnalyserNode;
   refCount: number;
+  /** `stream` taps captureStream without hijacking element output; legacy `element` routed all audio via Web Audio. */
+  mode: "stream" | "element";
 };
+
+function captureMediaStream(media: HTMLMediaElement): MediaStream | null {
+  const el = media as HTMLMediaElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream };
+  try {
+    if (typeof el.captureStream === "function") return el.captureStream();
+    if (typeof el.mozCaptureStream === "function") return el.mozCaptureStream();
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function createAnalyserGraph(media: HTMLMediaElement, variant: "full" | "compact"): GraphEntry | undefined {
+  const ctx = getSharedAudioContext();
+  if (!ctx) return undefined;
+
+  const stream = captureMediaStream(media);
+  if (stream) {
+    try {
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = variant === "compact" ? 512 : 1024;
+      analyser.smoothingTimeConstant = 0.72;
+      source.connect(analyser);
+      void ctx.resume().catch(() => {});
+      return { ctx, source, analyser, refCount: 0, mode: "stream" };
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
 
 const graphByMedia = new WeakMap<HTMLMediaElement, GraphEntry>();
 const teardownTimers = new WeakMap<HTMLMediaElement, ReturnType<typeof setTimeout>>();
@@ -43,11 +78,11 @@ export function resumeSharedAudioContext(): Promise<void> {
   return ctx.resume().catch(() => {});
 }
 
-/** True when the visualizer routed this element through a suspended AudioContext (no audible output). */
+/** True when legacy element-routing left audio on a suspended AudioContext (stream tap does not block output). */
 export function isMediaOutputSuspended(media: HTMLMediaElement | null): boolean {
   if (!media) return false;
   const entry = graphByMedia.get(media);
-  if (!entry) return false;
+  if (!entry || entry.mode === "stream") return false;
   return entry.ctx.state === "suspended";
 }
 
@@ -77,7 +112,7 @@ function scheduleGraphTeardown(media: HTMLMediaElement) {
 }
 
 type Props = {
-  /** HTML5 `<audio>` from Howler (`html5: true`). */
+  /** Channel playback `<audio>` element. */
   media: HTMLAudioElement | null;
   isActive: boolean;
   accent: string;
@@ -115,20 +150,8 @@ export function AudioWaveVisualizer({ media, isActive, accent, className, varian
 
     let existing = graphByMedia.get(media);
     if (!existing) {
-      try {
-        const ctx = getSharedAudioContext();
-        if (!ctx) throw new Error("AudioContext unavailable");
-        const source = ctx.createMediaElementSource(media);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = variant === "compact" ? 512 : 1024;
-        analyser.smoothingTimeConstant = 0.72;
-        source.connect(analyser);
-        source.connect(ctx.destination);
-        existing = { ctx, source, analyser, refCount: 0 };
-        graphByMedia.set(media, existing);
-      } catch {
-        existing = undefined;
-      }
+      existing = createAnalyserGraph(media, variant);
+      if (existing) graphByMedia.set(media, existing);
     }
 
     if (existing) {

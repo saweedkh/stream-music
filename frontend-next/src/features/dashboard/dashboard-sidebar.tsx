@@ -103,6 +103,13 @@ export function DashboardSidebar({
             />
           ) : null}
         </div>
+        <div className="mt-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {t("dashboard.workspace")}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("dashboard.subtitle")}</p>
+        </div>
+
         <Button
           type="button"
           className="mt-3 h-10 w-full gap-2 bg-brand text-brand-foreground shadow-md shadow-brand/15 hover:bg-brand-strong"

@@ -40,8 +40,8 @@ export function TrackSharingSection(props: Props) {
   } = props;
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
+    <Card className="w-full border-border/40 bg-[var(--surface-inset)]">
+      <CardHeader className="sr-only">
         <CardTitle>{t("sharing.cardTitle")}</CardTitle>
         <CardDescription>{t("sharing.cardDescription")}</CardDescription>
       </CardHeader>

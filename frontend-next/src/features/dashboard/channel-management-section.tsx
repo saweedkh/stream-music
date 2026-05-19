@@ -101,7 +101,7 @@ export function ChannelManagementSection(props: Props) {
           ) : null}
         </header>
 
-        <ScrollArea className="h-[min(480px,62vh)]">
+        <ScrollArea className="max-h-[min(32rem,100%)]">
           <div className="p-4 sm:p-5">
             {channels.length === 0 ? (
               <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">

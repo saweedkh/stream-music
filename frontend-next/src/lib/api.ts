@@ -1,23 +1,35 @@
 /**
  * In the browser we always use the page origin (e.g. http://192.168.x.x:8080 on a phone on LAN).
- * `NEXT_PUBLIC_*` pointing at localhost breaks mobile — never use hardcoded localhost for client fetches.
- * On the server (RSC) we call Django inside Docker via INTERNAL_API_BASE_URL.
+ * For local `npm run dev` against a remote prod stack, set DEV_REMOTE_ORIGIN in `.env.local`;
+ * Next.js rewrites proxy /api, /ws, and /audio to that host while the browser stays on localhost.
+ * On the server (RSC) we call Django via INTERNAL_* or DEV_REMOTE_ORIGIN.
  */
+function devRemoteOrigin(): string | undefined {
+  const raw = process.env.DEV_REMOTE_ORIGIN?.replace(/\/$/, "");
+  return raw || undefined;
+}
+
 export function getApiBase(): string {
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
   return (
-    process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+    process.env.INTERNAL_API_BASE_URL ||
+    devRemoteOrigin() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "http://localhost:8000"
   );
 }
 
-/** WebSocket must use the same host as the page so nginx can upgrade /ws/ behind :8080. */
+/** WebSocket must use the same host as the page so the dev proxy can upgrade /ws/ behind :3000. */
 export function getWsBase(): string {
   if (typeof window !== "undefined") {
     return window.location.protocol === "https:" ? `wss://${window.location.host}` : `ws://${window.location.host}`;
   }
-  return process.env.INTERNAL_WS_BASE_URL || process.env.NEXT_PUBLIC_WS_BASE_URL || "ws://localhost:8000";
+  if (process.env.INTERNAL_WS_BASE_URL) return process.env.INTERNAL_WS_BASE_URL;
+  const remote = devRemoteOrigin();
+  if (remote) return remote.replace(/^http/i, "ws");
+  return process.env.NEXT_PUBLIC_WS_BASE_URL || "ws://localhost:8000";
 }
 
 let csrfReady = false;

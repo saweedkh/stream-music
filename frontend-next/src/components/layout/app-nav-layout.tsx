@@ -1,29 +1,24 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { DashboardMobileHeader } from "@/features/dashboard/dashboard-mobile-header";
-import { DashboardPageHeader } from "@/features/dashboard/dashboard-page-header";
 import { DashboardSidebar } from "@/features/dashboard/dashboard-sidebar";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
 import { JoinChannelDialog } from "@/features/dashboard/join-channel-dialog";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
+import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
   activeTab: DashboardTab;
   onSelectTab: (tab: DashboardTab) => void;
   children: ReactNode;
-  showPageHeader?: boolean;
 };
 
-export function AppNavLayout({
-  activeTab,
-  onSelectTab,
-  children,
-  showPageHeader = false,
-}: AppNavLayoutProps) {
+export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutProps) {
   const { t } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
@@ -59,12 +54,16 @@ export function AppNavLayout({
   };
 
   return (
-    <div className="flex min-h-[calc(100dvh-5rem)] flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/40 lg:min-h-[calc(100dvh-3rem)] lg:flex-row">
-      <div className="hidden lg:flex lg:min-h-0 lg:shrink-0">
-        <DashboardSidebar {...sidebarProps} className="rounded-s-2xl" />
+    <div
+      className={cn(
+        "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/40 lg:flex-row",
+      )}
+    >
+      <div className="hidden h-full min-h-0 lg:flex lg:shrink-0">
+        <DashboardSidebar {...sidebarProps} className="h-full rounded-s-2xl" />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -74,10 +73,20 @@ export function AppNavLayout({
           </SheetContent>
         </Sheet>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-            {showPageHeader ? <DashboardPageHeader activeTab={activeTab} /> : null}
-            {children}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="relative mx-auto flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>

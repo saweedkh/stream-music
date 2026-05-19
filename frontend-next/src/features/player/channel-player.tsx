@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
-import { ChannelAudioUnlockDialog } from "@/features/player/channel-audio-unlock-dialog";
 import { ChannelPlayerFull } from "@/features/player/channel-player-full";
 import { ChannelPlayerMini } from "@/features/player/channel-player-mini";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
@@ -41,11 +40,9 @@ export function ChannelPlayer({
   const { showToast } = useToast();
 
   const {
-    howlRef,
     isPlaying,
     activeTrackPath,
     lastSyncAt,
-    needsUserInteraction,
     position,
     setPosition,
     duration,
@@ -53,12 +50,15 @@ export function ChannelPlayer({
     setVolume,
     vizAudioEl,
     isBuffering,
+    needsUnlock,
     offsetMs,
     isDraggingSeekRef,
     applyControl,
     commitSeek,
     refreshChannelPlaybackState,
     unlockChannelAudio,
+    recordUserGesture,
+    getCurrentPosition,
   } = useChannelPlaybackEngine({
     channelId,
     socketState,
@@ -115,38 +115,46 @@ export function ChannelPlayer({
   const introRemainingSec =
     !canControl && introCapSec > 0 && position < introCapSec ? Math.max(0, Math.ceil(introCapSec - position)) : null;
 
+  const primeAudio = () => {
+    recordUserGesture();
+    void unlockChannelAudio();
+  };
+
   const onPlayPause = () => {
-    const howl = howlRef.current;
-    if (!howl) return;
+    recordUserGesture();
+    if (!canControl) {
+      primeAudio();
+      return;
+    }
     if (isPlaying) {
-      void applyControl("pause", { position: howl.seek() as number });
+      void applyControl("pause", { position: getCurrentPosition() });
     } else {
-      const at = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-      void applyControl("play", { position: at });
+      void applyControl("play", { position: getCurrentPosition() });
     }
   };
 
   const seekHandlers = {
     onSeekPointerDown: () => {
+      recordUserGesture();
       isDraggingSeekRef.current = true;
     },
     onSeekChange: (value: number) => setPosition(value),
     onSeekCommit: (value: number) => commitSeek(value),
   };
 
-  const showUnlockDialog = Boolean(needsUserInteraction && isPlaying && activeTrackPath);
-
-  const onEnableAudio = () => {
-    void unlockChannelAudio();
+  const handleExpand = () => {
+    primeAudio();
+    onDrawerOpenChange(true);
   };
 
   return (
     <>
-      <ChannelAudioUnlockDialog open={showUnlockDialog} title={title} onEnable={onEnableAudio} />
-
       <ChannelPlayerFull
         open={drawerOpen}
-        onOpenChange={onDrawerOpenChange}
+        onOpenChange={(open) => {
+          if (open) primeAudio();
+          onDrawerOpenChange(open);
+        }}
         channelId={channelId}
         socketState={socketState}
         title={title}
@@ -164,16 +172,16 @@ export function ChannelPlayer({
         syncDeltaMs={syncDeltaMs}
         lastSyncAt={lastSyncAt}
         isBuffering={isBuffering}
+        needsUnlock={needsUnlock}
         introRemainingSec={introRemainingSec}
         introCapSec={introCapSec}
         rehearsalMuted={rehearsalMuted}
         rehearsalLiftActive={rehearsalLiftActive}
-        needsUserInteraction={needsUserInteraction}
+        onUnlockAudio={primeAudio}
         onPrev={() => void applyControl("prev")}
         onPlayPause={onPlayPause}
         onNext={() => void applyControl("next")}
         onVolumeChange={setVolume}
-        onEnableAudio={onEnableAudio}
         onRefreshSync={canControl ? () => void refreshChannelPlaybackState() : undefined}
         {...seekHandlers}
       />
@@ -190,7 +198,9 @@ export function ChannelPlayer({
         duration={duration}
         vizAudioEl={vizAudioEl}
         expanded={drawerOpen}
-        onExpand={() => onDrawerOpenChange(true)}
+        needsUnlock={needsUnlock}
+        onExpand={handleExpand}
+        onUnlockAudio={primeAudio}
         onPrev={() => void applyControl("prev")}
         onPlayPause={onPlayPause}
         onNext={() => void applyControl("next")}

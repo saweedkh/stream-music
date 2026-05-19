@@ -28,10 +28,15 @@ function isSelfShelledPath(pathname: string | null) {
   return Boolean(pathname?.startsWith("/dashboard") || pathname?.startsWith("/channel/"));
 }
 
+function isDashboardPath(pathname: string | null) {
+  return Boolean(pathname?.startsWith("/dashboard"));
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [me, setMe] = useState<AuthUser | null>(null);
   const inChannel = Boolean(pathname?.startsWith("/channel/"));
+  const isDashboard = isDashboardPath(pathname);
   const isAuthPage = isAuthPath(pathname);
   const isSelfShelled = isSelfShelledPath(pathname);
   const useGlobalNav = Boolean(me && !isAuthPage && !isSelfShelled);
@@ -62,7 +67,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               "relative mx-auto w-full",
               inChannel && isSelfShelled
                 ? "flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden px-3 py-3 pb-[calc(8.75rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:py-4 sm:pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))]"
-                : "min-h-screen",
+                : isDashboard && isSelfShelled
+                  ? "flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden px-3 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:py-4"
+                  : "min-h-screen",
               (isSelfShelled || useGlobalNav) && !inChannel && "max-w-[1500px] px-3 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:py-4",
               isAuthPage && "max-w-lg px-4 py-6",
               !isAuthPage && !isSelfShelled && !useGlobalNav && "max-w-6xl px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:px-6 sm:py-6",
@@ -74,7 +81,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             {useGlobalNav ? (
               <AppGlobalNavShell>{children}</AppGlobalNavShell>
             ) : (
-              <main className={cn(inChannel && isSelfShelled && "flex min-h-0 flex-1 flex-col")}>{children}</main>
+              <main
+                className={cn((inChannel || isDashboard) && isSelfShelled && "flex min-h-0 flex-1 flex-col overflow-hidden")}
+              >
+                {children}
+              </main>
             )}
           </motion.div>
           <GlobalChannelPlayerDock />

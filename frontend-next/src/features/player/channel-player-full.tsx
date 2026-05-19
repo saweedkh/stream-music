@@ -35,11 +35,12 @@ type Props = {
   syncDeltaMs: number;
   lastSyncAt: number | null;
   isBuffering: boolean;
+  needsUnlock?: boolean;
+  onUnlockAudio?: () => void;
   introRemainingSec: number | null;
   introCapSec: number;
   rehearsalMuted: boolean;
   rehearsalLiftActive: boolean;
-  needsUserInteraction: boolean;
   onPrev: () => void;
   onPlayPause: () => void;
   onNext: () => void;
@@ -47,7 +48,6 @@ type Props = {
   onSeekChange: (value: number) => void;
   onSeekCommit: (value: number) => void;
   onVolumeChange: (value: number) => void;
-  onEnableAudio: () => void;
   onRefreshSync?: () => void;
 };
 
@@ -71,11 +71,12 @@ export function ChannelPlayerFull({
   syncDeltaMs,
   lastSyncAt,
   isBuffering,
+  needsUnlock = false,
+  onUnlockAudio,
   introRemainingSec,
   introCapSec: _introCapSec,
   rehearsalMuted,
   rehearsalLiftActive,
-  needsUserInteraction,
   onPrev,
   onPlayPause,
   onNext,
@@ -83,7 +84,6 @@ export function ChannelPlayerFull({
   onSeekChange,
   onSeekCommit,
   onVolumeChange,
-  onEnableAudio,
   onRefreshSync,
 }: Props) {
   const { t } = useTranslations();
@@ -138,6 +138,16 @@ export function ChannelPlayerFull({
             {!activeTrackPath ? (
               <Alert tone="error" className="mb-4 text-sm">
                 {t("player.noActiveTrack")}
+              </Alert>
+            ) : null}
+
+            {needsUnlock && onUnlockAudio ? (
+              <Alert tone="info" className="mb-4 text-sm">
+                <p className="font-medium">{t("player.unlockTitle")}</p>
+                <p className="mt-1 text-muted-foreground">{t("player.unlockDescription")}</p>
+                <Button type="button" size="sm" className="mt-3" onClick={onUnlockAudio}>
+                  {t("player.unlockTitle")}
+                </Button>
               </Alert>
             ) : null}
 
@@ -214,15 +224,6 @@ export function ChannelPlayerFull({
                 </span>
               </div>
             </div>
-
-            {needsUserInteraction && isPlaying ? (
-              <Alert tone="info" className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">{t("player.autoplayBlocked")}</span>
-                <Button type="button" size="sm" onClick={onEnableAudio}>
-                  {t("player.enableAudio")}
-                </Button>
-              </Alert>
-            ) : null}
 
             {(rehearsalMuted || rehearsalLiftActive || introRemainingSec != null || isBuffering) && (
               <div className="mt-4 space-y-1 rounded-xl bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">

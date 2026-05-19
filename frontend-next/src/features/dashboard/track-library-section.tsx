@@ -135,7 +135,7 @@ export function TrackLibrarySection(props: Props) {
               {t("tracks.empty")}
             </p>
           ) : (
-            <ul className="max-h-[min(480px,60vh)] space-y-1.5 overflow-y-auto pe-1">
+            <ul className="max-h-[28rem] space-y-1.5 overflow-y-auto pe-1">
               {tracks.map((track) => (
                 <li
                   key={track.id}

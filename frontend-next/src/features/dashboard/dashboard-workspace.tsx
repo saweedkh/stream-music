@@ -9,6 +9,7 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
+import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
 import { type DashboardTab, isDashboardTab } from "@/features/dashboard/dashboard-types";
 import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
 import { PlaylistManager } from "@/features/dashboard/playlist-manager";
@@ -270,10 +271,12 @@ export function DashboardWorkspace() {
   if (isLoading) {
     return (
       <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
-        <div className="space-y-5">
-          <Skeleton className="h-24 w-full max-w-lg rounded-xl" />
-          <Skeleton className="h-[min(420px,55vh)] w-full rounded-2xl" />
-        </div>
+        <DashboardPanelShell tab={activeTab} className="min-h-0 flex-1">
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        </DashboardPanelShell>
       </DashboardShell>
     );
   }
@@ -329,29 +332,31 @@ export function DashboardWorkspace() {
     }
   }
 
+  const interruptedUploadAlert = pendingUpload ? (
+    <Alert tone="info" className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-sm">
+        {t("dashboard.interruptedUpload")} <strong>{pendingUpload.fileName}</strong> (
+        {Math.round((pendingUpload.written / Math.max(1, pendingUpload.fileSize)) * 100)}% {t("dashboard.done")})
+      </span>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => {
+          setTrackTitle(pendingUpload.title);
+          setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
+          if (activeTab !== "tracks") setActiveTab("tracks");
+          showToast(t("dashboard.resumeUploadHint"), "info");
+        }}
+      >
+        {t("dashboard.resumeUpload")}
+      </Button>
+    </Alert>
+  ) : null;
+
   return (
     <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
-      <div className="space-y-5">
-        {pendingUpload && activeTab !== "tracks" ? (
-          <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm">
-              {t("dashboard.interruptedUpload")} <strong>{pendingUpload.fileName}</strong> (
-              {Math.round((pendingUpload.written / Math.max(1, pendingUpload.fileSize)) * 100)}% {t("dashboard.done")})
-            </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setTrackTitle(pendingUpload.title);
-                setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
-                setActiveTab("tracks");
-                showToast(t("dashboard.resumeUploadHint"), "info");
-              }}
-            >
-              {t("dashboard.resumeUpload")}
-            </Button>
-          </Alert>
-        ) : null}
+      <DashboardPanelShell tab={activeTab} flush={activeTab === "playlists"} className="min-h-0 flex-1">
+        {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
 
         {activeTab === "channels" ? (
           <ChannelManagementSection
@@ -371,25 +376,7 @@ export function DashboardWorkspace() {
 
         {activeTab === "tracks" ? (
           <>
-            {pendingUpload ? (
-              <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">
-                  {t("dashboard.interruptedUpload")} <strong>{pendingUpload.fileName}</strong> (
-                  {Math.round((pendingUpload.written / Math.max(1, pendingUpload.fileSize)) * 100)}% {t("dashboard.done")})
-                </span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setTrackTitle(pendingUpload.title);
-                    setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
-                    showToast(t("dashboard.resumeUploadHint"), "info");
-                  }}
-                >
-                  {t("dashboard.resumeUpload")}
-                </Button>
-              </Alert>
-            ) : null}
+            {interruptedUploadAlert}
             <TrackLibrarySection
               tracks={tracks}
               trackTitle={trackTitle}
@@ -427,7 +414,7 @@ export function DashboardWorkspace() {
         ) : null}
 
         {activeTab === "settings" ? <NotificationPreferencesCard /> : null}
-      </div>
+      </DashboardPanelShell>
     </DashboardShell>
   );
 }

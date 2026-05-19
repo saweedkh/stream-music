@@ -20,7 +20,9 @@ type Props = {
   duration: number;
   vizAudioEl: HTMLAudioElement | null;
   expanded: boolean;
+  needsUnlock?: boolean;
   onExpand: () => void;
+  onUnlockAudio?: () => void;
   onPrev: () => void;
   onPlayPause: () => void;
   onNext: () => void;
@@ -41,7 +43,9 @@ export function ChannelPlayerMini({
   duration,
   vizAudioEl,
   expanded,
+  needsUnlock = false,
   onExpand,
+  onUnlockAudio,
   onPrev,
   onPlayPause,
   onNext,
@@ -55,6 +59,7 @@ export function ChannelPlayerMini({
 
   return (
     <div
+      data-testid="channel-player-shell"
       className={cn(
         "player-shell fixed inset-x-0 bottom-0 z-40 border-t",
         expanded && "player-shell--expanded",
@@ -111,6 +116,16 @@ export function ChannelPlayerMini({
           onValueChange={onSeekChange}
           onValueCommit={onSeekCommit}
         />
+        {needsUnlock && onUnlockAudio ? (
+          <button
+            type="button"
+            className="w-full rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-left text-xs text-amber-100/95 transition hover:bg-amber-500/15"
+            onClick={onUnlockAudio}
+          >
+            <span className="font-medium">{t("player.unlockTitle")}</span>
+            <span className="mt-0.5 block text-[10px] text-amber-100/70">{t("player.unlockDescription")}</span>
+          </button>
+        ) : null}
         {!expanded ? (
           <div className="h-9 w-full overflow-hidden rounded-xl border border-border/50 bg-[var(--surface-inset)]">
             <AudioWaveVisualizer media={vizAudioEl} isActive={waveActive} accent={accentKey} variant="compact" className="h-full w-full" />

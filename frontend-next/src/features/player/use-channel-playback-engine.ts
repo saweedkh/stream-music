@@ -1,18 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Howl, Howler } from "howler";
-
-/** One HTML5 track at a time; keep the pool tiny so leaked instances surface quickly. */
-if (typeof window !== "undefined") {
-  Howler.html5PoolSize = 2;
-}
 import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/playback-payload";
-import { isMediaOutputSuspended, resumeSharedAudioContext } from "@/features/player/audio-wave-visualizer";
+import { resumeSharedAudioContext } from "@/features/player/audio-wave-visualizer";
+import {
+  createChannelAudio,
+  haltChannelAudio,
+  loadChannelTrack,
+  playChannelAudio,
+  readDuration,
+  readPosition,
+  seekChannelAudio,
+} from "@/features/player/channel-audio-transport";
+import { audienceVolume } from "@/features/player/playback-audience";
 import { applyDriftCorrection, expectedTimeSeconds } from "@/features/player/sync-client";
-import { ChannelClosedError, getApiBase, getChannelState, getServerTime } from "@/lib/api";
+import { ChannelClosedError, getChannelState, getServerTime } from "@/lib/api";
+import { resolveTrackMediaSrc } from "@/lib/media-url";
 
 export type PlaybackSyncSnapshot = {
   offsetMs: number;
@@ -22,46 +27,10 @@ export type PlaybackSyncSnapshot = {
   trackPath: string | undefined;
 };
 
-function getHowlHtml5Audio(howl: Howl | null): HTMLAudioElement | null {
-  if (!howl) return null;
-  const sounds = (howl as unknown as { _sounds?: Array<{ _node?: unknown }> })._sounds;
-  const node = sounds?.[0]?._node;
-  return node instanceof HTMLAudioElement ? node : null;
-}
-
 function blendClockOffset(prevMs: number, sampleMs: number, alpha: number): number {
   if (!Number.isFinite(sampleMs)) return prevMs;
   if (!Number.isFinite(prevMs) || Math.abs(prevMs) < 1) return sampleMs;
   return prevMs + (sampleMs - prevMs) * alpha;
-}
-
-const AUDIO_RESYNC_SILENCE_MS = 1100;
-
-function shouldAudienceHear(
-  howl: Howl,
-  canControl: boolean,
-  experience: ChannelExperience | null,
-): boolean {
-  const exp = experience;
-  const audio = getHowlHtml5Audio(howl);
-  const posNow =
-    audio && Number.isFinite(audio.currentTime)
-      ? audio.currentTime
-      : typeof howl.seek() === "number"
-        ? (howl.seek() as number)
-        : 0;
-  const introCap = Math.max(0, Math.min(120, Number(exp?.intro_preview_seconds) || 0));
-  const introGate = !canControl && introCap > 0 && posNow >= introCap;
-  const liftActive = Boolean(exp?.rehearsal_lift_until && Date.parse(exp.rehearsal_lift_until) > Date.now());
-  const rehearsalMute = Boolean(exp?.rehearsal_mode && !canControl && !liftActive);
-  return !rehearsalMute && !introGate;
-}
-
-function isLocalPlaybackAudible(howl: Howl, audio: HTMLAudioElement | null): boolean {
-  if (!howl.playing()) return false;
-  if (audio?.paused) return false;
-  if (audio && isMediaOutputSuspended(audio)) return false;
-  return true;
 }
 
 type EngineOptions = {
@@ -93,8 +62,10 @@ export function useChannelPlaybackEngine({
   experienceRef.current = experience;
   const canControlRef = useRef(canControl);
   canControlRef.current = canControl;
-  const howlRef = useRef<Howl | null>(null);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadGenerationRef = useRef(0);
+  const loadedSrcRef = useRef<string | null>(null);
   const lastTransportRef = useRef({
     playing: initialIsPlaying,
     track: initialTrackPath,
@@ -110,11 +81,7 @@ export function useChannelPlaybackEngine({
   const sendSocketMessageRef = useRef(sendSocketMessage);
   const pendingSocketCommandRef = useRef<Record<string, unknown> | null>(null);
   const controlRequestInFlightRef = useRef(false);
-  const loadedTrackSrcRef = useRef<string | null>(null);
   const hasServerClockRef = useRef(false);
-  const needsUserInteractionRef = useRef(false);
-  const audioSilentSinceRef = useRef<number | null>(null);
-  const isBufferingRef = useRef(false);
   const propSnapshotRef = useRef({
     trackPath: initialTrackPath,
     startedAt: initialStartedAt,
@@ -142,8 +109,6 @@ export function useChannelPlaybackEngine({
   const [syncPausedAt, setSyncPausedAt] = useState<number | null | undefined>(initialPausedAt);
   const [activeTrackPath, setActiveTrackPath] = useState<string | undefined>(initialTrackPath);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
-  const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
-  needsUserInteractionRef.current = needsUserInteraction;
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.75);
@@ -154,9 +119,9 @@ export function useChannelPlaybackEngine({
   const [queueVersion, setQueueVersion] = useState(0);
   const queueVersionRef = useRef(0);
   queueVersionRef.current = queueVersion;
-  const [vizAudioEl, setVizAudioEl] = useState<HTMLAudioElement | null>(null);
   const [isBuffering, setIsBuffering] = useState(false);
-  isBufferingRef.current = isBuffering;
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+  const [vizAudioEl, setVizAudioEl] = useState<HTMLAudioElement | null>(null);
 
   syncRef.current = {
     offsetMs,
@@ -166,38 +131,83 @@ export function useChannelPlaybackEngine({
     trackPath: activeTrackPath,
   };
 
-  const teardownMainHowl = useCallback(() => {
-    const prev = howlRef.current;
-    howlRef.current = null;
-    setVizAudioEl(null);
-    if (!prev) return;
-    try {
-      prev.stop();
-      prev.unload();
-    } catch {
-      /* ignore */
+  const invalidateLoads = useCallback(() => {
+    loadGenerationRef.current += 1;
+  }, []);
+
+  const haltPlaybackNow = useCallback(() => {
+    invalidateLoads();
+    loadedSrcRef.current = null;
+    haltChannelAudio(audioRef.current);
+    suppressDriftUntilRef.current = Date.now() + 4000;
+  }, [invalidateLoads]);
+
+  const seekAudioToSync = useCallback((audio: HTMLAudioElement, force = false) => {
+    const snap = syncRef.current;
+    const expected = expectedTimeSeconds({
+      startedAt: snap.startedAt,
+      pausedAt: snap.pausedAt,
+      offsetMs: snap.offsetMs,
+      isPlaying: true,
+    });
+    const current = readPosition(audio);
+    if (force || Math.abs(current - expected) > 0.85) {
+      seekChannelAudio(audio, Math.max(0, expected));
+      suppressDriftUntilRef.current = Date.now() + 2800;
+    }
+    return expected;
+  }, []);
+
+  const applyTransport = useCallback(
+    async (opts?: { forceSeek?: boolean }) => {
+      const audio = audioRef.current;
+      if (!audio?.src) return;
+      if (!isPlayingRef.current) return;
+
+      audio.playbackRate = 1;
+      seekAudioToSync(audio, Boolean(opts?.forceSeek));
+
+      const pos = readPosition(audio);
+      audio.volume = audienceVolume(pos, canControlRef.current, experienceRef.current, volumeRef.current);
+
+      await resumeSharedAudioContext();
+      const result = await playChannelAudio(audio);
+      if (result === "playing") {
+        setNeedsUnlock(false);
+        setIsBuffering(false);
+        return;
+      }
+      if (result === "blocked") {
+        setNeedsUnlock(true);
+        setIsBuffering(false);
+      }
+    },
+    [seekAudioToSync],
+  );
+
+  const applyTransportRef = useRef(applyTransport);
+  applyTransportRef.current = applyTransport;
+
+  const pauseAudioAtSync = useCallback((audio: HTMLAudioElement) => {
+    audio.playbackRate = 1;
+    if (!audio.paused) audio.pause();
+    const snap = syncRef.current;
+    if (typeof snap.pausedAt === "number") {
+      seekChannelAudio(audio, Math.max(0, snap.pausedAt));
+      setPosition(Math.max(0, snap.pausedAt));
+      suppressDriftUntilRef.current = Date.now() + 1500;
     }
   }, []);
 
   const requestAutoNext = useCallback(
-    (howl: Howl) => {
+    (audio: HTMLAudioElement) => {
       if (!isPlayingRef.current || !socketConnectedRef.current) return;
 
       const trackKey = syncRef.current.trackPath ?? "";
       if (autoNextSentForTrackRef.current === trackKey) return;
 
-      const audio = getHowlHtml5Audio(howl);
-      const dur =
-        audio && Number.isFinite(audio.duration) && audio.duration > 0
-          ? audio.duration
-          : typeof howl.duration === "function"
-            ? Number(howl.duration()) || 0
-            : 0;
-      let pos = 0;
-      if (audio && Number.isFinite(audio.currentTime)) pos = audio.currentTime;
-      else if (typeof howl.seek() === "function") pos = Number(howl.seek()) || 0;
-
-      // After a natural end Howler often resets seek to 0 — only skip mid-track stop/unload.
+      const dur = readDuration(audio);
+      const pos = readPosition(audio);
       if (dur > 3 && pos > 1.5 && pos < dur - 1.5) return;
 
       autoNextSentForTrackRef.current = trackKey;
@@ -215,72 +225,13 @@ export function useChannelPlaybackEngine({
   const requestAutoNextRef = useRef(requestAutoNext);
   requestAutoNextRef.current = requestAutoNext;
 
-  const seekHowlToSync = useCallback((howl: Howl, force = false) => {
-    const snap = syncRef.current;
-    const expected = expectedTimeSeconds({
-      startedAt: snap.startedAt,
-      pausedAt: snap.pausedAt,
-      offsetMs: snap.offsetMs,
-      isPlaying: true,
-    });
-    const current = typeof howl.seek() === "number" ? (howl.seek() as number) : 0;
-    if (force || Math.abs(current - expected) > 0.85) {
-      howl.seek(Math.max(0, expected));
-      suppressDriftUntilRef.current = Date.now() + 2800;
-    }
-    return expected;
+  const recordUserGesture = useCallback(() => {
+    void resumeSharedAudioContext();
   }, []);
 
-  const startHowlTransport = useCallback((howl: Howl, opts?: { forceSeek?: boolean }) => {
-    const audio = getHowlHtml5Audio(howl);
-    if (audio) audio.playbackRate = 1;
-    if (typeof howl.rate === "function") howl.rate(1);
-    seekHowlToSync(howl, Boolean(opts?.forceSeek));
-    if (!howl.playing()) {
-      const played = howl.play();
-      if (played === undefined) {
-        suppressDriftUntilRef.current = Date.now() + 2800;
-      }
-    }
-  }, [seekHowlToSync]);
-
-  const tryStartPendingTransport = useCallback(() => {
-    const howl = howlRef.current;
-    if (!howl || !isPlayingRef.current || !hasServerClockRef.current) return;
-    if (needsUserInteractionRef.current) {
-      seekHowlToSync(howl, true);
-      return;
-    }
-    startHowlTransport(howl, { forceSeek: true });
-  }, [seekHowlToSync, startHowlTransport]);
-
-  const markNeedsAudioResync = useCallback(
-    (howl?: Howl | null) => {
-      const h = howl ?? howlRef.current;
-      if (!h || !isPlayingRef.current || needsUserInteractionRef.current) return;
-      if (!syncRef.current.trackPath) return;
-
-      audioSilentSinceRef.current = null;
-      needsUserInteractionRef.current = true;
-      setNeedsUserInteraction(true);
-      seekHowlToSync(h, true);
-      if (h.playing()) {
-        try {
-          h.pause();
-        } catch {
-          /* ignore */
-        }
-      }
-    },
-    [seekHowlToSync],
-  );
-
-  const markNeedsAudioResyncRef = useRef(markNeedsAudioResync);
-  markNeedsAudioResyncRef.current = markNeedsAudioResync;
-
   const unlockChannelAudio = useCallback(async () => {
-    const howl = howlRef.current;
-    if (!howl) return;
+    const audio = audioRef.current;
+    if (!audio?.src) return;
 
     let nextOffset = syncRef.current.offsetMs;
     try {
@@ -293,11 +244,8 @@ export function useChannelPlaybackEngine({
 
     syncRef.current = { ...syncRef.current, offsetMs: nextOffset };
     await resumeSharedAudioContext();
-    audioSilentSinceRef.current = null;
-    needsUserInteractionRef.current = false;
-    setNeedsUserInteraction(false);
-    startHowlTransport(howl, { forceSeek: true });
-  }, [startHowlTransport]);
+    await applyTransportRef.current({ forceSeek: true });
+  }, []);
 
   const applySyncState = useCallback(
     (patch: Partial<PlaybackSyncSnapshot> & { queueVersion?: number }) => {
@@ -337,6 +285,8 @@ export function useChannelPlaybackEngine({
 
       if (merged.trackPath !== syncRef.current.trackPath) {
         autoNextSentForTrackRef.current = null;
+        haltPlaybackNow();
+        suppressDriftUntilRef.current = Date.now() + 5000;
       }
 
       applySyncState({
@@ -347,7 +297,7 @@ export function useChannelPlaybackEngine({
         queueVersion: merged.queueVersion,
       });
     },
-    [applySyncState],
+    [applySyncState, haltPlaybackNow],
   );
 
   const handleIncomingRef = useRef(handleIncomingPlaybackPayload);
@@ -383,6 +333,10 @@ export function useChannelPlaybackEngine({
       if (controlRequestInFlightRef.current) return;
       controlRequestInFlightRef.current = true;
       try {
+        if (action === "next" || action === "prev") {
+          haltPlaybackNow();
+          setIsBuffering(true);
+        }
         const sent = sendSocketMessage({ action, ...payload });
         if (!sent) {
           pendingSocketCommandRef.current = { action, ...payload };
@@ -395,7 +349,7 @@ export function useChannelPlaybackEngine({
         controlRequestInFlightRef.current = false;
       }
     },
-    [canControl, onToast, sendSocketMessage],
+    [canControl, haltPlaybackNow, onToast, sendSocketMessage],
   );
 
   const commitSeek = useCallback(
@@ -403,9 +357,9 @@ export function useChannelPlaybackEngine({
       isDraggingSeekRef.current = false;
       const clamped = Math.max(0, next);
       setPosition(clamped);
-      const howl = howlRef.current;
-      if (howl) {
-        howl.seek(clamped);
+      const audio = audioRef.current;
+      if (audio?.src) {
+        seekChannelAudio(audio, clamped);
         suppressDriftUntilRef.current = Date.now() + 2800;
       }
       if (canControl) void applyControl("seek", { position: clamped });
@@ -413,14 +367,19 @@ export function useChannelPlaybackEngine({
     [applyControl, canControl],
   );
 
+  const getCurrentPosition = useCallback(() => {
+    const audio = audioRef.current;
+    return audio?.src ? readPosition(audio) : position;
+  }, [position]);
+
   useEffect(() => {
     isPlayingRef.current = isPlaying;
-    if (!isPlaying) {
-      audioSilentSinceRef.current = null;
-      needsUserInteractionRef.current = false;
-      setNeedsUserInteraction(false);
+    const audio = audioRef.current;
+    if (!audio?.src) return;
+    if (!isPlaying && !audio.paused) {
+      pauseAudioAtSync(audio);
     }
-  }, [isPlaying]);
+  }, [isPlaying, pauseAudioAtSync]);
 
   useEffect(() => {
     socketConnectedRef.current = socketState === "connected";
@@ -436,7 +395,7 @@ export function useChannelPlaybackEngine({
         .then(({ offset }) => {
           setOffsetMs((prev) => blendClockOffset(prev, offset, 0.5));
           hasServerClockRef.current = true;
-          tryStartPendingTransport();
+          if (isPlayingRef.current) void applyTransportRef.current();
         })
         .catch(() => {});
     };
@@ -450,7 +409,7 @@ export function useChannelPlaybackEngine({
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [tryStartPendingTransport]);
+  }, []);
 
   useEffect(() => {
     const onClock = (ev: Event) => {
@@ -470,35 +429,56 @@ export function useChannelPlaybackEngine({
       .then(({ offset }) => {
         setOffsetMs((prev) => blendClockOffset(prev, offset, 0.55));
         hasServerClockRef.current = true;
-        tryStartPendingTransport();
+        if (isPlayingRef.current) void applyTransportRef.current({ forceSeek: true });
       })
       .catch(() => {});
-  }, [socketState, channelId, tryStartPendingTransport]);
+  }, [socketState, channelId]);
+
+  useEffect(() => {
+    const audio = createChannelAudio();
+    audio.setAttribute("data-channel-audio", channelId);
+    audio.style.cssText = "position:fixed;width:0;height:0;opacity:0;pointer-events:none";
+    document.body.appendChild(audio);
+    audioRef.current = audio;
+    setVizAudioEl(audio);
+
+    const onEnded = () => {
+      requestAutoNextRef.current(audio);
+    };
+
+    audio.addEventListener("ended", onEnded);
+
+    return () => {
+      audio.removeEventListener("ended", onEnded);
+      haltChannelAudio(audio);
+      audio.remove();
+      if (audioRef.current === audio) audioRef.current = null;
+      setVizAudioEl(null);
+    };
+  }, [channelId]);
 
   useEffect(() => {
     lastAppliedEventSeqRef.current = 0;
-    loadedTrackSrcRef.current = null;
+    loadedSrcRef.current = null;
     autoNextSentForTrackRef.current = null;
     suppressDriftUntilRef.current = 0;
     hasServerClockRef.current = false;
     setQueueVersion(0);
-    teardownMainHowl();
+    setNeedsUnlock(false);
+    haltPlaybackNow();
     setPosition(0);
     setDuration(0);
     setIsBuffering(false);
+
     const snap = propSnapshotRef.current;
-    const requireUnlock = Boolean(
-      !canControlRef.current && snap.initialIsPlaying && snap.trackPath,
-    );
-    needsUserInteractionRef.current = requireUnlock;
-    setNeedsUserInteraction(requireUnlock);
     void getServerTime()
       .then(({ offset }) => {
         setOffsetMs((prev) => blendClockOffset(prev, offset, 0.55));
         hasServerClockRef.current = true;
-        tryStartPendingTransport();
+        if (snap.initialIsPlaying) void applyTransportRef.current({ forceSeek: true });
       })
       .catch(() => {});
+
     applySyncState({
       isPlaying: snap.initialIsPlaying,
       startedAt: snap.startedAt,
@@ -511,13 +491,7 @@ export function useChannelPlaybackEngine({
       started: snap.startedAt,
       paused: snap.pausedAt,
     };
-  }, [applySyncState, channelId, teardownMainHowl]);
-
-  useEffect(() => {
-    return () => {
-      teardownMainHowl();
-    };
-  }, [teardownMainHowl]);
+  }, [applySyncState, channelId, haltPlaybackNow]);
 
   useEffect(() => {
     if (socketState !== "closed") return;
@@ -551,146 +525,77 @@ export function useChannelPlaybackEngine({
   }, [onToast, sendSocketMessage, socketState]);
 
   useEffect(() => {
-    const src = activeTrackPath ? `${getApiBase()}${activeTrackPath}` : null;
-    const loadGen = ++loadGenerationRef.current;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const src = resolveTrackMediaSrc(activeTrackPath);
+    const loadId = ++loadGenerationRef.current;
 
     if (!src) {
-      loadedTrackSrcRef.current = null;
-      teardownMainHowl();
+      loadedSrcRef.current = null;
+      haltChannelAudio(audio);
       setPosition(0);
       setDuration(0);
       setIsBuffering(false);
       return;
     }
 
-    if (loadedTrackSrcRef.current === src && howlRef.current) {
+    if (loadedSrcRef.current === src) {
       return;
     }
-    loadedTrackSrcRef.current = src;
-    autoNextSentForTrackRef.current = null;
 
-    teardownMainHowl();
+    loadedSrcRef.current = src;
+    autoNextSentForTrackRef.current = null;
     setIsBuffering(true);
 
-    const howl = new Howl({
-      src: [src],
-      html5: true,
-      preload: true,
-      volume: volumeRef.current,
-      onload: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        setIsBuffering(false);
-        setDuration(howl.duration() || 0);
-        setVizAudioEl(getHowlHtml5Audio(howl));
-        if (isPlayingRef.current) tryStartPendingTransport();
-      },
-      onplay: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        setIsBuffering(false);
-        setVizAudioEl(getHowlHtml5Audio(howl));
-      },
-      onplayerror: () => {
-        if (loadGen !== loadGenerationRef.current) return;
-        setIsBuffering(false);
-        markNeedsAudioResyncRef.current(howl);
-      },
-      onpause: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        if (!isPlayingRef.current || needsUserInteractionRef.current) return;
-        markNeedsAudioResyncRef.current(howl);
-      },
-      onloaderror: () => {
-        if (loadGen !== loadGenerationRef.current) return;
-        loadedTrackSrcRef.current = null;
+    let cancelled = false;
+
+    void (async () => {
+      const result = await loadChannelTrack(audio, src, () => loadGenerationRef.current === loadId);
+      if (cancelled || loadGenerationRef.current !== loadId) return;
+
+      if (result === "error") {
+        loadedSrcRef.current = null;
         setIsBuffering(false);
         onToastRef.current?.("Cannot load audio source", "error");
-      },
-      onend: () => {
-        if (loadGen !== loadGenerationRef.current || howlRef.current !== howl) return;
-        requestAutoNextRef.current(howl);
-      },
-    });
-
-    howlRef.current = howl;
-
-    return () => {
-      if (loadGen !== loadGenerationRef.current) return;
-      if (howlRef.current === howl) howlRef.current = null;
-      try {
-        howl.stop();
-        howl.unload();
-      } catch {
-        /* ignore */
+        return;
       }
-      setVizAudioEl(null);
-    };
-  }, [activeTrackPath, channelId, seekHowlToSync, teardownMainHowl, tryStartPendingTransport]);
+      if (result === "aborted") return;
 
-  useEffect(() => {
-    const howl = howlRef.current;
-    const audio = vizAudioEl;
-    if (!howl || !audio) return;
-    const onNativeEnded = () => {
-      if (howlRef.current !== howl) return;
-      requestAutoNextRef.current(howl);
-    };
-    const onNativePause = () => {
-      if (howlRef.current !== howl) return;
-      if (!isPlayingRef.current || needsUserInteractionRef.current) return;
-      markNeedsAudioResyncRef.current(howl);
-    };
-    const onNativeStalled = () => {
-      if (howlRef.current !== howl) return;
-      if (!isPlayingRef.current || needsUserInteractionRef.current) return;
-      markNeedsAudioResyncRef.current(howl);
-    };
-    audio.addEventListener("ended", onNativeEnded);
-    audio.addEventListener("pause", onNativePause);
-    audio.addEventListener("stalled", onNativeStalled);
+      setDuration(readDuration(audio));
+      setIsBuffering(false);
+
+      if (isPlayingRef.current) {
+        await applyTransportRef.current({ forceSeek: true });
+      } else if (!isPlayingRef.current && typeof syncRef.current.pausedAt === "number") {
+        seekChannelAudio(audio, Math.max(0, syncRef.current.pausedAt));
+        setPosition(Math.max(0, syncRef.current.pausedAt));
+      }
+    })();
+
     return () => {
-      audio.removeEventListener("ended", onNativeEnded);
-      audio.removeEventListener("pause", onNativePause);
-      audio.removeEventListener("stalled", onNativeStalled);
+      cancelled = true;
+      loadGenerationRef.current += 1;
+      haltChannelAudio(audio);
+      if (loadedSrcRef.current === src) loadedSrcRef.current = null;
     };
-  }, [vizAudioEl, activeTrackPath]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState !== "visible") return;
-      const howl = howlRef.current;
-      if (!howl || !isPlayingRef.current || needsUserInteractionRef.current) return;
-      if (!shouldAudienceHear(howl, canControlRef.current, experienceRef.current)) return;
-      window.setTimeout(() => {
-        if (!isPlayingRef.current || needsUserInteractionRef.current) return;
-        const audio = getHowlHtml5Audio(howl);
-        if (!isLocalPlaybackAudible(howl, audio)) {
-          markNeedsAudioResyncRef.current(howl);
-        }
-      }, 400);
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
+  }, [activeTrackPath, channelId]);
 
   useEffect(() => {
     let raf = 0;
     let driftTick = 0;
+
     const tick = () => {
-      const howl = howlRef.current;
-      if (howl) {
-        const audio = getHowlHtml5Audio(howl);
+      const audio = audioRef.current;
+      if (audio?.src) {
         const snap = syncRef.current;
+        const posNow = readPosition(audio);
+
         if (!isDraggingSeekRef.current) {
-          const current =
-            audio && Number.isFinite(audio.currentTime)
-              ? audio.currentTime
-              : typeof howl.seek() === "number"
-                ? (howl.seek() as number)
-                : 0;
-          setPosition(current);
+          setPosition(posNow);
         }
 
-        if (snap.isPlaying && audio && !isDraggingSeekRef.current && Date.now() >= suppressDriftUntilRef.current) {
+        if (snap.isPlaying && !isDraggingSeekRef.current && Date.now() >= suppressDriftUntilRef.current) {
           if (driftTick++ % 5 === 0) {
             applyDriftCorrection(audio, {
               startedAt: snap.startedAt,
@@ -699,78 +604,28 @@ export function useChannelPlaybackEngine({
               isPlaying: true,
             });
           }
-          if (typeof howl.rate === "function") howl.rate(1);
-        } else if (audio) {
+        } else {
           audio.playbackRate = 1;
         }
 
-        const exp = experienceRef.current;
-        const posNow =
-          audio && Number.isFinite(audio.currentTime)
-            ? audio.currentTime
-            : typeof howl.seek() === "number"
-              ? (howl.seek() as number)
-              : 0;
-        const introCap = Math.max(0, Math.min(120, Number(exp?.intro_preview_seconds) || 0));
-        const introGate = !canControlRef.current && introCap > 0 && posNow >= introCap;
-        const liftActive = Boolean(
-          exp?.rehearsal_lift_until && Date.parse(exp.rehearsal_lift_until) > Date.now(),
-        );
-        const rehearsalMute = Boolean(exp?.rehearsal_mode && !canControlRef.current && !liftActive);
-        howl.volume(rehearsalMute || introGate ? 0 : volume);
+        audio.volume = audienceVolume(posNow, canControlRef.current, experienceRef.current, volumeRef.current);
 
-        const trackDur =
-          audio && Number.isFinite(audio.duration) && audio.duration > 0
-            ? audio.duration
-            : typeof howl.duration === "function"
-              ? Number(howl.duration()) || 0
-              : 0;
+        const trackDur = readDuration(audio);
         const trackKey = snap.trackPath ?? "";
-        if (
-          snap.isPlaying &&
-          trackDur > 0.5 &&
-          posNow >= trackDur - 0.35 &&
-          autoNextSentForTrackRef.current !== trackKey
-        ) {
-          requestAutoNextRef.current(howl);
-        }
-
-        const nearTrackEnd = trackDur > 0.5 && posNow >= trackDur - 1.2;
-        const howlReady = (howl as Howl & { state?: () => string }).state?.() === "loaded";
-        if (
-          snap.isPlaying &&
-          snap.trackPath &&
-          howlReady &&
-          !isBufferingRef.current &&
-          !needsUserInteractionRef.current &&
-          !nearTrackEnd &&
-          Date.now() >= suppressDriftUntilRef.current &&
-          shouldAudienceHear(howl, canControlRef.current, experienceRef.current)
-        ) {
-          const audible = isLocalPlaybackAudible(howl, audio);
-          if (!audible) {
-            const since = audioSilentSinceRef.current;
-            if (since == null) {
-              audioSilentSinceRef.current = Date.now();
-            } else if (Date.now() - since >= AUDIO_RESYNC_SILENCE_MS) {
-              markNeedsAudioResyncRef.current(howl);
-            }
-          } else {
-            audioSilentSinceRef.current = null;
-          }
-        } else if (!snap.isPlaying || needsUserInteractionRef.current) {
-          audioSilentSinceRef.current = null;
+        if (snap.isPlaying && trackDur > 0.5 && posNow >= trackDur - 0.35 && autoNextSentForTrackRef.current !== trackKey) {
+          requestAutoNextRef.current(audio);
         }
       }
       raf = window.requestAnimationFrame(tick);
     };
+
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
   }, [volume]);
 
   useEffect(() => {
-    const howl = howlRef.current;
-    if (!howl) return;
+    const audio = audioRef.current;
+    if (!audio?.src) return;
 
     const prev = lastTransportRef.current;
     const next = {
@@ -788,44 +643,22 @@ export function useChannelPlaybackEngine({
     if (trackChanged) return;
 
     if (isPlaying) {
-      if (needsUserInteractionRef.current) {
-        seekHowlToSync(howl, playStateChanged || startAnchorChanged);
-        return;
-      }
-      if (!playStateChanged && !startAnchorChanged && howl.playing()) return;
-      startHowlTransport(howl, { forceSeek: playStateChanged || startAnchorChanged });
+      if (!playStateChanged && !startAnchorChanged && !audio.paused) return;
+      void applyTransport({ forceSeek: playStateChanged || startAnchorChanged });
       return;
     }
 
-    if (!playStateChanged && !pausePosChanged && !howl.playing()) return;
-    const audio = getHowlHtml5Audio(howl);
-    if (audio) audio.playbackRate = 1;
-    if (typeof howl.rate === "function") howl.rate(1);
-    if (howl.playing()) howl.pause();
-    if (typeof syncPausedAt === "number") {
-      howl.seek(Math.max(0, syncPausedAt));
-      setPosition(Math.max(0, syncPausedAt));
-      suppressDriftUntilRef.current = Date.now() + 1500;
-    }
-  }, [activeTrackPath, isPlaying, seekHowlToSync, startHowlTransport, syncPausedAt, syncStartedAt]);
-
-  useEffect(() => {
-    if (!needsUserInteraction || !isPlaying) return;
-    const howl = howlRef.current;
-    if (!howl) return;
-    const expected = seekHowlToSync(howl, false);
-    setPosition(Math.max(0, expected));
-  }, [needsUserInteraction, isPlaying, offsetMs, seekHowlToSync, syncPausedAt, syncStartedAt]);
+    if (!playStateChanged && !pausePosChanged && audio.paused) return;
+    pauseAudioAtSync(audio);
+  }, [activeTrackPath, applyTransport, isPlaying, pauseAudioAtSync, syncPausedAt, syncStartedAt]);
 
   return {
-    howlRef,
+    audioRef,
     isPlaying,
     syncStartedAt,
     syncPausedAt,
     activeTrackPath,
     lastSyncAt,
-    needsUserInteraction,
-    setNeedsUserInteraction,
     position,
     setPosition,
     duration,
@@ -834,12 +667,14 @@ export function useChannelPlaybackEngine({
     queueVersion,
     vizAudioEl,
     isBuffering,
+    needsUnlock,
     offsetMs,
     isDraggingSeekRef,
     applyControl,
     commitSeek,
     refreshChannelPlaybackState,
-    startHowlTransport,
     unlockChannelAudio,
+    recordUserGesture,
+    getCurrentPosition,
   };
 }
