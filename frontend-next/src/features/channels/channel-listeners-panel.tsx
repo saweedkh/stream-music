@@ -6,6 +6,7 @@ import { useChannelPresence } from "@/hooks/use-channel-presence";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
 import { Button } from "@/components/ui/button";
 import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
 import { adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
@@ -61,6 +62,7 @@ export function ChannelListenersPanel({
 
   const activeMembers = useMemo(() => members.filter((m) => m.is_active), [members]);
   const inactiveMembers = useMemo(() => members.filter((m) => !m.is_active), [members]);
+  const memberByUserId = useMemo(() => new Map(members.map((m) => [m.user_id, m])), [members]);
 
   const headerActions = (
     <>
@@ -96,7 +98,11 @@ export function ChannelListenersPanel({
                 <Avatar className="h-8 w-8 border border-brand/40">
                   <AvatarFallback className="text-xs">{(m.username || "?").slice(0, 1)}</AvatarFallback>
                 </Avatar>
-                <span className="text-sm text-foreground">@{m.username}</span>
+                <UsernameWithBadges
+                  username={m.username}
+                  flags={memberByUserId.get(m.id)}
+                  usernameClassName="text-sm text-foreground"
+                />
                 <span className="h-2 w-2 rounded-full bg-brand" title={t("room.admin.listeners.onlineStatus")} />
               </div>
             ))}
@@ -140,7 +146,11 @@ export function ChannelListenersPanel({
                       <AvatarFallback>{(member.username || "?").slice(0, 1)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">@{member.username}</p>
+                      <UsernameWithBadges
+                        username={member.username}
+                        flags={member}
+                        usernameClassName="text-sm font-medium text-foreground"
+                      />
                       <p className="text-xs text-muted-foreground">
                         {t("room.admin.listeners.joined", {
                           date: new Date(member.joined_at).toLocaleDateString(),
@@ -177,7 +187,11 @@ export function ChannelListenersPanel({
                       <AvatarFallback>{(member.username || "?").slice(0, 1)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-muted-foreground">@{member.username}</p>
+                      <UsernameWithBadges
+                        username={member.username}
+                        flags={member}
+                        usernameClassName="text-sm text-muted-foreground"
+                      />
                     </div>
                     <Badge variant="outline" className="shrink-0 capitalize">
                       {member.role}

@@ -39,6 +39,7 @@ import {
   listPlaylistItems,
   listPlaylists,
   listTracks,
+  normalizeTrackList,
   playPlaylistInChannel,
   playTrackInChannel,
   reorderPlaylistItem,
@@ -189,7 +190,7 @@ export function ChannelAdminPlaylistPanel({ channelId, canManage, sendSocketMess
     setLibraryLoading(true);
     void listTracks({ search: debouncedLibraryQuery, limit: LIBRARY_SEARCH_LIMIT })
       .then((rows) => {
-        if (!cancelled) setLibraryTracks(rows);
+        if (!cancelled) setLibraryTracks(normalizeTrackList(rows));
       })
       .catch(() => {
         if (!cancelled) showToast("Search failed.", "error");

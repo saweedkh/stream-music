@@ -10,6 +10,7 @@ import type { DashboardTab } from "@/features/dashboard/dashboard-types";
 import { JoinChannelDialog } from "@/features/dashboard/join-channel-dialog";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
+import { listenUserSessionRefresh } from "@/lib/user-session-events";
 import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
@@ -33,6 +34,14 @@ export function AppNavLayout({ activeTab, onSelectTab, children }: AppNavLayoutP
         }
       })
       .catch(() => setUser(null));
+  }, []);
+
+  useEffect(() => {
+    return listenUserSessionRefresh(() => {
+      void getMe()
+        .then((res) => setUser(res?.user ?? null))
+        .catch(() => setUser(null));
+    });
   }, []);
 
   function handleSelectTab(tab: DashboardTab) {

@@ -8,6 +8,22 @@ from apps.tracks.upload_views import (
     TrackUploadStatusView,
 )
 
+from apps.common.admin_views import (
+    AdminBadgeDetailView,
+    AdminBadgesView,
+    AdminChannelsView,
+    AdminHealthView,
+    AdminOverviewView,
+    AdminUserDetailView,
+    AdminUsersView,
+)
+from apps.common.support_views import (
+    SupportCategoriesView,
+    SupportStaffUsersView,
+    SupportTicketDetailView,
+    SupportTicketMessagesView,
+    SupportTicketsView,
+)
 from apps.common.health import HealthView
 from apps.common.metrics import MetricsView
 from apps.common.openapi_schema import OpenApiSchemaView
@@ -15,6 +31,7 @@ from apps.common.views import (
     LoginView,
     LogoutView,
     MeView,
+    UserPasswordChangeView,
     UserNotificationSettingsView,
     WebPushSubscriptionView,
     WebPushTestView,
@@ -78,10 +95,23 @@ urlpatterns = [
     path("auth/login", LoginView.as_view()),
     path("auth/logout", LogoutView.as_view()),
     path("auth/me", MeView.as_view()),
+    path("auth/me/password", UserPasswordChangeView.as_view()),
     path("auth/me/notification-settings", UserNotificationSettingsView.as_view()),
     path("auth/me/push-subscription", WebPushSubscriptionView.as_view()),
     path("auth/me/push-test", WebPushTestView.as_view()),
     path("auth/users", UsersListView.as_view()),
+    path("admin/overview", AdminOverviewView.as_view()),
+    path("admin/users", AdminUsersView.as_view()),
+    path("admin/users/<int:user_id>", AdminUserDetailView.as_view()),
+    path("admin/badges", AdminBadgesView.as_view()),
+    path("admin/badges/<int:badge_id>", AdminBadgeDetailView.as_view()),
+    path("admin/channels", AdminChannelsView.as_view()),
+    path("admin/health", AdminHealthView.as_view()),
+    path("support/categories", SupportCategoriesView.as_view()),
+    path("support/tickets", SupportTicketsView.as_view()),
+    path("support/tickets/<int:ticket_id>", SupportTicketDetailView.as_view()),
+    path("support/tickets/<int:ticket_id>/messages", SupportTicketMessagesView.as_view()),
+    path("support/staff-users", SupportStaffUsersView.as_view()),
     path("channels/<int:channel_id>/state", ChannelStateView.as_view()),
     path("channels/<int:channel_id>/control", ChannelControlView.as_view()),
     path("channels/join-from-link", ChannelJoinFromLinkView.as_view()),

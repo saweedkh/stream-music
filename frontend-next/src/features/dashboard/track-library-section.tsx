@@ -1,14 +1,17 @@
 "use client";
 
+import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FavoriteStarButton } from "@/components/ui/favorite-star-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useTranslations } from "@/components/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import type { TrackSummary } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Props = {
   tracks: TrackSummary[];
@@ -23,6 +26,10 @@ type Props = {
   onTrackFileChange: (file: File | null) => void;
   onTrackFileDrop: (file: File | null) => void;
   onUploadTrack: () => void;
+  favoritesOnly?: boolean;
+  favoriteBusyTrackId?: number | null;
+  onFavoritesOnlyChange?: (on: boolean) => void;
+  onToggleFavorite?: (trackId: number, favorited: boolean) => void;
 };
 
 const VISIBILITY_KEYS: Record<TrackSummary["visibility"], MessageKey> = {
@@ -47,6 +54,10 @@ export function TrackLibrarySection(props: Props) {
     onTrackFileChange,
     onTrackFileDrop,
     onUploadTrack,
+    favoritesOnly = false,
+    favoriteBusyTrackId = null,
+    onFavoritesOnlyChange,
+    onToggleFavorite,
   } = props;
 
   const visibilityTone: Record<TrackSummary["visibility"], "default" | "warning" | "success"> = {
@@ -126,13 +137,29 @@ export function TrackLibrarySection(props: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("tracks.libraryTitle", { count: tracks.length })}</CardTitle>
-          <CardDescription>{t("tracks.libraryDescription")}</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle>{t("tracks.libraryTitle", { count: tracks.length })}</CardTitle>
+              <CardDescription>{t("tracks.libraryDescription")}</CardDescription>
+            </div>
+            {onFavoritesOnlyChange ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={favoritesOnly ? "default" : "outline"}
+                className={cn("h-8 shrink-0 gap-1.5", favoritesOnly && "bg-amber-500/90 hover:bg-amber-500")}
+                onClick={() => onFavoritesOnlyChange(!favoritesOnly)}
+              >
+                <Star className={cn("h-3.5 w-3.5", favoritesOnly && "fill-current")} aria-hidden />
+                {favoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           {tracks.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border/70 py-12 text-center text-sm text-muted-foreground">
-              {t("tracks.empty")}
+              {favoritesOnly ? t("favorites.showOnly") : t("tracks.empty")}
             </p>
           ) : (
             <ul className="max-h-[28rem] space-y-1.5 overflow-y-auto pe-1">
@@ -141,7 +168,15 @@ export function TrackLibrarySection(props: Props) {
                   key={track.id}
                   className="flex items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-border/60 hover:bg-muted/30"
                 >
-                  <div className="min-w-0">
+                  {onToggleFavorite ? (
+                    <FavoriteStarButton
+                      favorited={Boolean(track.is_favorited)}
+                      busy={favoriteBusyTrackId === track.id}
+                      label={track.is_favorited ? t("favorites.remove") : t("favorites.add")}
+                      onToggle={() => onToggleFavorite(track.id, !track.is_favorited)}
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{track.title}</p>
                     <p className="text-xs text-muted-foreground">{t("tracks.trackId", { id: track.id })}</p>
                   </div>

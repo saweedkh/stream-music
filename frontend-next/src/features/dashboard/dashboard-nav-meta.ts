@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bell, LayoutGrid, ListMusic, Music, Share2 } from "lucide-react";
+import { Crown, LayoutGrid, LifeBuoy, ListMusic, Music, Share2, UserCircle } from "lucide-react";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -13,7 +13,9 @@ export const DASHBOARD_TAB_ICONS: Record<DashboardTab, LucideIcon> = {
   tracks: Music,
   playlists: ListMusic,
   sharing: Share2,
-  settings: Bell,
+  support: LifeBuoy,
+  settings: UserCircle,
+  admin: Crown,
 };
 
 export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
@@ -33,8 +35,16 @@ export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
     titleKey: "dashboard.page.sharing.title",
     descriptionKey: "dashboard.page.sharing.description",
   },
+  support: {
+    titleKey: "dashboard.page.support.title",
+    descriptionKey: "dashboard.page.support.description",
+  },
   settings: {
     titleKey: "dashboard.page.settings.title",
     descriptionKey: "dashboard.page.settings.description",
+  },
+  admin: {
+    titleKey: "dashboard.page.admin.title",
+    descriptionKey: "dashboard.page.admin.description",
   },
 };

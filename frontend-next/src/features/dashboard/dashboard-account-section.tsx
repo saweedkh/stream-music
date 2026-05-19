@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
 import { logoutUser, type AuthUser } from "@/lib/api";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,7 @@ export function DashboardAccountSection({ user, onAction, preferencesInMenu = fa
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">@{user.username}</p>
+            <UsernameWithBadges username={user.username} flags={user} usernameClassName="text-sm font-medium text-foreground" />
             <p className="text-xs text-muted-foreground">{t("nav.account")}</p>
           </div>
         </div>
@@ -103,7 +104,7 @@ export function DashboardAccountSection({ user, onAction, preferencesInMenu = fa
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1 text-start">
-            <p className="truncate text-sm font-semibold text-foreground">@{user.username}</p>
+            <UsernameWithBadges username={user.username} flags={user} usernameClassName="text-sm font-semibold text-foreground" />
             <p className="text-[11px] text-muted-foreground">{t("dashboard.preferences")}</p>
           </div>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/40 text-muted-foreground transition-colors group-hover:bg-muted/55 group-data-[state=open]:bg-brand/10 group-data-[state=open]:text-brand">

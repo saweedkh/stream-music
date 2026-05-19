@@ -34,6 +34,23 @@ export function getWsBase(): string {
 
 let csrfReady = false;
 
+export type UserBadge = {
+  slug: string;
+  label: string;
+  description?: string;
+  icon: string;
+  color: string;
+  priority: number;
+  is_system?: boolean;
+};
+
+export type UserBadgeFlags = {
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
+};
+
 export type AuthUser = {
   id: number;
   username: string;
@@ -41,6 +58,11 @@ export type AuthUser = {
   first_name: string;
   last_name: string;
   is_staff: boolean;
+  is_superuser?: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
+  /** ISO datetime from Django `User.date_joined`. */
+  date_joined?: string;
 };
 
 export type UserNotificationSettings = {
@@ -182,13 +204,26 @@ export type TrackSummary = {
   album: string;
   file: string;
   visibility: "private" | "shared_with_users" | "shared_with_channels" | "public_lan";
+  is_favorited?: boolean;
 };
 export type PlaylistSummary = {
   id: number;
   name: string;
   channel: number | null;
   is_auto_generated: boolean;
+  is_favorited?: boolean;
 };
+
+export type PaginatedTracks = {
+  results: TrackSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export function normalizeTrackList(data: TrackSummary[] | PaginatedTracks): TrackSummary[] {
+  return Array.isArray(data) ? data : data.results;
+}
 export type PlaylistItemSummary = {
   id: number;
   playlist: number;
@@ -439,6 +474,30 @@ export async function getMe(): Promise<MeBootstrap | null> {
   return (await res.json()) as MeBootstrap;
 }
 
+export async function patchMeProfile(payload: {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+}): Promise<MeBootstrap> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update profile"));
+  return (await res.json()) as MeBootstrap;
+}
+
+export async function postChangePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/password`,
+    await withAuthHeaders({
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot change password"));
+}
+
 export async function checkApiHealth(): Promise<{ status: string; db: boolean; redis: boolean }> {
   const res = await fetch(`${getApiBase()}/api/health`, { cache: "no-store" });
   const data = (await res.json()) as { status: string; db: boolean; redis: boolean };
@@ -485,10 +544,304 @@ export type ChannelMember = {
   id: number;
   user_id: number;
   username: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
   role: "owner" | "moderator" | "member";
   is_active: boolean;
   joined_at: string;
 };
+
+export type AdminOverview = {
+  users: { total: number; active: number; staff: number; superuser: number };
+  channels: { total: number; active: number; playing: number };
+  tracks_total: number;
+  playlists_total: number;
+  memberships_active: number;
+};
+
+export type AdminUserRow = {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
+  date_joined: string | null;
+  last_login: string | null;
+};
+
+export type AdminBadgeDefinition = UserBadge & {
+  id: number;
+  description: string;
+  is_active: boolean;
+  is_system?: boolean;
+};
+
+export type AdminChannelRow = {
+  id: number;
+  name: string;
+  privacy: string;
+  owner_id: number;
+  owner_username: string | null;
+  is_active: boolean;
+  member_count: number;
+  is_playing: boolean;
+};
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const res = await fetch(`${getApiBase()}/api/admin/overview`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load admin overview"));
+  return (await res.json()) as AdminOverview;
+}
+
+export async function listAdminUsers(options?: { search?: string; limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (options?.search?.trim()) params.set("search", options.search.trim());
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.offset != null) params.set("offset", String(options.offset));
+  const qs = params.toString();
+  const res = await fetch(`${getApiBase()}/api/admin/users${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load users"));
+  return (await res.json()) as { results: AdminUserRow[]; total: number; offset: number; limit: number };
+}
+
+export async function patchAdminUser(
+  userId: number,
+  payload: Partial<Pick<AdminUserRow, "is_active" | "is_staff" | "is_superuser">> & { badge_slugs?: string[] },
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/users/${userId}`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update user"));
+  return (await res.json()) as AdminUserRow;
+}
+
+export async function listAdminBadges() {
+  const res = await fetch(`${getApiBase()}/api/admin/badges`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load badges"));
+  return (await res.json()) as { results: AdminBadgeDefinition[] };
+}
+
+export async function createAdminBadge(payload: {
+  slug: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  priority?: number;
+  is_active?: boolean;
+}) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/badges`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot create badge"));
+  return (await res.json()) as AdminBadgeDefinition;
+}
+
+export async function patchAdminBadge(
+  badgeId: number,
+  payload: Partial<Pick<AdminBadgeDefinition, "label" | "description" | "icon" | "color" | "priority" | "is_active">>,
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/badges/${badgeId}`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update badge"));
+  return (await res.json()) as AdminBadgeDefinition;
+}
+
+export async function deleteAdminBadge(badgeId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/badges/${badgeId}`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete badge"));
+}
+
+export async function listAdminChannels(options?: { search?: string; limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (options?.search?.trim()) params.set("search", options.search.trim());
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.offset != null) params.set("offset", String(options.offset));
+  const qs = params.toString();
+  const res = await fetch(`${getApiBase()}/api/admin/channels${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load channels"));
+  return (await res.json()) as { results: AdminChannelRow[]; total: number; offset: number; limit: number };
+}
+
+export async function getAdminHealth() {
+  const res = await fetch(`${getApiBase()}/api/admin/health`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load health"));
+  return (await res.json()) as { status: string; db: boolean; redis: boolean };
+}
+
+export type SupportTicketStatus =
+  | "open"
+  | "in_progress"
+  | "waiting_user"
+  | "waiting_staff"
+  | "resolved"
+  | "closed";
+
+export type SupportTicketPriority = "low" | "normal" | "high" | "urgent";
+
+export type SupportTicketRow = {
+  id: number;
+  reference: string;
+  subject: string;
+  category: string;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  assigned_to_id: number | null;
+  assigned_to_username: string | null;
+  requester_id?: number;
+  requester_username?: string;
+  requester?: { id: number; username: string; badges?: UserBadge[]; is_staff?: boolean; is_superuser?: boolean };
+  created_at: string | null;
+  updated_at: string | null;
+  closed_at: string | null;
+  last_message_at: string | null;
+  last_message_preview: string;
+  unread_count: number;
+  is_mine?: boolean;
+};
+
+export type SupportMessageRow = {
+  id: number;
+  ticket_id: number;
+  author_id: number;
+  author: { id: number; username: string; badges?: UserBadge[]; is_staff?: boolean; is_superuser?: boolean };
+  body: string;
+  is_internal: boolean;
+  is_mine: boolean;
+  created_at: string | null;
+  edited_at?: string | null;
+};
+
+export type SupportInboxStats = {
+  open: number;
+  in_progress: number;
+  waiting_staff: number;
+  waiting_user: number;
+  total_active: number;
+};
+
+export async function getSupportCategories() {
+  const res = await fetch(`${getApiBase()}/api/support/categories`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load categories"));
+  return (await res.json()) as { categories: Array<{ id: string; label: string }> };
+}
+
+export async function listSupportTickets(options?: {
+  status?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const params = new URLSearchParams();
+  if (options?.status) params.set("status", options.status);
+  if (options?.search?.trim()) params.set("search", options.search.trim());
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.offset != null) params.set("offset", String(options.offset));
+  const qs = params.toString();
+  const res = await fetch(`${getApiBase()}/api/support/tickets${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load tickets"));
+  return (await res.json()) as {
+    results: SupportTicketRow[];
+    total: number;
+    offset: number;
+    limit: number;
+    stats?: SupportInboxStats;
+  };
+}
+
+export async function createSupportTicket(payload: {
+  subject: string;
+  category: string;
+  body: string;
+  priority?: SupportTicketPriority;
+}) {
+  const res = await fetch(
+    `${getApiBase()}/api/support/tickets`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot create ticket"));
+  return (await res.json()) as { ticket: SupportTicketRow; message: SupportMessageRow };
+}
+
+export async function getSupportTicket(ticketId: number) {
+  const res = await fetch(`${getApiBase()}/api/support/tickets/${ticketId}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load ticket"));
+  return (await res.json()) as { ticket: SupportTicketRow };
+}
+
+export async function patchSupportTicket(
+  ticketId: number,
+  payload: Partial<{
+    status: SupportTicketStatus;
+    priority: SupportTicketPriority;
+    assigned_to_id: number | null;
+    category: string;
+  }>,
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/support/tickets/${ticketId}`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update ticket"));
+  return (await res.json()) as { ticket: SupportTicketRow };
+}
+
+export async function listSupportTicketMessages(ticketId: number, options?: { limit?: number; before?: number }) {
+  const params = new URLSearchParams();
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.before != null) params.set("before", String(options.before));
+  const qs = params.toString();
+  const res = await fetch(`${getApiBase()}/api/support/tickets/${ticketId}/messages${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load messages"));
+  return (await res.json()) as { messages: SupportMessageRow[] };
+}
+
+export async function postSupportTicketMessage(
+  ticketId: number,
+  payload: { body: string; is_internal?: boolean },
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/support/tickets/${ticketId}/messages`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot send message"));
+  return (await res.json()) as { message: SupportMessageRow; ticket: SupportTicketRow };
+}
+
+export async function listSupportStaffUsers() {
+  const res = await fetch(`${getApiBase()}/api/support/staff-users`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load staff"));
+  return (await res.json()) as { results: Array<{ id: number; username: string }> };
+}
 
 export async function updateChannelSettings(
   channelId: string,
@@ -530,13 +883,25 @@ export async function getSimilarTracks(channelId: string, fromTrackId: number) {
   return (await res.json()) as { results: TrackSummary[] };
 }
 
-export type ChannelChatReaction = { user_id: number; username: string; emoji: string };
+export type ChannelChatReaction = {
+  user_id: number;
+  username: string;
+  emoji: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
+};
 
 export type ChannelChatMessageRow = {
   id: number;
   channel: number;
   user_id: number;
   username: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_premium?: boolean;
+  badges?: UserBadge[];
   body: string;
   is_pinned?: boolean;
   pinned_at?: string | null;
@@ -790,17 +1155,37 @@ export async function createChannel(payload: {
   return (await res.json()) as ChannelSummary;
 }
 
-export async function listTracks(options?: { search?: string; limit?: number }) {
+export async function listTracks(options?: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+  favorited?: boolean;
+}): Promise<TrackSummary[] | PaginatedTracks> {
   const params = new URLSearchParams();
   const q = (options?.search ?? "").trim();
   if (q) params.set("search", q);
   if (options?.limit != null && Number.isFinite(options.limit)) {
     params.set("limit", String(Math.floor(options.limit)));
   }
+  if (options?.offset != null && Number.isFinite(options.offset)) {
+    params.set("offset", String(Math.floor(options.offset)));
+  }
+  if (options?.favorited) params.set("favorited", "true");
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${getApiBase()}/api/tracks/${suffix}`, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error("Cannot load tracks");
-  return (await res.json()) as TrackSummary[];
+  const data = await res.json();
+  if (Array.isArray(data)) return data as TrackSummary[];
+  return data as PaginatedTracks;
+}
+
+export async function setTrackFavorite(trackId: number, favorited: boolean): Promise<{ is_favorited: boolean }> {
+  const res = await fetch(
+    `${getApiBase()}/api/tracks/${trackId}/favorite/`,
+    await withAuthHeaders({ method: favorited ? "POST" : "DELETE", body: "{}" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update favorite"));
+  return (await res.json()) as { is_favorited: boolean };
 }
 
 const CHUNK_UPLOAD_THRESHOLD_BYTES = 2 * 1024 * 1024;
@@ -988,14 +1373,24 @@ export async function uploadTrack(
   });
 }
 
-export async function listPlaylists(channelId?: string) {
-  let url = `${getApiBase()}/api/playlists/`;
-  if (channelId != null && channelId !== "") {
-    url += `?channel=${encodeURIComponent(channelId)}`;
-  }
+export async function listPlaylists(channelId?: string, options?: { favorited?: boolean }) {
+  const params = new URLSearchParams();
+  if (channelId != null && channelId !== "") params.set("channel", channelId);
+  if (options?.favorited) params.set("favorited", "true");
+  const qs = params.toString();
+  const url = `${getApiBase()}/api/playlists/${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error("Cannot load playlists");
   return (await res.json()) as PlaylistSummary[];
+}
+
+export async function setPlaylistFavorite(playlistId: number, favorited: boolean): Promise<{ is_favorited: boolean }> {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/favorite/`,
+    await withAuthHeaders({ method: favorited ? "POST" : "DELETE", body: "{}" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update favorite"));
+  return (await res.json()) as { is_favorited: boolean };
 }
 
 export async function createPlaylist(payload: { name: string; channel?: number | null }) {

@@ -11,7 +11,9 @@ import { ChannelManagementSection } from "@/features/dashboard/channel-managemen
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
 import { type DashboardTab, isDashboardTab } from "@/features/dashboard/dashboard-types";
-import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
+import { AdminPanelHub } from "@/features/dashboard/admin-panel-hub";
+import { SupportHub } from "@/features/dashboard/support-hub";
+import { UserProfileHub } from "@/features/dashboard/user-profile-hub";
 import { PlaylistManager } from "@/features/dashboard/playlist-manager";
 import { TrackLibrarySection } from "@/features/dashboard/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/track-sharing-section";
@@ -29,11 +31,14 @@ import {
   listUsers,
   removeTrackSharePermission,
   reorderPlaylistItem,
+  normalizeTrackList,
+  setTrackFavorite,
   uploadTrackChunked,
   type ChannelSummary,
   type PlaylistItemSummary,
   type PlaylistSummary,
   type TrackSharePermission,
+  type AuthUser,
   type TrackSummary,
 } from "@/lib/api";
 import { parseAudioFileMetadata } from "@/lib/audio-metadata";
@@ -76,8 +81,11 @@ export function DashboardWorkspace() {
   const [draggingPlaylistItemId, setDraggingPlaylistItemId] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DashboardTab>(isDashboardTab(tabFromUrl) ? tabFromUrl : "channels");
+  const [tracksFavoritesOnly, setTracksFavoritesOnly] = useState(false);
+  const [favoriteBusyTrackId, setFavoriteBusyTrackId] = useState<number | null>(null);
 
   const groupedPlaylistItems = useMemo(() => {
     const result: Record<number, PlaylistItemSummary[]> = {};
@@ -105,15 +113,52 @@ export function DashboardWorkspace() {
     });
   }
 
+  async function loadTracksForLibrary(favoritedOnly: boolean) {
+    const data = await listTracks(favoritedOnly ? { favorited: true } : {});
+    setTracks(normalizeTrackList(data));
+  }
+
+  async function handleTrackFavoriteToggle(trackId: number, next: boolean) {
+    setFavoriteBusyTrackId(trackId);
+    try {
+      await setTrackFavorite(trackId, next);
+      if (tracksFavoritesOnly && !next) {
+        setTracks((prev) => prev.filter((t) => t.id !== trackId));
+      } else {
+        setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, is_favorited: next } : t)));
+      }
+      showToast(t("favorites.updated"), "success");
+    } catch {
+      showToast(t("favorites.updateFailed"), "error");
+    } finally {
+      setFavoriteBusyTrackId(null);
+    }
+  }
+
+  async function handleTracksFavoritesOnlyChange(on: boolean) {
+    setTracksFavoritesOnly(on);
+    try {
+      await loadTracksForLibrary(on);
+    } catch {
+      showToast(t("dashboard.loadFailed"), "error");
+    }
+  }
+
   async function refreshAll() {
     setIsLoading(true);
     try {
       const me = await getMe();
+      setCurrentUser(me?.user ?? null);
       setCurrentUserId(me?.user?.id ?? null);
-      const [c, t, p, u] = await Promise.all([listChannels(), listTracks(), listPlaylists(), listUsers()]);
+      const [c, trackData, p, u] = await Promise.all([
+        listChannels(),
+        listTracks(tracksFavoritesOnly ? { favorited: true } : {}),
+        listPlaylists(),
+        listUsers(),
+      ]);
       const pi = await listPlaylistItems();
       setChannels(c);
-      setTracks(t);
+      setTracks(normalizeTrackList(trackData));
       setPlaylists(p);
       setPlaylistItems(pi);
       setUsers(u.results);
@@ -136,9 +181,13 @@ export function DashboardWorkspace() {
   useEffect(() => {
     const queryTab = searchParams.get("tab");
     if (isDashboardTab(queryTab)) {
+      if (queryTab === "admin" && !currentUser?.is_superuser) {
+        setActiveTab("channels");
+        return;
+      }
       setActiveTab(queryTab);
     }
-  }, [searchParams]);
+  }, [searchParams, currentUser?.is_superuser]);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -355,7 +404,11 @@ export function DashboardWorkspace() {
 
   return (
     <DashboardShell activeTab={activeTab} onSelectTab={setActiveTab}>
-      <DashboardPanelShell tab={activeTab} flush={activeTab === "playlists"} className="min-h-0 flex-1">
+      <DashboardPanelShell
+        tab={activeTab}
+        flush={activeTab === "playlists" || activeTab === "channels"}
+        className="min-h-0 flex-1"
+      >
         {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
 
         {activeTab === "channels" ? (
@@ -385,11 +438,15 @@ export function DashboardWorkspace() {
               isUploading={isUploading}
               uploadProgress={uploadProgress}
               errors={fieldErrors}
+              favoritesOnly={tracksFavoritesOnly}
+              favoriteBusyTrackId={favoriteBusyTrackId}
               onTrackTitleChange={setTrackTitle}
               onTrackVisibilityChange={setTrackVisibility}
               onTrackFileChange={handleTrackFileSelect}
               onTrackFileDrop={handleTrackFileSelect}
               onUploadTrack={handleUploadTrack}
+              onFavoritesOnlyChange={(on) => void handleTracksFavoritesOnlyChange(on)}
+              onToggleFavorite={(trackId, next) => void handleTrackFavoriteToggle(trackId, next)}
             />
           </>
         ) : null}
@@ -413,7 +470,13 @@ export function DashboardWorkspace() {
           />
         ) : null}
 
-        {activeTab === "settings" ? <NotificationPreferencesCard /> : null}
+        {activeTab === "support" ? <SupportHub user={currentUser} /> : null}
+
+        {activeTab === "settings" ? (
+          <UserProfileHub channelCount={channels.length} trackCount={tracks.length} playlistCount={playlists.length} />
+        ) : null}
+
+        {activeTab === "admin" && currentUser?.is_superuser ? <AdminPanelHub /> : null}
       </DashboardPanelShell>
     </DashboardShell>
   );

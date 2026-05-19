@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings as django_settings
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Max, Q
@@ -127,7 +127,9 @@ from apps.common.serializers import (
     PlaylistItemSerializer,
     QueueItemSerializer,
     TrackSerializer,
+    AuthUserProfileUpdateSerializer,
     AuthUserSerializer,
+    PasswordChangeSerializer,
     InviteTokenSerializer,
     TrackSharePermissionSerializer,
     UserNotificationSettingsSerializer,
@@ -154,9 +156,34 @@ from apps.playback.services.state_store import playback_state_store
 from apps.tracks.filesystem_import import import_audio_files_under_media
 from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
 from apps.tracks.models import Track, TrackSharePermission
+from apps.common.admin_views import (
+    AdminChannelsView,
+    AdminHealthView,
+    AdminOverviewView,
+    AdminUserDetailView,
+    AdminUsersView,
+)
+from apps.common.favorites import UserPlaylistFavorite, UserTrackFavorite
+from apps.common.user_badges import is_platform_superuser, user_badge_flags
 
 # Per-request cap for playlist bulk-add (client may send smaller chunks).
 PLAYLIST_BULK_ADD_MAX = 150
+
+
+def _favorited_track_ids_for_user(user) -> set[int]:
+    return set(UserTrackFavorite.objects.filter(user_id=user.id).values_list("track_id", flat=True))
+
+
+def _favorited_playlist_ids_for_user(user) -> set[int]:
+    return set(UserPlaylistFavorite.objects.filter(user_id=user.id).values_list("playlist_id", flat=True))
+
+
+def _playlist_visible_to_user(user, playlist: Playlist) -> bool:
+    if playlist.owner_id == user.id:
+        return True
+    if playlist.channel_id:
+        return ChannelMembership.objects.filter(channel_id=playlist.channel_id, user=user, is_active=True).exists()
+    return False
 
 
 def _queue_serialize_context(channel_id: int, user_id: int | None, item_ids: list[int]) -> dict:
@@ -304,6 +331,34 @@ class MeView(APIView):
             body["webpush"] = {"vapid_public_key": pub}
         return Response(body)
 
+    def patch(self, request):
+        ser = AuthUserProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        body = {"user": AuthUserSerializer(request.user).data}
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
+        body["notification_settings"] = UserNotificationSettingsSerializer(prefs).data
+        pub = (getattr(django_settings, "WEBPUSH_VAPID_PUBLIC_KEY", None) or "").strip()
+        if pub:
+            body["webpush"] = {"vapid_public_key": pub}
+        return Response(body)
+
+
+class UserPasswordChangeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        ser = PasswordChangeSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        current = ser.validated_data["current_password"]
+        new_pw = ser.validated_data["new_password"]
+        if not request.user.check_password(current):
+            return Response({"detail": "wrong_password"}, status=status.HTTP_400_BAD_REQUEST)
+        request.user.set_password(new_pw)
+        request.user.save(update_fields=["password"])
+        update_session_auth_hash(request, request.user)
+        return Response({"detail": "ok"})
+
 
 class UserNotificationSettingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -354,7 +409,13 @@ class UsersListView(APIView):
 
     def get(self, request):
         users = User.objects.exclude(id=request.user.id).order_by("username")[:100]
-        return Response({"results": [{"id": user.id, "username": user.username} for user in users]})
+        return Response(
+            {
+                "results": [
+                    {"id": user.id, "username": user.username, **user_badge_flags(user)} for user in users
+                ]
+            }
+        )
 
 
 class ChannelViewSet(viewsets.ModelViewSet):
@@ -364,12 +425,20 @@ class ChannelViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return (
-            self.queryset.filter(memberships__user=user)
-            .filter(Q(is_active=True) | Q(owner=user))
-            .select_related("playback_session")
-            .distinct()
-        )
+        if is_platform_superuser(user):
+            qs = self.queryset.select_related("playback_session").distinct()
+        else:
+            qs = (
+                self.queryset.filter(memberships__user=user)
+                .filter(Q(is_active=True) | Q(owner=user))
+                .select_related("playback_session")
+                .distinct()
+            )
+        if getattr(self, "action", None) == "list" and not (
+            self.request.query_params.get("include_test") or ""
+        ).strip().lower() in ("1", "true", "yes"):
+            qs = qs.exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
+        return qs.order_by("-is_active", "-id")
 
     def perform_create(self, serializer):
         channel = serializer.save(owner=self.request.user)
@@ -398,11 +467,24 @@ class TrackViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     queryset = Track.objects.select_related("owner").all()
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        user = self.request.user
+        if getattr(user, "is_authenticated", False):
+            ctx["favorited_track_ids"] = _favorited_track_ids_for_user(user)
+        return ctx
+
     def get_queryset(self):
-        qs = tracks_accessible_to_user(self.request.user).order_by("title", "id")
+        if is_platform_superuser(self.request.user):
+            qs = Track.objects.select_related("owner").order_by("title", "id")
+        else:
+            qs = tracks_accessible_to_user(self.request.user).order_by("title", "id")
         search = (self.request.query_params.get("search") or "").strip()
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(artist__icontains=search))
+        fav = (self.request.query_params.get("favorited") or "").strip().lower()
+        if fav in ("1", "true", "yes"):
+            qs = qs.filter(favorited_by__user=self.request.user).distinct()
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -442,28 +524,52 @@ class TrackViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    @action(detail=True, methods=["post", "delete"], url_path="favorite")
+    def favorite(self, request, pk=None):
+        track = self.get_object()
+        if request.method == "POST":
+            UserTrackFavorite.objects.get_or_create(user=request.user, track=track)
+            return Response({"is_favorited": True})
+        UserTrackFavorite.objects.filter(user=request.user, track=track).delete()
+        return Response({"is_favorited": False})
+
 
 class PlaylistViewSet(viewsets.ModelViewSet):
     serializer_class = PlaylistSerializer
     permission_classes = [permissions.IsAuthenticated]
     queryset = Playlist.objects.select_related("owner", "channel").all()
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        user = self.request.user
+        if getattr(user, "is_authenticated", False):
+            ctx["favorited_playlist_ids"] = _favorited_playlist_ids_for_user(user)
+        return ctx
+
     def get_queryset(self):
         user = self.request.user
-        channel_id = self.request.query_params.get("channel")
-        if channel_id is not None and channel_id != "":
-            try:
-                cid = int(channel_id)
-            except ValueError:
-                return self.queryset.none()
-            if not ChannelMembership.objects.filter(channel_id=cid, user=user, is_active=True).exists():
-                return self.queryset.none()
-            return self.queryset.filter(channel_id=cid)
+        if is_platform_superuser(user):
+            qs = self.queryset.all()
+        else:
+            channel_id = self.request.query_params.get("channel")
+            if channel_id is not None and channel_id != "":
+                try:
+                    cid = int(channel_id)
+                except ValueError:
+                    return self.queryset.none()
+                if not ChannelMembership.objects.filter(channel_id=cid, user=user, is_active=True).exists():
+                    return self.queryset.none()
+                qs = self.queryset.filter(channel_id=cid)
+            else:
+                qs = self.queryset.filter(
+                    Q(owner=user)
+                    | Q(channel__memberships__user=user, channel__memberships__is_active=True),
+                ).distinct()
 
-        return self.queryset.filter(
-            Q(owner=user)
-            | Q(channel__memberships__user=user, channel__memberships__is_active=True),
-        ).distinct()
+        fav = (self.request.query_params.get("favorited") or "").strip().lower()
+        if fav in ("1", "true", "yes"):
+            qs = qs.filter(favorited_by__user=user).distinct()
+        return qs
 
     def perform_create(self, serializer):
         channel = serializer.validated_data.get("channel")
@@ -480,6 +586,17 @@ class PlaylistViewSet(viewsets.ModelViewSet):
         if not _can_edit_channel_playlist(self.request.user, instance):
             raise PermissionDenied("permission_denied")
         instance.delete()
+
+    @action(detail=True, methods=["post", "delete"], url_path="favorite")
+    def favorite(self, request, pk=None):
+        playlist = self.get_object()
+        if not _playlist_visible_to_user(request.user, playlist):
+            raise PermissionDenied("permission_denied")
+        if request.method == "POST":
+            UserPlaylistFavorite.objects.get_or_create(user=request.user, playlist=playlist)
+            return Response({"is_favorited": True})
+        UserPlaylistFavorite.objects.filter(user=request.user, playlist=playlist).delete()
+        return Response({"is_favorited": False})
 
     @action(detail=True, methods=["post"], url_path="add-tracks")
     def add_tracks(self, request, pk=None):
@@ -1470,6 +1587,8 @@ class ChannelJoinFromLinkView(APIView):
 
 
 def _can_manage_channel(user, channel_id: int) -> bool:
+    if is_platform_superuser(user):
+        return True
     return ChannelMembership.objects.filter(
         channel_id=channel_id,
         user=user,
@@ -1898,8 +2017,11 @@ class ChannelMembersView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, channel_id: int):
-        if not _can_manage_channel(request.user, channel_id):
-            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        if not is_platform_superuser(request.user) and not _can_manage_channel(request.user, channel_id):
+            if not ChannelMembership.objects.filter(
+                channel_id=channel_id, user=request.user, is_active=True
+            ).exists():
+                return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
         members = ChannelMembership.objects.filter(channel_id=channel_id).select_related("user").order_by("joined_at")
         data = [
             {
@@ -1909,6 +2031,7 @@ class ChannelMembersView(APIView):
                 "role": m.role,
                 "is_active": m.is_active,
                 "joined_at": m.joined_at,
+                **user_badge_flags(m.user),
             }
             for m in members
         ]

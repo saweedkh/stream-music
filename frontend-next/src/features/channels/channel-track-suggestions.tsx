@@ -17,6 +17,7 @@ import {
   getMe,
   listChannelSuggestions,
   listTracks,
+  normalizeTrackList,
   reviewChannelSuggestion,
   type ChannelPlaylistSuggestion,
   type TrackSummary,
@@ -51,7 +52,7 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
     ]);
     const uid = me?.user?.id ?? null;
     setMyUserId(uid);
-    setTracks(trackList);
+    setTracks(normalizeTrackList(trackList));
     setMySuggestions(uid != null ? suggestions.results.filter((s) => s.user === uid) : []);
   }, [channelId]);
 
@@ -242,7 +243,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
         listTracks(),
       ]);
       setSuggestions(s.results);
-      setTracks(trackList);
+      setTracks(normalizeTrackList(trackList));
     } finally {
       setLoading(false);
     }

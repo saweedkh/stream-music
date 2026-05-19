@@ -19,9 +19,34 @@ from apps.tracks.models import Track, TrackSharePermission
 
 
 class TrackSerializer(serializers.ModelSerializer):
+    is_favorited = serializers.SerializerMethodField()
+
     class Meta:
         model = Track
-        fields = ["id", "title", "artist", "album", "genre", "tags", "duration_seconds", "file", "visibility", "created_at"]
+        fields = [
+            "id",
+            "title",
+            "artist",
+            "album",
+            "genre",
+            "tags",
+            "duration_seconds",
+            "file",
+            "visibility",
+            "created_at",
+            "is_favorited",
+        ]
+
+    def get_is_favorited(self, obj):
+        fav_ids = self.context.get("favorited_track_ids")
+        if fav_ids is not None:
+            return obj.id in fav_ids
+        request = self.context.get("request")
+        if not request or not getattr(request.user, "is_authenticated", False):
+            return False
+        from apps.common.favorites import UserTrackFavorite
+
+        return UserTrackFavorite.objects.filter(user_id=request.user.id, track_id=obj.id).exists()
 
 
 class TrackSharePermissionSerializer(serializers.ModelSerializer):
@@ -136,10 +161,23 @@ class ChannelChatMessageSerializer(serializers.ModelSerializer):
 
 
 class PlaylistSerializer(serializers.ModelSerializer):
+    is_favorited = serializers.SerializerMethodField()
+
     class Meta:
         model = Playlist
-        fields = ["id", "name", "owner", "channel", "is_auto_generated", "created_at"]
+        fields = ["id", "name", "owner", "channel", "is_auto_generated", "created_at", "is_favorited"]
         read_only_fields = ["owner", "is_auto_generated", "created_at"]
+
+    def get_is_favorited(self, obj):
+        fav_ids = self.context.get("favorited_playlist_ids")
+        if fav_ids is not None:
+            return obj.id in fav_ids
+        request = self.context.get("request")
+        if not request or not getattr(request.user, "is_authenticated", False):
+            return False
+        from apps.common.favorites import UserPlaylistFavorite
+
+        return UserPlaylistFavorite.objects.filter(user_id=request.user.id, playlist_id=obj.id).exists()
 
 
 class PlaylistItemSerializer(serializers.ModelSerializer):
@@ -237,9 +275,50 @@ class ChannelNotificationPreferenceSerializer(serializers.ModelSerializer):
 
 
 class AuthUserSerializer(serializers.ModelSerializer):
+    date_joined = serializers.DateTimeField(read_only=True)
+    is_superuser = serializers.BooleanField(read_only=True)
+    badges = serializers.SerializerMethodField()
+    is_premium = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "is_staff"]
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_staff",
+            "is_superuser",
+            "is_premium",
+            "badges",
+            "date_joined",
+        ]
+
+    def get_badges(self, obj):
+        from apps.common.user_badges import badges_for_user
+
+        return badges_for_user(obj)
+
+    def get_is_premium(self, obj):
+        from apps.common.account_badges import SLUG_PREMIUM
+        from apps.common.user_badges import badges_for_user
+
+        slugs = {b["slug"] for b in badges_for_user(obj)}
+        return SLUG_PREMIUM in slugs
+
+
+class AuthUserProfileUpdateSerializer(serializers.ModelSerializer):
+    """Partial update for the signed-in user (username is immutable here)."""
+
+    class Meta:
+        model = User
+        fields = ["email", "first_name", "last_name"]
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8, max_length=128)
 
 
 class InviteTokenSerializer(serializers.ModelSerializer):

@@ -32,8 +32,9 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    # Host 8001 avoids clash with other local services on :8000 (API still on 8000 inside the network).
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       - postgres
       - redis

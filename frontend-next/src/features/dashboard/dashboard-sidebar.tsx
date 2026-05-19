@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Bell, LayoutGrid, ListMusic, LogIn, Music, Radio, Share2 } from "lucide-react";
+import { Crown, LayoutGrid, LifeBuoy, ListMusic, LogIn, Music, Radio, Share2, UserCircle } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { DashboardAccountSection } from "@/features/dashboard/dashboard-account-section";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
@@ -19,16 +19,23 @@ type NavItem = {
     | "dashboard.tab.tracks"
     | "dashboard.tab.playlists"
     | "dashboard.tab.sharing"
-    | "dashboard.tab.settings";
+    | "dashboard.tab.support"
+    | "dashboard.tab.settings"
+    | "dashboard.tab.admin";
   icon: LucideIcon;
 };
 
 type NavSection = {
-  titleKey: "dashboard.sidebar.section.channels" | "dashboard.sidebar.section.library" | "dashboard.sidebar.section.settings";
+  titleKey:
+    | "dashboard.sidebar.section.channels"
+    | "dashboard.sidebar.section.library"
+    | "dashboard.sidebar.section.help"
+    | "dashboard.sidebar.section.settings"
+    | "dashboard.sidebar.section.admin";
   items: NavItem[];
 };
 
-const NAV_SECTIONS: NavSection[] = [
+const NAV_SECTIONS_BASE: NavSection[] = [
   {
     titleKey: "dashboard.sidebar.section.channels",
     items: [{ id: "channels", labelKey: "dashboard.tab.channels", icon: LayoutGrid }],
@@ -42,8 +49,12 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    titleKey: "dashboard.sidebar.section.help",
+    items: [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }],
+  },
+  {
     titleKey: "dashboard.sidebar.section.settings",
-    items: [{ id: "settings", labelKey: "dashboard.tab.settings", icon: Bell }],
+    items: [{ id: "settings", labelKey: "dashboard.tab.settings", icon: UserCircle }],
   },
 ];
 
@@ -73,6 +84,16 @@ export function DashboardSidebar({
   className,
 }: DashboardSidebarProps) {
   const { t } = useTranslations();
+
+  const navSections: NavSection[] = user?.is_superuser
+    ? [
+        ...NAV_SECTIONS_BASE,
+        {
+          titleKey: "dashboard.sidebar.section.admin",
+          items: [{ id: "admin", labelKey: "dashboard.tab.admin", icon: Crown }],
+        },
+      ]
+    : NAV_SECTIONS_BASE;
 
   return (
     <aside
@@ -121,7 +142,7 @@ export function DashboardSidebar({
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80">
-        {NAV_SECTIONS.map((section, sectionIndex) => (
+        {navSections.map((section, sectionIndex) => (
           <div key={section.titleKey} className={sectionIndex > 0 ? "mt-1" : ""}>
             {sectionIndex > 0 ? <SectionDivider /> : null}
             <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">

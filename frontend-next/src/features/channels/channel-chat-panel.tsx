@@ -22,12 +22,41 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { useReconnectingChannelChatSocket } from "@/hooks/use-reconnecting-channel-chat-socket";
-import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatReaction } from "@/lib/api";
+import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
+import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatReaction, type UserBadge } from "@/lib/api";
+import type { UserBadgeFlags } from "@/lib/user-badges";
 import { renderMessageWithMentions } from "@/lib/render-mentions";
 import { channelChatHref, useNotificationStore } from "@/lib/notifications/store";
 import { cn } from "@/lib/utils";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎵"] as const;
+
+function parseBadge(raw: unknown): UserBadge | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.slug !== "string" || typeof o.label !== "string") return null;
+  return {
+    slug: o.slug,
+    label: o.label,
+    description: typeof o.description === "string" ? o.description : undefined,
+    icon: typeof o.icon === "string" ? o.icon : "badge-check",
+    color: typeof o.color === "string" ? o.color : "sky",
+    priority: typeof o.priority === "number" ? o.priority : 100,
+    is_system: Boolean(o.is_system),
+  };
+}
+
+function parseBadgeFlags(o: Record<string, unknown>): UserBadgeFlags {
+  const badges = Array.isArray(o.badges)
+    ? o.badges.map(parseBadge).filter((b): b is UserBadge => b != null)
+    : undefined;
+  return {
+    is_staff: Boolean(o.is_staff),
+    is_superuser: Boolean(o.is_superuser),
+    is_premium: Boolean(o.is_premium),
+    badges,
+  };
+}
 
 function parseMessage(raw: unknown): ChannelChatMessageRow | null {
   if (!raw || typeof raw !== "object") return null;
@@ -37,20 +66,26 @@ function parseMessage(raw: unknown): ChannelChatMessageRow | null {
   const channel = typeof o.channel === "number" ? o.channel : Number(o.channel);
   if (!Number.isFinite(channel)) return null;
   const reactions: ChannelChatReaction[] = Array.isArray(o.reactions)
-    ? (o.reactions
+    ? o.reactions
         .map((r) => {
           if (!r || typeof r !== "object") return null;
           const x = r as Record<string, unknown>;
           if (typeof x.user_id !== "number" || typeof x.username !== "string" || typeof x.emoji !== "string") return null;
-          return { user_id: x.user_id, username: x.username, emoji: x.emoji };
+          return {
+            user_id: x.user_id,
+            username: x.username,
+            emoji: x.emoji,
+            ...parseBadgeFlags(x),
+          } as ChannelChatReaction;
         })
-        .filter((x): x is ChannelChatReaction => x != null))
+        .filter((x): x is ChannelChatReaction => x != null)
     : [];
   return {
     id: o.id,
     channel,
     user_id: o.user_id,
     username: o.username,
+    ...parseBadgeFlags(o),
     body: o.body,
     is_pinned: Boolean(o.is_pinned),
     pinned_at: typeof o.pinned_at === "string" ? o.pinned_at : o.pinned_at === null ? null : undefined,
@@ -594,7 +629,15 @@ export function ChannelChatPanel({
                         )}
                       >
                         {!mine ? (
-                          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{m.username}</p>
+                          <div className="mb-1">
+                            <UsernameWithBadges
+                              username={m.username}
+                              flags={m}
+                              prefix=""
+                              size="xs"
+                              usernameClassName="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                            />
+                          </div>
                         ) : null}
                         {editingId === m.id ? (
                           <div className="space-y-2">

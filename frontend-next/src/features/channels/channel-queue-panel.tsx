@@ -18,6 +18,7 @@ import {
   jumpToChannelQueueItem,
   listChannelQueue,
   listTracks,
+  normalizeTrackList,
   removeChannelQueueItem,
   removeQueueUpvote,
   reorderChannelQueueItem,
@@ -52,7 +53,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
   const loadListenerQueue = useCallback(async () => {
     setLoading(true);
     try {
-      const [queueData, tracks] = await Promise.all([listChannelQueue(channelId), listTracks()]);
+      const [queueData, tracksRaw] = await Promise.all([listChannelQueue(channelId), listTracks()]);
+      const tracks = normalizeTrackList(tracksRaw);
       setQueue(queueData.results);
       setTrackMap(Object.fromEntries(tracks.map((tr) => [tr.id, tr])));
       setStatus(null);
@@ -117,7 +119,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
     }
     setLoading(true);
     try {
-      const [queueData, tracks] = await Promise.all([listChannelQueue(channelId), listTracks()]);
+      const [queueData, tracksRaw] = await Promise.all([listChannelQueue(channelId), listTracks()]);
+      const tracks = normalizeTrackList(tracksRaw);
       setQueue(queueData.results);
       setTrackMap(Object.fromEntries(tracks.map((t) => [t.id, t])));
     } catch (error) {

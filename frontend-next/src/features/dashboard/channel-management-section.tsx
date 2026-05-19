@@ -16,11 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTranslations } from "@/components/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { reopenChannel, type ChannelSummary } from "@/lib/api";
 import { useToast } from "@/components/ui/toast-provider";
+import { filterDashboardChannels, sortChannelsForDashboard } from "@/lib/channel-filters";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -68,15 +68,20 @@ export function ChannelManagementSection(props: Props) {
     onChannelsRefresh,
   } = props;
 
-  const liveCount = useMemo(
-    () => channels.filter((c) => c.is_active !== false && c.is_playing === true).length,
+  const visibleChannels = useMemo(
+    () => sortChannelsForDashboard(filterDashboardChannels(channels)),
     [channels],
   );
 
+  const liveCount = useMemo(
+    () => visibleChannels.filter((c) => c.is_active !== false && c.is_playing === true).length,
+    [visibleChannels],
+  );
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_min(100%,22rem)]">
-      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm">
-        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/50 bg-muted/10 px-5 py-4">
+    <div className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[minmax(0,1fr)_min(100%,22rem)]">
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm">
+        <header className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-border/50 bg-muted/10 px-5 py-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand/20 bg-brand/10 text-brand">
@@ -85,8 +90,8 @@ export function ChannelManagementSection(props: Props) {
               <h2 className="font-display text-lg font-semibold tracking-tight">{t("channels.yourChannels")}</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              {channels.length > 0
-                ? t("channels.roomsSummary", { total: channels.length, live: liveCount })
+              {visibleChannels.length > 0
+                ? t("channels.roomsSummary", { total: visibleChannels.length, live: liveCount })
                 : t("channels.createSubtitle")}
             </p>
           </div>
@@ -101,9 +106,9 @@ export function ChannelManagementSection(props: Props) {
           ) : null}
         </header>
 
-        <ScrollArea className="max-h-[min(32rem,100%)]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="p-4 sm:p-5">
-            {channels.length === 0 ? (
+            {visibleChannels.length === 0 ? (
               <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
                 <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border/60 bg-card/80 text-muted-foreground">
                   <Radio className="h-7 w-7 opacity-60" aria-hidden />
@@ -112,7 +117,7 @@ export function ChannelManagementSection(props: Props) {
               </div>
             ) : (
               <ul className="space-y-3">
-                {channels.map((channel) => (
+                {visibleChannels.map((channel) => (
                   <li key={channel.id}>
                     <ChannelCard
                       channel={channel}
@@ -124,10 +129,10 @@ export function ChannelManagementSection(props: Props) {
               </ul>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </section>
 
-      <aside className="xl:sticky xl:top-4 xl:self-start">
+      <aside className="shrink-0 xl:sticky xl:top-4 xl:self-start">
         <CreateChannelPanel
           channelName={channelName}
           channelPrivacy={channelPrivacy}

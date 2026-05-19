@@ -46,3 +46,63 @@ class AuthViewsTests(TestCase):
             HTTP_X_CSRFTOKEN=csrf,
         )
         self.assertEqual(response.status_code, 401)
+
+    def test_patch_me_profile(self):
+        User.objects.create_user(username="carol", email="old@example.com", password="pw123456")
+        csrf = self._prime_csrf()
+        self.client.post(
+            "/api/auth/login",
+            {"username": "carol", "password": "pw123456"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        csrf = self.client.cookies["csrftoken"].value
+        res = self.client.patch(
+            "/api/auth/me",
+            {"email": "new@example.com", "first_name": "Carol", "last_name": "D"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["user"]["email"], "new@example.com")
+        self.assertEqual(data["user"]["first_name"], "Carol")
+        self.assertEqual(data["user"]["last_name"], "D")
+
+    def test_change_password_wrong_current(self):
+        User.objects.create_user(username="dave", password="pw123456")
+        csrf = self._prime_csrf()
+        self.client.post(
+            "/api/auth/login",
+            {"username": "dave", "password": "pw123456"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        csrf = self.client.cookies["csrftoken"].value
+        res = self.client.post(
+            "/api/auth/me/password",
+            {"current_password": "wrong", "new_password": "newpass12"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_change_password_success(self):
+        User.objects.create_user(username="erin", password="pw123456")
+        csrf = self._prime_csrf()
+        self.client.post(
+            "/api/auth/login",
+            {"username": "erin", "password": "pw123456"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        csrf = self.client.cookies["csrftoken"].value
+        res = self.client.post(
+            "/api/auth/me/password",
+            {"current_password": "pw123456", "new_password": "newpass12"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(res.status_code, 200)
+        u = User.objects.get(username="erin")
+        self.assertTrue(u.check_password("newpass12"))

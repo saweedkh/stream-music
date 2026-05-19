@@ -7,6 +7,7 @@ from django.utils import timezone
 import time
 
 from apps.channels.models import Channel, ChannelChatMessage, ChannelChatMessageReaction, ChannelMembership
+from apps.common.user_badges import user_badge_flags
 
 _CHAT_SEND_TS: dict[tuple[int, int], list[float]] = {}
 _CHAT_SEND_WINDOW = 12
@@ -16,13 +17,22 @@ _CHAT_SEND_MAX = 8
 def message_to_dict(msg: ChannelChatMessage) -> dict:
     reactions = []
     for r in msg.reactions.all().select_related("user"):
-        reactions.append({"user_id": r.user_id, "username": r.user.username, "emoji": r.emoji})
+        reactions.append(
+            {
+                "user_id": r.user_id,
+                "username": r.user.username,
+                "emoji": r.emoji,
+                **user_badge_flags(r.user),
+            }
+        )
     deleted = msg.deleted_at is not None
+    author_flags = user_badge_flags(msg.user) if msg.user_id else {"is_staff": False, "is_superuser": False, "is_premium": False, "badges": []}
     return {
         "id": msg.id,
         "channel": msg.channel_id,
         "user_id": msg.user_id,
         "username": msg.user.username if msg.user_id else "?",
+        **author_flags,
         "body": "" if deleted else (msg.body or ""),
         "is_pinned": bool(getattr(msg, "is_pinned", False)),
         "pinned_at": msg.pinned_at.isoformat() if getattr(msg, "pinned_at", None) else None,

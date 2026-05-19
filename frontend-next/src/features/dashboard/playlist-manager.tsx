@@ -11,9 +11,11 @@ import {
   Pencil,
   Plus,
   Search,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
+import { FavoriteStarButton } from "@/components/ui/favorite-star-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +46,8 @@ import {
   listPlaylists,
   listTracks,
   reorderPlaylistItem,
+  setPlaylistFavorite,
+  setTrackFavorite,
   updatePlaylist,
   updateTrack,
   uploadTrackChunked,
@@ -150,20 +154,28 @@ export function PlaylistManager() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [libFavoritesOnly, setLibFavoritesOnly] = useState(false);
+  const [playlistsFavoritesOnly, setPlaylistsFavoritesOnly] = useState(false);
+  const [favoriteBusyTrackId, setFavoriteBusyTrackId] = useState<number | null>(null);
+  const [favoriteBusyPlaylistId, setFavoriteBusyPlaylistId] = useState<number | null>(null);
 
   // ─── data loading ─────────────────────────────────────────────────────────
   const fetchLibrary = useCallback(
-    async (search: string, offset: number) => {
+    async (search: string, offset: number, favoritedOnly = libFavoritesOnly) => {
       setLibLoading(true);
       try {
-        const result = await listTracks({ search, limit: LIB_PAGE, offset } as Parameters<typeof listTracks>[0] & { offset?: number });
+        const result = await listTracks({
+          search,
+          limit: LIB_PAGE,
+          offset,
+          favorited: favoritedOnly || undefined,
+        });
         if (Array.isArray(result)) {
-          setLibraryTracks(result as TrackSummary[]);
-          setLibraryTotal((result as TrackSummary[]).length);
+          setLibraryTracks(result);
+          setLibraryTotal(result.length);
         } else {
-          const r = result as { results: TrackSummary[]; total: number };
-          setLibraryTracks(r.results);
-          setLibraryTotal(r.total);
+          setLibraryTracks(result.results);
+          setLibraryTotal(result.total);
         }
       } catch {
         showToast(t("playlists.cannotLoadTracks"), "error");
@@ -171,7 +183,7 @@ export function PlaylistManager() {
         setLibLoading(false);
       }
     },
-    [showToast],
+    [libFavoritesOnly, showToast, t],
   );
 
   useEffect(() => {
@@ -179,15 +191,21 @@ export function PlaylistManager() {
     void fetchLibrary(debouncedLibQuery, 0);
   }, [debouncedLibQuery, fetchLibrary]);
 
-  const refreshMeta = useCallback(async () => {
-    try {
-      const [c, p] = await Promise.all([listChannels(), listPlaylists()]);
-      setChannels(c);
-      setPlaylists(p);
-    } catch {
-      showToast(t("playlists.cannotRefresh"), "error");
-    }
-  }, [showToast]);
+  const refreshMeta = useCallback(
+    async (favoritedOnly = playlistsFavoritesOnly) => {
+      try {
+        const [c, p] = await Promise.all([
+          listChannels(),
+          listPlaylists(undefined, { favorited: favoritedOnly || undefined }),
+        ]);
+        setChannels(c);
+        setPlaylists(p);
+      } catch {
+        showToast(t("playlists.cannotRefresh"), "error");
+      }
+    },
+    [playlistsFavoritesOnly, showToast, t],
+  );
 
   const refreshItems = useCallback(async () => {
     try {
@@ -418,6 +436,43 @@ export function PlaylistManager() {
     }
   }
 
+  async function handleTrackFavoriteToggle(trackId: number, next: boolean) {
+    setFavoriteBusyTrackId(trackId);
+    try {
+      await setTrackFavorite(trackId, next);
+      if (libFavoritesOnly && !next) {
+        setLibraryTracks((prev) => prev.filter((tr) => tr.id !== trackId));
+        setLibraryTotal((n) => Math.max(0, n - 1));
+      } else {
+        setLibraryTracks((prev) => prev.map((tr) => (tr.id === trackId ? { ...tr, is_favorited: next } : tr)));
+      }
+      showToast(t("favorites.updated"), "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t("favorites.updateFailed"), "error");
+    } finally {
+      setFavoriteBusyTrackId(null);
+    }
+  }
+
+  async function handlePlaylistFavoriteToggle(playlistId: number, next: boolean, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setFavoriteBusyPlaylistId(playlistId);
+    try {
+      await setPlaylistFavorite(playlistId, next);
+      if (playlistsFavoritesOnly && !next) {
+        setPlaylists((prev) => prev.filter((pl) => pl.id !== playlistId));
+        if (selectedPlaylistId === playlistId) setSelectedPlaylistId(null);
+      } else {
+        setPlaylists((prev) => prev.map((pl) => (pl.id === playlistId ? { ...pl, is_favorited: next } : pl)));
+      }
+      showToast(t("favorites.updated"), "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t("favorites.updateFailed"), "error");
+    } finally {
+      setFavoriteBusyPlaylistId(null);
+    }
+  }
+
   // ─── pagination helpers ───────────────────────────────────────────────────
   function prevPage() {
     const next = Math.max(0, libOffset - LIB_PAGE);
@@ -448,11 +503,27 @@ export function PlaylistManager() {
     <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[min(100%,280px)_1fr] lg:gap-5">
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
       <Card className="flex min-h-0 flex-col overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>
-          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-brand hover:text-brand" onClick={() => setShowCreatePlaylist(true)}>
-            <Plus className="h-4 w-4" />
-            {t("playlists.new")}
+        <CardHeader className="flex flex-col gap-2 space-y-0 pb-3">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>
+            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-brand hover:text-brand" onClick={() => setShowCreatePlaylist(true)}>
+              <Plus className="h-4 w-4" />
+              {t("playlists.new")}
+            </Button>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={playlistsFavoritesOnly ? "default" : "outline"}
+            className={`h-7 w-full gap-1.5 text-xs ${playlistsFavoritesOnly ? "bg-amber-500/90 hover:bg-amber-500" : ""}`}
+            onClick={() => {
+              const next = !playlistsFavoritesOnly;
+              setPlaylistsFavoritesOnly(next);
+              void refreshMeta(next);
+            }}
+          >
+            <Star className={`h-3.5 w-3.5 ${playlistsFavoritesOnly ? "fill-current" : ""}`} aria-hidden />
+            {playlistsFavoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
           </Button>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 pt-0">
@@ -472,6 +543,13 @@ export function PlaylistManager() {
                   setPlaylistQuery("");
                 }}
               >
+                <FavoriteStarButton
+                  favorited={Boolean(pl.is_favorited)}
+                  busy={favoriteBusyPlaylistId === pl.id}
+                  label={pl.is_favorited ? t("favorites.remove") : t("favorites.add")}
+                  className="h-7 w-7"
+                  onToggle={() => void handlePlaylistFavoriteToggle(pl.id, !pl.is_favorited)}
+                />
                 <ListMusic className="h-4 w-4 shrink-0 opacity-60" />
                 {renamingPlaylistId === pl.id ? (
                   <input
@@ -532,7 +610,22 @@ export function PlaylistManager() {
                   <span className="ms-2 text-xs font-normal text-muted-foreground">{t("playlists.tracksCount", { count: libraryTotal })}</span>
                 )}
               </CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={libFavoritesOnly ? "default" : "outline"}
+                  className={`h-7 gap-1 px-2 text-xs ${libFavoritesOnly ? "bg-amber-500/90 hover:bg-amber-500" : ""}`}
+                  onClick={() => {
+                    const next = !libFavoritesOnly;
+                    setLibFavoritesOnly(next);
+                    setLibOffset(0);
+                    void fetchLibrary(debouncedLibQuery, 0, next);
+                  }}
+                >
+                  <Star className={`h-3.5 w-3.5 ${libFavoritesOnly ? "fill-current" : ""}`} aria-hidden />
+                  {libFavoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-muted-foreground hover:text-foreground" onClick={() => setShowUpload((v) => !v)}>
                   <Plus className="h-4 w-4" />
                   {t("playlists.upload")}
@@ -706,6 +799,14 @@ export function PlaylistManager() {
                       >
                         {selected && <Check className="h-3 w-3" />}
                       </button>
+
+                      <FavoriteStarButton
+                        favorited={Boolean(track.is_favorited)}
+                        busy={favoriteBusyTrackId === track.id}
+                        label={track.is_favorited ? t("favorites.remove") : t("favorites.add")}
+                        className="h-7 w-7"
+                        onToggle={() => void handleTrackFavoriteToggle(track.id, !track.is_favorited)}
+                      />
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">{track.title}</p>
