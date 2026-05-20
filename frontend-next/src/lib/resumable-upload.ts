@@ -49,6 +49,8 @@ export type ResumableTrackPayload = {
   title: string;
   artist?: string;
   album?: string;
+  genre?: string;
+  tags?: string[];
   visibility: TrackSummary["visibility"];
   file: File;
 };

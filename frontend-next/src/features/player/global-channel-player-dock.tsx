@@ -19,6 +19,7 @@ export function GlobalChannelPlayerDock() {
       canControl={state.canControl}
       sendSocketMessage={state.sendSocketMessage}
       experience={state.experience ?? null}
+      currentTrackId={state.currentTrackId}
       drawerOpen={expanded}
       onDrawerOpenChange={setExpanded}
     />

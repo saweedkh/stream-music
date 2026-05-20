@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   GripVertical,
+  Link2,
   ListMusic,
   Loader2,
   Music,
@@ -38,6 +39,8 @@ import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,
   createPlaylist,
+  createPlaylistShareLink,
+  getPlaylistShareLink,
   deletePlaylist,
   deletePlaylistItem,
   deleteTrack,
@@ -96,6 +99,8 @@ export function PlaylistManager() {
 
   // ─── selected playlist ────────────────────────────────────────────────────
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const selectedPlaylist = useMemo(() => playlists.find((p) => p.id === selectedPlaylistId) ?? null, [playlists, selectedPlaylistId]);
   const playlistItems = useMemo(
     () => allItems.filter((i) => i.playlist === selectedPlaylistId).sort((a, b) => a.position - b.position),
@@ -880,7 +885,42 @@ export function PlaylistManager() {
                     {t("playlists.tracksCount", { count: playlistItems.length })}
                   </span>
                 </CardTitle>
+                {!selectedPlaylist.channel ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1"
+                    disabled={shareBusy}
+                    onClick={() => {
+                      void (async () => {
+                        setShareBusy(true);
+                        try {
+                          let link = await getPlaylistShareLink(selectedPlaylist.id);
+                          if (!link.active) {
+                            link = await createPlaylistShareLink(selectedPlaylist.id);
+                          }
+                          const path = link.share_url ?? `/share/playlist/${link.token}`;
+                          const full = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+                          setShareUrl(full);
+                          await navigator.clipboard.writeText(full);
+                          showToast(t("share.playlist.copy"), "success");
+                        } catch (e) {
+                          showToast(e instanceof Error ? e.message : t("share.playlist.loadFailed"), "error");
+                        } finally {
+                          setShareBusy(false);
+                        }
+                      })();
+                    }}
+                  >
+                    {shareBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                    {t("share.playlist.create")}
+                  </Button>
+                ) : null}
               </div>
+              {shareUrl ? (
+                <p className="mt-1 truncate text-xs text-muted-foreground">{shareUrl}</p>
+              ) : null}
               <div className="relative mt-2">
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input

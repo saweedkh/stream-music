@@ -29,7 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
 import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
-import { getMe, patchMeProfile, postChangePassword, type AuthUser } from "@/lib/api";
+import { getMe, patchMeProfile, patchMePublicProfile, postChangePassword, type AuthUser } from "@/lib/api";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { dispatchUserSessionRefresh } from "@/lib/user-session-events";
 import { cn } from "@/lib/utils";
@@ -70,6 +70,8 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [bio, setBio] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -89,6 +91,8 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
         setEmail(u.email ?? "");
         setFirstName(u.first_name ?? "");
         setLastName(u.last_name ?? "");
+        setBio(u.bio ?? "");
+        setIsPublic(Boolean(u.is_public));
       }
     } catch {
       showToast(t("profile.loadFailed"), "error");
@@ -118,12 +122,15 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
     if (!user) return;
     setSavingProfile(true);
     try {
-      const me = await patchMeProfile({
-        email: email.trim(),
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-      });
-      setUser(me.user);
+      const [me] = await Promise.all([
+        patchMeProfile({
+          email: email.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        }),
+        patchMePublicProfile({ bio: bio.trim(), is_public: isPublic }),
+      ]);
+      setUser({ ...me.user, bio: bio.trim(), is_public: isPublic });
       showToast(t("profile.profileSaved"), "success");
       dispatchUserSessionRefresh();
     } catch (err) {
@@ -284,6 +291,26 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
                     <Input id="profile-last" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-bio">{t("profile.public.bio")}</Label>
+                  <Input id="profile-bio" value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} />
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                  />
+                  {t("profile.public.isPublic")}
+                </label>
+                {isPublic && user ? (
+                  <p className="text-xs text-muted-foreground">
+                    <Link href={`/users/${user.username}`} className="text-brand underline-offset-2 hover:underline">
+                      {t("profile.public.publicHint", { username: user.username })}
+                    </Link>
+                  </p>
+                ) : null}
                 <Button type="submit" disabled={savingProfile} className="gap-2">
                   {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
                   {t("profile.saveProfile")}

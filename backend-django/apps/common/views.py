@@ -440,8 +440,19 @@ class ChannelViewSet(viewsets.ModelViewSet):
             qs = qs.exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
         return qs.order_by("-is_active", "-id")
 
+    def create(self, request, *args, **kwargs):
+        from apps.common.premium_limits import can_create_channel
+
+        ok, code = can_create_channel(request.user)
+        if not ok:
+            return Response({"detail": code}, status=status.HTTP_403_FORBIDDEN)
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
-        channel = serializer.save(owner=self.request.user)
+        from apps.common.premium_limits import clamp_member_limit
+
+        ml = clamp_member_limit(self.request.user, serializer.validated_data.get("member_limit", 50))
+        channel = serializer.save(owner=self.request.user, member_limit=ml)
         ChannelMembership.objects.create(channel=channel, user=self.request.user, role=ChannelMembership.Role.OWNER)
         PlaybackSession.objects.get_or_create(channel=channel)
         InviteToken.objects.create(channel=channel, created_by=self.request.user, is_active=True)
@@ -481,7 +492,21 @@ class TrackViewSet(viewsets.ModelViewSet):
             qs = tracks_accessible_to_user(self.request.user).order_by("title", "id")
         search = (self.request.query_params.get("search") or "").strip()
         if search:
-            qs = qs.filter(Q(title__icontains=search) | Q(artist__icontains=search))
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(artist__icontains=search)
+                | Q(album__icontains=search)
+                | Q(genre__icontains=search)
+            )
+        genre = (self.request.query_params.get("genre") or "").strip()
+        if genre:
+            qs = qs.filter(genre__iexact=genre)
+        album = (self.request.query_params.get("album") or "").strip()
+        if album:
+            qs = qs.filter(album__iexact=album)
+        tag = (self.request.query_params.get("tag") or "").strip()
+        if tag:
+            qs = qs.filter(tags__contains=[tag])
         fav = (self.request.query_params.get("favorited") or "").strip().lower()
         if fav in ("1", "true", "yes"):
             qs = qs.filter(favorited_by__user=self.request.user).distinct()
@@ -1906,10 +1931,15 @@ class ChannelSettingsView(APIView):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
         channel = get_object_or_404(Channel, id=channel_id)
         update_fields = []
-        for field in ["name", "description", "privacy", "member_limit", "join_requires_approval"]:
+        for field in ["name", "description", "privacy", "join_requires_approval"]:
             if field in request.data:
                 setattr(channel, field, request.data[field])
                 update_fields.append(field)
+        if "member_limit" in request.data:
+            from apps.common.premium_limits import clamp_member_limit
+
+            channel.member_limit = clamp_member_limit(channel.owner, request.data.get("member_limit", channel.member_limit))
+            update_fields.append("member_limit")
         if "public_join_slug" in request.data:
             if channel.privacy == Channel.Privacy.PRIVATE:
                 if _normalize_public_join_slug_for_save(request.data.get("public_join_slug")) not in (None, False):

@@ -27,6 +27,17 @@ from apps.common.support_views import (
 from apps.common.health import HealthView
 from apps.common.metrics import MetricsView
 from apps.common.openapi_schema import OpenApiSchemaView
+from apps.common.discovery_views import (
+    ChannelFollowView,
+    GlobalSearchView,
+    MePublicProfileView,
+    PlaylistShareImportView,
+    PlaylistShareLinkView,
+    PlaylistSharePreviewView,
+    PremiumLimitsView,
+    PublicUserProfileView,
+    TrackFacetsView,
+)
 from apps.common.views import (
     LoginView,
     LogoutView,
@@ -95,6 +106,15 @@ urlpatterns = [
     path("auth/login", LoginView.as_view()),
     path("auth/logout", LogoutView.as_view()),
     path("auth/me", MeView.as_view()),
+    path("auth/me/public-profile", MePublicProfileView.as_view()),
+    path("auth/me/premium-limits", PremiumLimitsView.as_view()),
+    path("search/global", GlobalSearchView.as_view()),
+    path("tracks/facets", TrackFacetsView.as_view()),
+    path("users/<str:username>/profile", PublicUserProfileView.as_view()),
+    path("playlists/<int:playlist_id>/share", PlaylistShareLinkView.as_view()),
+    path("playlists/share/<uuid:token>", PlaylistSharePreviewView.as_view()),
+    path("channels/<int:channel_id>/playlists/import-share", PlaylistShareImportView.as_view()),
+    path("channels/<int:channel_id>/follow", ChannelFollowView.as_view()),
     path("auth/me/password", UserPasswordChangeView.as_view()),
     path("auth/me/notification-settings", UserNotificationSettingsView.as_view()),
     path("auth/me/push-subscription", WebPushSubscriptionView.as_view()),

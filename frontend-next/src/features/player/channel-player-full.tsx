@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ChevronDown, Volume2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ type Props = {
   onSeekCommit: (value: number) => void;
   onVolumeChange: (value: number) => void;
   onRefreshSync?: () => void;
+  reactionsSlot?: ReactNode;
 };
 
 export function ChannelPlayerFull({
@@ -85,6 +87,7 @@ export function ChannelPlayerFull({
   onSeekCommit,
   onVolumeChange,
   onRefreshSync,
+  reactionsSlot,
 }: Props) {
   const { t } = useTranslations();
   const pal = resolvePlayerAccent(accentKey);
@@ -181,6 +184,7 @@ export function ChannelPlayerFull({
                   <span className="mx-1.5 text-border">·</span>
                   <span title={channelId}>#{channelId.slice(0, 8)}</span>
                 </p>
+                {reactionsSlot}
               </div>
             </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRef } from "react";
 import { ChevronUp, Radio } from "lucide-react";
 import { usePlayerMiniInset } from "@/hooks/use-player-mini-inset";
@@ -31,6 +32,7 @@ type Props = {
   onSeekPointerDown: () => void;
   onSeekChange: (value: number) => void;
   onSeekCommit: (value: number) => void;
+  reactionsSlot?: ReactNode;
 };
 
 export function ChannelPlayerMini({
@@ -54,6 +56,7 @@ export function ChannelPlayerMini({
   onSeekPointerDown,
   onSeekChange,
   onSeekCommit,
+  reactionsSlot,
 }: Props) {
   const { t } = useTranslations();
   const shellRef = useRef<HTMLDivElement>(null);
@@ -121,6 +124,7 @@ export function ChannelPlayerMini({
           onValueChange={onSeekChange}
           onValueCommit={onSeekCommit}
         />
+        {reactionsSlot}
         {needsUnlock && onUnlockAudio ? (
           <button
             type="button"

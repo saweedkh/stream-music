@@ -30,6 +30,17 @@ type Props = {
   favoriteBusyTrackId?: number | null;
   onFavoritesOnlyChange?: (on: boolean) => void;
   onToggleFavorite?: (trackId: number, favorited: boolean) => void;
+  filterGenre?: string;
+  filterAlbum?: string;
+  filterTag?: string;
+  facetGenres?: string[];
+  facetAlbums?: string[];
+  facetTags?: string[];
+  onFilterGenreChange?: (value: string) => void;
+  onFilterAlbumChange?: (value: string) => void;
+  onFilterTagChange?: (value: string) => void;
+  onBatchFiles?: (files: FileList | null) => void;
+  batchFileCount?: number;
 };
 
 const VISIBILITY_KEYS: Record<TrackSummary["visibility"], MessageKey> = {
@@ -58,6 +69,17 @@ export function TrackLibrarySection(props: Props) {
     favoriteBusyTrackId = null,
     onFavoritesOnlyChange,
     onToggleFavorite,
+    filterGenre = "",
+    filterAlbum = "",
+    filterTag = "",
+    facetGenres = [],
+    facetAlbums = [],
+    facetTags = [],
+    onFilterGenreChange,
+    onFilterAlbumChange,
+    onFilterTagChange,
+    onBatchFiles,
+    batchFileCount = 0,
   } = props;
 
   const visibilityTone: Record<TrackSummary["visibility"], "default" | "warning" | "success"> = {
@@ -116,6 +138,21 @@ export function TrackLibrarySection(props: Props) {
               accept="audio/*"
               onChange={(e) => onTrackFileChange(e.target.files?.[0] ?? null)}
             />
+            {onBatchFiles ? (
+              <div className="space-y-1">
+                <input
+                  className="w-full text-xs file:me-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1"
+                  type="file"
+                  accept="audio/*"
+                  multiple
+                  onChange={(e) => onBatchFiles(e.target.files)}
+                />
+                <p className="text-xs text-muted-foreground">{t("tracks.batchUpload")}</p>
+                {batchFileCount > 0 ? (
+                  <p className="text-xs text-brand">{t("tracks.batchProgress", { current: "…", total: String(batchFileCount) })}</p>
+                ) : null}
+              </div>
+            ) : null}
             {selectedTrackFileName ? (
               <p className="text-xs text-muted-foreground">{t("tracks.selectedFile", { name: selectedTrackFileName })}</p>
             ) : null}
@@ -157,6 +194,43 @@ export function TrackLibrarySection(props: Props) {
           </div>
         </CardHeader>
         <CardContent>
+          {onFilterGenreChange ? (
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("tracks.filterGenre")}</Label>
+                <Select value={filterGenre} onChange={(e) => onFilterGenreChange(e.target.value)}>
+                  <option value="">{t("tracks.filterAll")}</option>
+                  {facetGenres.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("tracks.filterAlbum")}</Label>
+                <Select value={filterAlbum} onChange={(e) => onFilterAlbumChange?.(e.target.value)}>
+                  <option value="">{t("tracks.filterAll")}</option>
+                  {facetAlbums.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("tracks.filterTag")}</Label>
+                <Select value={filterTag} onChange={(e) => onFilterTagChange?.(e.target.value)}>
+                  <option value="">{t("tracks.filterAll")}</option>
+                  {facetTags.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          ) : null}
           {tracks.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border/70 py-12 text-center text-sm text-muted-foreground">
               {favoritesOnly ? t("favorites.showOnly") : t("tracks.empty")}

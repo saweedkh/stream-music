@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ChannelCommandMenu } from "@/components/room/channel-command-menu";
+import { GlobalSearchDialog } from "@/features/discovery/global-search-dialog";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, type AuthUser } from "@/lib/api";
 import { ConnectivityBanner } from "@/components/connectivity-banner";
@@ -43,6 +44,7 @@ function isDashboardPath(pathname: string | null) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [me, setMe] = useState<AuthUser | null>(null);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const inChannel = Boolean(pathname?.startsWith("/channel/"));
   const isDashboard = isDashboardPath(pathname);
   const isAuthPage = isAuthPath(pathname);
@@ -65,11 +67,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       .catch(() => setMe(null));
   }, []);
 
+  useEffect(() => {
+    if (!me || isAuthPage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [me, isAuthPage]);
+
   return (
     <ToastProvider>
       <NotificationProvider>
         <GlobalChannelPlayerProvider>
           <ChannelCommandMenu channelId={channelId} canManage={Boolean(channelId)} />
+          {me && !isAuthPage ? (
+            <GlobalSearchDialog open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />
+          ) : null}
           <motion.div
             className={cn(
               "relative mx-auto w-full",

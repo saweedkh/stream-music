@@ -28,6 +28,11 @@ class TrackUploadInitView(APIView):
             return Response({"detail": "invalid_visibility"}, status=status.HTTP_400_BAD_REQUEST)
         artist = (request.data.get("artist") or "").strip()
         album = (request.data.get("album") or "").strip()
+        genre = (request.data.get("genre") or "").strip()[:120]
+        raw_tags = request.data.get("tags")
+        tags: list[str] = []
+        if isinstance(raw_tags, list):
+            tags = [str(t).strip() for t in raw_tags if str(t).strip()][:20]
         try:
             upload_id = init_session(
                 user_id=request.user.id,
@@ -38,6 +43,8 @@ class TrackUploadInitView(APIView):
                     "visibility": visibility,
                     "artist": artist,
                     "album": album,
+                    "genre": genre,
+                    "tags": tags,
                 },
             )
         except ValueError as e:
@@ -126,6 +133,8 @@ class TrackUploadFinalizeView(APIView):
                     title=meta["title"],
                     artist=meta.get("artist") or "",
                     album=meta.get("album") or "",
+                    genre=meta.get("genre") or "",
+                    tags=meta.get("tags") if isinstance(meta.get("tags"), list) else [],
                     visibility=meta["visibility"],
                     file_hash=file_hash,
                     file=django_file,

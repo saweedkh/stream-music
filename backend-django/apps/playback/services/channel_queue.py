@@ -167,3 +167,35 @@ def insert_track_after_now_playing(
     for i in range(0, len(bulk_rows), _BULK_CHUNK):
         ChannelQueueItem.objects.bulk_create(bulk_rows[i : i + _BULK_CHUNK])
     return list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
+
+
+def rebalance_queue_premium_boost(*, channel: Channel, current_track_id: int | None) -> list[ChannelQueueItem]:
+    """Stable-sort upcoming queue so tracks owned by premium users play sooner."""
+    from apps.common.premium_limits import track_owner_is_premium
+    from apps.playback.services.queue_advance import find_current_queue_index
+
+    rows = list(
+        ChannelQueueItem.objects.filter(channel=channel)
+        .select_related("track", "track__owner")
+        .order_by("position", "id")
+    )
+    if len(rows) < 2:
+        return rows
+    current_idx = find_current_queue_index(rows, current_track_id)
+    head = rows[: current_idx + 1]
+    tail = rows[current_idx + 1 :]
+    if not tail:
+        return rows
+    premium = [row for row in tail if track_owner_is_premium(row.track)]
+    regular = [row for row in tail if not track_owner_is_premium(row.track)]
+    if not premium or len(premium) == len(tail):
+        return rows
+    rebuilt = head + premium + regular
+    ChannelQueueItem.objects.filter(channel=channel).delete()
+    bulk_rows = [
+        ChannelQueueItem(channel=channel, track=row.track, position=index, added_by_id=row.added_by_id)
+        for index, row in enumerate(rebuilt)
+    ]
+    for i in range(0, len(bulk_rows), _BULK_CHUNK):
+        ChannelQueueItem.objects.bulk_create(bulk_rows[i : i + _BULK_CHUNK])
+    return list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))

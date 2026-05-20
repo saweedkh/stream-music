@@ -33,6 +33,7 @@ import {
   listChannels,
   listPlaylistItems,
   listPlaylists,
+  getTrackFacets,
   listTracks,
   listTrackSharePermissions,
   listUsers,
@@ -139,6 +140,13 @@ export function DashboardWorkspace() {
   const [activeTab, setActiveTab] = useState<DashboardTab>(isDashboardTab(tabFromUrl) ? tabFromUrl : "channels");
   const [tracksFavoritesOnly, setTracksFavoritesOnly] = useState(false);
   const [favoriteBusyTrackId, setFavoriteBusyTrackId] = useState<number | null>(null);
+  const [filterGenre, setFilterGenre] = useState("");
+  const [filterAlbum, setFilterAlbum] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [facetGenres, setFacetGenres] = useState<string[]>([]);
+  const [facetAlbums, setFacetAlbums] = useState<string[]>([]);
+  const [facetTags, setFacetTags] = useState<string[]>([]);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
 
   const groupedPlaylistItems = useMemo(() => {
     const result: Record<number, PlaylistItemSummary[]> = {};
@@ -167,7 +175,12 @@ export function DashboardWorkspace() {
   }
 
   async function loadTracksForLibrary(favoritedOnly: boolean) {
-    const data = await listTracks(favoritedOnly ? { favorited: true } : {});
+    const data = await listTracks({
+      ...(favoritedOnly ? { favorited: true } : {}),
+      ...(filterGenre ? { genre: filterGenre } : {}),
+      ...(filterAlbum ? { album: filterAlbum } : {}),
+      ...(filterTag ? { tag: filterTag } : {}),
+    });
     setTracks(normalizeTrackList(data));
   }
 
@@ -203,12 +216,21 @@ export function DashboardWorkspace() {
       const me = await getMe();
       setCurrentUser(me?.user ?? null);
       setCurrentUserId(me?.user?.id ?? null);
-      const [c, trackData, p, u] = await Promise.all([
+      const [c, trackData, p, u, facets] = await Promise.all([
         listChannels(),
-        listTracks(tracksFavoritesOnly ? { favorited: true } : {}),
+        listTracks({
+          ...(tracksFavoritesOnly ? { favorited: true } : {}),
+          ...(filterGenre ? { genre: filterGenre } : {}),
+          ...(filterAlbum ? { album: filterAlbum } : {}),
+          ...(filterTag ? { tag: filterTag } : {}),
+        }),
         listPlaylists(),
         listUsers(),
+        getTrackFacets().catch(() => ({ genres: [], albums: [], tags: [] })),
       ]);
+      setFacetGenres(facets.genres);
+      setFacetAlbums(facets.albums);
+      setFacetTags(facets.tags);
       const pi = await listPlaylistItems();
       setChannels(c);
       setTracks(normalizeTrackList(trackData));
@@ -226,6 +248,11 @@ export function DashboardWorkspace() {
   useEffect(() => {
     refreshAll();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "tracks") return;
+    void loadTracksForLibrary(tracksFavoritesOnly);
+  }, [filterGenre, filterAlbum, filterTag]);
 
   useEffect(() => {
     setPendingUpload(loadPendingUpload());
@@ -309,6 +336,44 @@ export function DashboardWorkspace() {
       showToast(message, "error");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleBatchUpload(files: FileList | null) {
+    if (!files?.length) {
+      setBatchFiles([]);
+      return;
+    }
+    const list = Array.from(files);
+    setBatchFiles(list);
+    setIsUploading(true);
+    let done = 0;
+    try {
+      for (const file of list) {
+        const meta = await parseAudioFileMetadata(file);
+        const title = meta.title ?? file.name.replace(/\.[^/.]+$/, "");
+        setUploadProgress(Math.round((done / list.length) * 100));
+        await uploadTrackResumable(
+          uploadTrackChunked,
+          {
+            title,
+            artist: meta.artist,
+            album: meta.album,
+            visibility: trackVisibility,
+            file,
+          },
+          { onProgress: (p) => setUploadProgress(Math.round(((done + p / 100) / list.length) * 100)) },
+        );
+        done += 1;
+      }
+      showToast(t("tracks.batchDone", { count: String(done) }), "success");
+      setBatchFiles([]);
+      await refreshAll();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("dashboard.uploadFailed"), "error");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   }
 
@@ -517,6 +582,17 @@ export function DashboardWorkspace() {
               onUploadTrack={handleUploadTrack}
               onFavoritesOnlyChange={(on) => void handleTracksFavoritesOnlyChange(on)}
               onToggleFavorite={(trackId, next) => void handleTrackFavoriteToggle(trackId, next)}
+              filterGenre={filterGenre}
+              filterAlbum={filterAlbum}
+              filterTag={filterTag}
+              facetGenres={facetGenres}
+              facetAlbums={facetAlbums}
+              facetTags={facetTags}
+              onFilterGenreChange={setFilterGenre}
+              onFilterAlbumChange={setFilterAlbum}
+              onFilterTagChange={setFilterTag}
+              onBatchFiles={(files) => void handleBatchUpload(files)}
+              batchFileCount={batchFiles.length}
             />
           </>
         ) : null}

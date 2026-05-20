@@ -61,6 +61,8 @@ export type AuthUser = {
   is_superuser?: boolean;
   is_premium?: boolean;
   badges?: UserBadge[];
+  bio?: string;
+  is_public?: boolean;
   /** ISO datetime from Django `User.date_joined`. */
   date_joined?: string;
 };
@@ -1157,6 +1159,9 @@ export async function createChannel(payload: {
 
 export async function listTracks(options?: {
   search?: string;
+  genre?: string;
+  album?: string;
+  tag?: string;
   limit?: number;
   offset?: number;
   favorited?: boolean;
@@ -1164,6 +1169,9 @@ export async function listTracks(options?: {
   const params = new URLSearchParams();
   const q = (options?.search ?? "").trim();
   if (q) params.set("search", q);
+  if (options?.genre?.trim()) params.set("genre", options.genre.trim());
+  if (options?.album?.trim()) params.set("album", options.album.trim());
+  if (options?.tag?.trim()) params.set("tag", options.tag.trim());
   if (options?.limit != null && Number.isFinite(options.limit)) {
     params.set("limit", String(Math.floor(options.limit)));
   }
@@ -1208,7 +1216,15 @@ export async function getChunkUploadStatus(uploadId: string) {
 }
 
 export async function uploadTrackChunked(
-  payload: { title: string; artist?: string; album?: string; visibility: TrackSummary["visibility"]; file: File },
+  payload: {
+    title: string;
+    artist?: string;
+    album?: string;
+    genre?: string;
+    tags?: string[];
+    visibility: TrackSummary["visibility"];
+    file: File;
+  },
   options?: {
     onProgress?: (percent: number) => void;
     resumeUploadId?: string;
@@ -1249,6 +1265,8 @@ export async function uploadTrackChunked(
         title: payload.title,
         artist: payload.artist ?? "",
         album: payload.album ?? "",
+        genre: payload.genre ?? "",
+        tags: payload.tags ?? [],
         visibility: payload.visibility,
       }),
     });
@@ -1587,4 +1605,154 @@ export async function removeTrackSharePermission(trackId: number, shareId: numbe
     await withAuthHeaders({ method: "DELETE", body: JSON.stringify({ share_id: shareId }) }),
   );
   if (!res.ok) throw new Error("Cannot remove track share permission");
+}
+
+export type GlobalSearchResult = {
+  tracks: TrackSummary[];
+  playlists: PlaylistSummary[];
+  channels: ChannelSummary[];
+};
+
+export async function globalSearch(q: string): Promise<GlobalSearchResult> {
+  const params = new URLSearchParams({ q: q.trim() });
+  const res = await fetch(`${getApiBase()}/api/search/global?${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Search failed");
+  return (await res.json()) as GlobalSearchResult;
+}
+
+export type TrackFacets = { genres: string[]; albums: string[]; tags: string[] };
+
+export async function getTrackFacets(): Promise<TrackFacets> {
+  const res = await fetch(`${getApiBase()}/api/tracks/facets`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error("Cannot load facets");
+  return (await res.json()) as TrackFacets;
+}
+
+export type PublicUserProfile = {
+  user: {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+    badges: UserBadge[];
+    date_joined: string | null;
+  };
+  profile: { bio: string; is_public: boolean };
+  public_channels: ChannelSummary[];
+  following_count: number;
+  is_self: boolean;
+};
+
+export async function getPublicUserProfile(username: string): Promise<PublicUserProfile> {
+  const res = await fetch(`${getApiBase()}/api/users/${encodeURIComponent(username)}/profile`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Profile not found"));
+  return (await res.json()) as PublicUserProfile;
+}
+
+export async function patchMePublicProfile(payload: { bio?: string; is_public?: boolean }) {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/public-profile`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update profile"));
+  return (await res.json()) as { bio: string; is_public: boolean };
+}
+
+export type PremiumLimits = {
+  is_premium: boolean;
+  owned_channels: number;
+  max_owned_channels: number;
+  max_member_limit: number;
+  premium_queue_boost: boolean;
+};
+
+export async function getPremiumLimits(): Promise<PremiumLimits> {
+  const res = await fetch(`${getApiBase()}/api/auth/me/premium-limits`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error("Cannot load limits");
+  return (await res.json()) as PremiumLimits;
+}
+
+export type PlaylistShareLinkInfo = {
+  active?: boolean;
+  token?: string;
+  share_url?: string;
+  privacy?: string;
+  expires_at?: string | null;
+};
+
+export async function getPlaylistShareLink(playlistId: number): Promise<PlaylistShareLinkInfo> {
+  const res = await fetch(`${getApiBase()}/api/playlists/${playlistId}/share`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error("Cannot load share link");
+  return (await res.json()) as PlaylistShareLinkInfo;
+}
+
+export async function createPlaylistShareLink(
+  playlistId: number,
+  payload?: { privacy?: string; expires_in_hours?: number },
+): Promise<PlaylistShareLinkInfo & { token: string; share_url: string }> {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/share`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload ?? {}) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot create share link"));
+  return (await res.json()) as PlaylistShareLinkInfo & { token: string; share_url: string };
+}
+
+export async function previewPlaylistShare(token: string) {
+  const res = await fetch(`${getApiBase()}/api/playlists/share/${token}`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Invalid share link"));
+  return (await res.json()) as {
+    playlist: PlaylistSummary;
+    owner_username: string;
+    items: PlaylistItemSummary[];
+    item_count: number;
+  };
+}
+
+export async function importPlaylistShareToChannel(channelId: string, shareToken: string, name?: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/playlists/import-share`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ share_token: shareToken, name }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Import failed"));
+  return (await res.json()) as { playlist: PlaylistSummary };
+}
+
+export type ChannelFollowState = {
+  following: boolean;
+  notify_live: boolean;
+  follower_count: number;
+};
+
+export async function getChannelFollow(channelId: string): Promise<ChannelFollowState> {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/follow`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Cannot load follow state");
+  return (await res.json()) as ChannelFollowState;
+}
+
+export async function followChannel(channelId: string, notifyLive = true): Promise<ChannelFollowState> {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/follow`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ notify_live: notifyLive }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Follow failed"));
+  return (await res.json()) as ChannelFollowState;
+}
+
+export async function unfollowChannel(channelId: string): Promise<{ following: boolean }> {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/follow`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error("Unfollow failed");
+  return (await res.json()) as { following: boolean };
 }

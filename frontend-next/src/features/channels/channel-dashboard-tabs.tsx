@@ -647,6 +647,10 @@ export function ChannelDashboardTabs(props: Props) {
       ? (latestPlaybackPayload as { track?: { id?: number } }).track!.id!
       : null;
 
+  useEffect(() => {
+    upsertGlobalPlayerState({ currentTrackId });
+  }, [currentTrackId, upsertGlobalPlayerState]);
+
   if (!membershipLoaded) {
     return (
       <>

@@ -291,21 +291,33 @@ def notify_channel_chat_message_push(
 
 def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None = None) -> None:
     from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference
+    from apps.common.social_models import ChannelFollow
     from apps.playback.services.state_store import playback_state_store
 
     channel = Channel.objects.filter(id=channel_id).first()
     if channel is None:
         return
     present = set(playback_state_store.presence_user_ids(channel_id))
-    rows = ChannelMembership.objects.filter(channel_id=channel_id, is_active=True).exclude(user_id=actor_user_id)
-    for row in rows:
-        pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=row.user_id)
-        if pref.muted or not pref.notify_room_started:
+    member_ids = set(
+        ChannelMembership.objects.filter(channel_id=channel_id, is_active=True)
+        .exclude(user_id=actor_user_id)
+        .values_list("user_id", flat=True)
+    )
+    follower_ids = set(
+        ChannelFollow.objects.filter(channel_id=channel_id, notify_live=True)
+        .exclude(user_id=actor_user_id)
+        .values_list("user_id", flat=True)
+    )
+    notify_ids = member_ids | follower_ids
+    for user_id in notify_ids:
+        if user_id in present:
             continue
-        if row.user_id in present:
-            continue
+        if user_id in member_ids:
+            pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=user_id)
+            if pref.muted or not pref.notify_room_started:
+                continue
         send_web_push_to_user(
-            row.user_id,
+            user_id,
             title=f"[#{channel_id}] {channel.name}"[:60],
             body="Room is now live.",
             url=channel_tab_url(channel_id),

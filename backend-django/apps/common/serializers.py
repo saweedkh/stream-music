@@ -279,6 +279,8 @@ class AuthUserSerializer(serializers.ModelSerializer):
     is_superuser = serializers.BooleanField(read_only=True)
     badges = serializers.SerializerMethodField()
     is_premium = serializers.SerializerMethodField()
+    bio = serializers.SerializerMethodField()
+    is_public = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -293,7 +295,22 @@ class AuthUserSerializer(serializers.ModelSerializer):
             "is_premium",
             "badges",
             "date_joined",
+            "bio",
+            "is_public",
         ]
+
+    def _public_profile(self, obj):
+        from apps.common.social_models import UserPublicProfile
+
+        return UserPublicProfile.objects.filter(user_id=obj.id).first()
+
+    def get_bio(self, obj):
+        row = self._public_profile(obj)
+        return row.bio if row else ""
+
+    def get_is_public(self, obj):
+        row = self._public_profile(obj)
+        return bool(row.is_public) if row else False
 
     def get_badges(self, obj):
         from apps.common.user_badges import badges_for_user

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelPlayerFull } from "@/features/player/channel-player-full";
 import { ChannelPlayerMini } from "@/features/player/channel-player-mini";
+import { NowPlayingReactions } from "@/features/player/now-playing-reactions";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
 import { useChannelPlaybackEngine } from "@/features/player/use-channel-playback-engine";
@@ -22,6 +23,7 @@ type Props = {
   drawerOpen: boolean;
   onDrawerOpenChange: (open: boolean) => void;
   experience?: ChannelExperience | null;
+  currentTrackId?: number | null;
 };
 
 export function ChannelPlayer({
@@ -36,6 +38,7 @@ export function ChannelPlayer({
   drawerOpen,
   onDrawerOpenChange,
   experience = null,
+  currentTrackId = null,
 }: Props) {
   const { showToast } = useToast();
 
@@ -183,6 +186,7 @@ export function ChannelPlayer({
         onNext={() => void applyControl("next")}
         onVolumeChange={setVolume}
         onRefreshSync={canControl ? () => void refreshChannelPlaybackState() : undefined}
+        reactionsSlot={<NowPlayingReactions channelId={channelId} trackId={currentTrackId} />}
         {...seekHandlers}
       />
 
@@ -204,6 +208,7 @@ export function ChannelPlayer({
         onPrev={() => void applyControl("prev")}
         onPlayPause={onPlayPause}
         onNext={() => void applyControl("next")}
+        reactionsSlot={<NowPlayingReactions channelId={channelId} trackId={currentTrackId} compact />}
         {...seekHandlers}
       />
     </>

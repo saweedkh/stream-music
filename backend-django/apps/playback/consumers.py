@@ -762,6 +762,9 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                     position=next_position,
                     added_by_id=user_id,
                 )
+                from apps.playback.services.channel_queue import rebalance_queue_premium_boost
+
+                rebalance_queue_premium_boost(channel=channel, current_track_id=playback_session.track_id)
             queue_snapshot_rows = list(ChannelQueueItem.objects.filter(channel=channel).order_by("position", "id"))
             playback_session.queue_version += 1
             playback_session.save(update_fields=["queue_version", "updated_at"])
