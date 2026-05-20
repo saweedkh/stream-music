@@ -39,7 +39,7 @@ export function ChannelRoomMobileTabs(props: ListenerProps | AdminProps) {
   if (props.mode === "listener") {
     return (
       <nav
-        className="sticky bottom-0 z-30 -mx-1 border-t border-border/60 bg-background/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl lg:hidden"
+        className="sticky bottom-[var(--player-mini-inset,0px)] z-30 -mx-1 border-t border-border/60 bg-background/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl lg:hidden"
         aria-label={t("room.listener.navTitle")}
       >
         <div className="grid grid-cols-4 gap-0.5">
@@ -67,7 +67,7 @@ export function ChannelRoomMobileTabs(props: ListenerProps | AdminProps) {
   return (
     <>
       <nav
-        className="sticky bottom-0 z-30 -mx-1 border-t border-border/60 bg-background/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl lg:hidden"
+        className="sticky bottom-[var(--player-mini-inset,0px)] z-30 -mx-1 border-t border-border/60 bg-background/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl lg:hidden"
         aria-label={t("room.admin.navTitle")}
       >
         <div className="grid grid-cols-5 gap-0.5">

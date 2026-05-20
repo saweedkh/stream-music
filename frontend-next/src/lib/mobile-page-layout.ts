@@ -1,10 +1,16 @@
 /** Shared layout: mobile = document scroll + flat chrome; lg+ = nested panel cage. */
 
-export const mobilePageRoot =
-  "flex min-h-dvh flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] max-lg:overflow-visible sm:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]";
+/** Bottom padding when the global/channel mini player is docked (see --player-mini-inset). */
+export const playerDockPad =
+  "pb-[calc(var(--player-mini-inset,0px)+env(safe-area-inset-bottom,0px))]";
 
-export const mobilePageRootChannel =
-  "flex min-h-dvh flex-col pb-[calc(8.75rem+env(safe-area-inset-bottom,0px))] max-lg:overflow-visible sm:pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))]";
+/** Channel room: mini player + mobile tab bar above it. */
+export const playerDockPadWithRoomTabs =
+  "max-lg:pb-[calc(var(--player-mini-inset,0px)+var(--room-mobile-tabs-height,3.25rem)+env(safe-area-inset-bottom,0px))] lg:pb-[calc(var(--player-mini-inset,0px)+env(safe-area-inset-bottom,0px))]";
+
+export const mobilePageRoot = `flex min-h-dvh flex-col ${playerDockPad} max-lg:overflow-visible`;
+
+export const mobilePageRootChannel = `flex min-h-dvh flex-col ${playerDockPadWithRoomTabs} max-lg:overflow-visible`;
 
 export const desktopPageRoot =
   "lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden";

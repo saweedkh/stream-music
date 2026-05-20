@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { ChevronUp, Radio } from "lucide-react";
+import { usePlayerMiniInset } from "@/hooks/use-player-mini-inset";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
 import { ChannelPlayerArtwork } from "@/features/player/channel-player-artwork";
@@ -54,11 +56,14 @@ export function ChannelPlayerMini({
   onSeekCommit,
 }: Props) {
   const { t } = useTranslations();
+  const shellRef = useRef<HTMLDivElement>(null);
+  usePlayerMiniInset(shellRef);
   const pal = resolvePlayerAccent(accentKey);
   const waveActive = Boolean(activeTrackPath && isPlaying);
 
   return (
     <div
+      ref={shellRef}
       data-testid="channel-player-shell"
       className={cn(
         "player-shell fixed inset-x-0 bottom-0 z-40 border-t",

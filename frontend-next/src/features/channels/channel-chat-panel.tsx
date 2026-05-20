@@ -598,7 +598,9 @@ export function ChannelChatPanel({
           </Button>
         ) : null}
 
-        <ScrollArea className={cn(scrollAreaClass, fullHeight && "min-h-0 flex-1")}>
+        <ScrollArea
+          className={cn(scrollAreaClass, fullHeight && "min-h-0 flex-1 max-lg:scroll-pad-player-dock")}
+        >
           <div className="space-y-3 p-3 pr-2 sm:p-4">
             {!hydrated && connectEnabled ? (
               <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">

@@ -19,6 +19,7 @@ import {
   mobileMain,
   mobilePageRoot,
   mobilePageRootChannel,
+  playerDockPad,
 } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
@@ -76,9 +77,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               isSelfShelled && desktopPageRoot,
               inChannel && isSelfShelled && "px-2 py-2 sm:px-4 sm:py-4",
               isDashboard && isSelfShelled && "px-2 py-2 sm:px-3 sm:py-3",
-              (isSelfShelled || useGlobalNav) && !inChannel && "max-w-[1500px] px-3 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:py-4",
+              (isSelfShelled || useGlobalNav) && !inChannel && cn("max-w-[1500px] px-3 py-3 sm:px-4 sm:py-4", playerDockPad),
               isAuthPage && "max-w-lg px-4 py-6",
-              !isAuthPage && !isSelfShelled && !useGlobalNav && "min-h-screen max-w-6xl px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:px-6 sm:py-6",
+              !isAuthPage && !isSelfShelled && !useGlobalNav && cn("min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-6", playerDockPad),
               (isSelfShelled || useGlobalNav) && "max-w-[1500px]",
             )}
             {...fadeUp}

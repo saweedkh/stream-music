@@ -41,6 +41,8 @@
   --body-gradient-end: #f8fafc;
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-track: #f1f5f9;
+  --player-mini-inset: 0px;
+  --room-mobile-tabs-height: 3.25rem;
 }
 
 .dark {
@@ -74,6 +76,8 @@
   --body-gradient-end: #07090f;
   --scrollbar-thumb: #3f3f46;
   --scrollbar-track: #09090b;
+  --player-mini-inset: 0px;
+  --room-mobile-tabs-height: 3.25rem;
 }
 
 @layer base {
@@ -154,6 +158,12 @@ select option {
     @apply border backdrop-blur-2xl backdrop-saturate-150;
     border-color: color-mix(in srgb, var(--border) 90%, transparent);
     background: var(--player-chrome);
+  }
+
+  .scroll-pad-player-dock {
+    scroll-padding-bottom: calc(
+      var(--player-mini-inset, 0px) + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   .player-shell {
