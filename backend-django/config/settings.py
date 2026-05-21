@@ -10,6 +10,8 @@ def _env_truthy(key: str, default: str = "0") -> bool:
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = _env_truthy("DEBUG")
+# Playwright E2E registers many users from one IP; disable auth rate limits in isolated test stack.
+E2E_RATE_LIMIT_OFF = _env_truthy("E2E_RATE_LIMIT_OFF")
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
 
 SESSION_COOKIE_SECURE = _env_truthy("SESSION_COOKIE_SECURE", "1" if not DEBUG else "0")

@@ -62,7 +62,7 @@ function defaultExpanded(
   activeAdminSection: AdminSection,
 ): Record<CollapsibleSectionId, boolean> {
   return {
-    channels: activeTab === "channels",
+    channels: activeTab === "channels" || activeTab === "following",
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
     help: activeTab === "support",
     favorites: activeTab === "favoritePlaylists" || activeTab === "favoriteTracks",

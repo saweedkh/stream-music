@@ -3,6 +3,7 @@ import {
   Activity,
   Award,
   Bell,
+  Compass,
   Crown,
   KeyRound,
   LayoutGrid,
@@ -10,6 +11,7 @@ import {
   ListMusic,
   Music,
   Palette,
+  Radio,
   Server,
   Share2,
   Sparkles,
@@ -109,7 +111,10 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
       id: "channels",
       titleKey: "dashboard.sidebar.section.channels",
       variant: "main",
-      items: [{ id: "channels", labelKey: "dashboard.tab.channels", icon: LayoutGrid }],
+      items: [
+        { id: "channels", labelKey: "dashboard.tab.channels", icon: LayoutGrid },
+        { id: "following", labelKey: "dashboard.tab.following", icon: Radio },
+      ],
     },
     {
       id: "library",

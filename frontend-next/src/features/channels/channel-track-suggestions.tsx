@@ -32,6 +32,15 @@ type Props = {
   embedded?: boolean;
 };
 
+function suggestionStatusLabel(
+  t: (key: "room.suggestions.status.pending" | "room.suggestions.status.approved" | "room.suggestions.status.rejected", vars?: Record<string, string | number>) => string,
+  status: string,
+) {
+  const key = `room.suggestions.status.${status}` as "room.suggestions.status.pending";
+  const translated = t(key);
+  return translated === key ? status : translated;
+}
+
 function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
   const { t } = useTranslations();
   const { showToast } = useToast();
@@ -41,6 +50,9 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
   const [search, setSearch] = useState("");
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
   const [note, setNote] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+  const [externalTitle, setExternalTitle] = useState("");
+  const [externalArtist, setExternalArtist] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +97,30 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
       setNote("");
       setSelectedTrackId(null);
       setSearch("");
+      showToast(t("room.listener.suggestions.sent"), "success");
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Suggestion failed.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitExternalSuggestion() {
+    const url = externalUrl.trim();
+    if (!url) return;
+    setSubmitting(true);
+    try {
+      await createChannelSuggestion(channelId, {
+        external_url: url,
+        external_title: externalTitle.trim() || undefined,
+        external_artist: externalArtist.trim() || undefined,
+        note: note.trim(),
+      });
+      setExternalUrl("");
+      setExternalTitle("");
+      setExternalArtist("");
+      setNote("");
       showToast(t("room.listener.suggestions.sent"), "success");
       await load();
     } catch (e) {
@@ -182,6 +218,39 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
             <Send className="size-4" aria-hidden />
             {submitting ? t("common.loading") : t("room.listener.suggestions.submit")}
           </Button>
+
+          <div className="border-t border-border/40 pt-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">{t("suggestions.externalUrl")}</p>
+            <Input
+              value={externalUrl}
+              onChange={(e) => setExternalUrl(e.target.value)}
+              placeholder="https://open.spotify.com/… or YouTube"
+              className={cn("mb-2", listenerFieldClass)}
+            />
+            <div className="mb-2 grid gap-2 sm:grid-cols-2">
+              <Input
+                value={externalTitle}
+                onChange={(e) => setExternalTitle(e.target.value)}
+                placeholder={t("suggestions.externalTitle")}
+                className={listenerFieldClass}
+              />
+              <Input
+                value={externalArtist}
+                onChange={(e) => setExternalArtist(e.target.value)}
+                placeholder={t("suggestions.externalArtist")}
+                className={listenerFieldClass}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={!externalUrl.trim() || submitting}
+              onClick={() => void submitExternalSuggestion()}
+            >
+              {t("suggestions.submitExternal")}
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -192,7 +261,11 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
           </h3>
           <ul className="space-y-2">
             {mySuggestions.map((s) => {
-              const title = tracks.find((tr) => tr.id === s.track)?.title ?? s.track_title ?? `#${s.track}`;
+              const title =
+                tracks.find((tr) => tr.id === s.track)?.title ??
+                s.track_title ??
+                s.external_title ??
+                (s.external_url ? s.external_url : `#${s.track ?? "link"}`);
               return (
                 <li key={s.id} className={cn("px-3 py-2.5", listenerItemClass)}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -203,7 +276,7 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
                       }
                       className="shrink-0 capitalize"
                     >
-                      {s.status}
+                      {suggestionStatusLabel(t, s.status)}
                     </Badge>
                   </div>
                   {s.note ? <p className="mt-1 text-xs text-muted-foreground">{s.note}</p> : null}
@@ -325,8 +398,26 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
   const [suggestTrackId, setSuggestTrackId] = useState<number | null>(null);
   const [suggestNote, setSuggestNote] = useState("");
   const [suggestionFilter, setSuggestionFilter] = useState<SuggestionFilter>("pending");
+  const [adminSearch, setAdminSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const isListener = variant === "listener";
+
+  const filteredSuggestions = useMemo(() => {
+    const q = adminSearch.trim().toLowerCase();
+    if (!q) return suggestions;
+    return suggestions.filter((s) => {
+      const title =
+        tracks.find((tr) => tr.id === s.track)?.title ??
+        s.track_title ??
+        s.external_title ??
+        s.external_url ??
+        "";
+      const user = s.username ?? "";
+      const note = s.note ?? "";
+      const blob = `${title} ${user} ${note}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [adminSearch, suggestions, tracks]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -346,6 +437,28 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
     if (isListener) return;
     void load().catch((e) => showToast(e instanceof Error ? e.message : "Could not load suggestions.", "error"));
   }, [load, showToast, isListener]);
+
+  useEffect(() => {
+    if (isListener) return;
+    const reload = () => void load().catch(() => undefined);
+    const onChanged = (ev: Event) => {
+      const e = ev as CustomEvent<{ channelId?: string }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      reload();
+    };
+    const onPlayback = (ev: Event) => {
+      const e = ev as CustomEvent<{ channelId?: string; payload?: { type?: string } }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      if (String(e.detail?.payload?.type ?? "").toLowerCase() !== "suggestions_updated") return;
+      reload();
+    };
+    window.addEventListener("channel-suggestions-changed", onChanged);
+    window.addEventListener("channel-playback-updated", onPlayback);
+    return () => {
+      window.removeEventListener("channel-suggestions-changed", onChanged);
+      window.removeEventListener("channel-playback-updated", onPlayback);
+    };
+  }, [channelId, isListener, load]);
 
   async function submitSuggestion() {
     if (suggestTrackId == null) return;
@@ -390,7 +503,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
 
   const suggestionRows = (
     <ul className="space-y-0.5 text-sm">
-      {suggestions.map((s) => {
+      {filteredSuggestions.map((s) => {
         const title = tracks.find((tr) => tr.id === s.track)?.title ?? `Track #${s.track}`;
         return (
           <li
@@ -404,8 +517,8 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
               <p className="truncate font-medium text-foreground">{title}</p>
               {s.note ? <p className="truncate text-xs text-muted-foreground">{s.note}</p> : null}
             </div>
-            <Badge variant="secondary" className="shrink-0 text-[10px] capitalize">
-              {s.status}
+            <Badge variant="secondary" className="shrink-0 text-[10px]">
+              {suggestionStatusLabel(t, s.status)}
             </Badge>
             {canManage && s.status === "pending" ? (
               <span className="flex shrink-0 gap-1">
@@ -445,6 +558,15 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
         </div>
 
         <div className="shrink-0 space-y-3 border-b border-border/40 px-4 py-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={adminSearch}
+              onChange={(e) => setAdminSearch(e.target.value)}
+              placeholder={t("room.admin.suggestions.searchPlaceholder")}
+              className="ps-9"
+            />
+          </div>
           <div className="flex gap-1 rounded-xl bg-muted/25 p-1">
             {filterTabs.map((tab) => (
               <button
@@ -499,7 +621,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
                 <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/40" />
               ))}
             </div>
-          ) : suggestions.length === 0 ? (
+          ) : filteredSuggestions.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
               <Sparkles className="size-10 text-muted-foreground/50" aria-hidden />
               <p className="text-sm text-muted-foreground">{t("room.admin.suggestions.empty")}</p>

@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
+/** API calls go through Next dev rewrites (same origin as the app) unless overridden. */
+const apiURL = process.env.PLAYWRIGHT_API_URL ?? baseURL;
 
 const systemChrome =
   process.env.PLAYWRIGHT_CHROME_PATH ??
@@ -58,6 +59,11 @@ export default defineConfig({
           url: baseURL,
           reuseExistingServer: true,
           timeout: 120_000,
+          env: {
+            ...process.env,
+            DEV_REMOTE_ORIGIN: process.env.DEV_REMOTE_ORIGIN ?? "http://127.0.0.1:8002",
+            NEXT_PUBLIC_WS_BASE_URL: process.env.NEXT_PUBLIC_WS_BASE_URL ?? "ws://127.0.0.1:8002",
+          },
         },
       ],
   metadata: { apiURL },

@@ -44,6 +44,7 @@ type Props = {
   onCloseChannel?: () => void;
   showLeave?: boolean;
   chatUnread: number;
+  pendingSuggestionsCount?: number;
   canManage: boolean;
   className?: string;
   user: AuthUser | null;
@@ -65,6 +66,7 @@ export function ChannelAdminSidebar({
   onCloseChannel,
   showLeave,
   chatUnread,
+  pendingSuggestionsCount = 0,
   canManage,
   className,
   user,
@@ -76,7 +78,7 @@ export function ChannelAdminSidebar({
   const [expanded, setExpanded] = useState<Record<ChannelTabGroup, boolean>>(() => ({
     listen: activeGroup === "listen",
     social: activeGroup === "social",
-    dj: activeGroup === "dj",
+    studio: activeGroup === "studio",
   }));
 
   useEffect(() => {
@@ -258,7 +260,12 @@ export function ChannelAdminSidebar({
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
-                    const unread = item.id === "chat" ? chatUnread : 0;
+                    const unread =
+                      item.id === "chat"
+                        ? chatUnread
+                        : item.id === "suggestions"
+                          ? pendingSuggestionsCount
+                          : 0;
 
                     return (
                       <li key={item.id}>
@@ -286,7 +293,18 @@ export function ChannelAdminSidebar({
                           </span>
                           <span className="truncate">{t(item.labelKey)}</span>
                           {unread > 0 ? (
-                            <span className="ms-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-foreground">
+                            <span
+                              className={cn(
+                                "ms-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-primary-foreground",
+                                item.id === "suggestions" ? "bg-amber-500" : "bg-brand",
+                              )}
+                              data-testid={item.id === "suggestions" ? "channel-nav-suggestions-badge" : undefined}
+                              title={
+                                item.id === "suggestions"
+                                  ? t("room.admin.suggestions.pendingBadge", { count: unread })
+                                  : undefined
+                              }
+                            >
                               {unread > 9 ? "9+" : unread}
                             </span>
                           ) : null}

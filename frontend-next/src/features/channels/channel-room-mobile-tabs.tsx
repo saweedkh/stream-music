@@ -29,12 +29,15 @@ type AdminProps = {
   onSelectTab: (tab: ChannelTabId) => void;
   canManage: boolean;
   chatUnread?: number;
+  pendingSuggestionsCount?: number;
 };
 
 export function ChannelRoomMobileTabs(props: ListenerProps | AdminProps) {
   const { t } = useTranslations();
   const [moreOpen, setMoreOpen] = useState(false);
   const chatUnread = props.chatUnread ?? 0;
+  const pendingSuggestions =
+    props.mode === "admin" ? (props.pendingSuggestionsCount ?? 0) : 0;
 
   if (props.mode === "listener") {
     return (
@@ -79,7 +82,14 @@ export function ChannelRoomMobileTabs(props: ListenerProps | AdminProps) {
                 active={props.activeTab === id}
                 label={t(item.labelKey)}
                 icon={item.icon}
-                badge={id === "chat" && chatUnread > 0 ? chatUnread : undefined}
+                badge={
+                  id === "chat" && chatUnread > 0
+                    ? chatUnread
+                    : id === "suggestions" && pendingSuggestions > 0
+                      ? pendingSuggestions
+                      : undefined
+                }
+                badgePending={id === "suggestions"}
                 onClick={() => props.onSelectTab(id)}
               />
             );
@@ -133,12 +143,14 @@ function TabButton({
   label,
   icon: Icon,
   badge,
+  badgePending,
   onClick,
 }: {
   active: boolean;
   label: string;
   icon: ComponentType<{ className?: string }>;
   badge?: number;
+  badgePending?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -153,7 +165,12 @@ function TabButton({
       <Icon className="h-5 w-5 shrink-0" aria-hidden />
       <span className="max-w-full truncate">{label}</span>
       {badge != null && badge > 0 ? (
-        <span className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-brand-foreground">
+        <span
+          className={cn(
+            "absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-primary-foreground",
+            badgePending ? "bg-amber-500" : "bg-brand",
+          )}
+        >
           {badge > 9 ? "9+" : badge}
         </span>
       ) : null}

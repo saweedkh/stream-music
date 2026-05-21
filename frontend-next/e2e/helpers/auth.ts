@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-export const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
+const defaultBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+export const apiURL = process.env.PLAYWRIGHT_API_URL ?? defaultBase;
 
 export function uniqueUsername(prefix = "e2e"): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -9,9 +10,14 @@ export function uniqueUsername(prefix = "e2e"): string {
 export async function fetchCsrf(request: APIRequestContext): Promise<string> {
   const res = await request.get(`${apiURL}/api/auth/csrf`);
   if (!res.ok()) throw new Error(`csrf failed: ${res.status()}`);
+  const body = (await res.json().catch(() => null)) as { csrfToken?: string } | null;
+  if (body?.csrfToken) return body.csrfToken;
+  const setCookie = res.headers()["set-cookie"] ?? "";
+  const fromHeader = /csrftoken=([^;]+)/i.exec(setCookie)?.[1];
+  if (fromHeader) return fromHeader;
   const state = await request.storageState();
   const token = state.cookies.find((c) => c.name === "csrftoken")?.value;
-  if (!token) throw new Error("csrftoken cookie missing");
+  if (!token) throw new Error("csrftoken missing (cookie and csrfToken JSON)");
   return token;
 }
 
@@ -25,6 +31,11 @@ export async function registerAndLogin(
     data: { username, email: `${username}@example.com`, password },
     headers: { "X-CSRFToken": csrf },
   });
+  if (register.status() === 429) {
+    throw new Error(
+      "register rate_limited — restart E2E backend with E2E_RATE_LIMIT_OFF=1 (see docker-compose.e2e.yml)",
+    );
+  }
   if (!register.ok() && register.status() !== 400) {
     throw new Error(`register failed: ${register.status()} ${await register.text()}`);
   }

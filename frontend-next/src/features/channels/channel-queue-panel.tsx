@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ListMusic, Loader2, Play, RefreshCw, ThumbsUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ListMusic, Loader2, Play, Radio, RefreshCw, ThumbsUp, Trash2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
 import { listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
@@ -32,6 +32,8 @@ type Props = {
   channelId: string;
   readOnly?: boolean;
   variant?: "admin" | "listener";
+  /** Currently playing track id (from playback sync). */
+  currentTrackId?: number | null;
   /** Admin channel tab — full-bleed layout aligned with playlist panel. */
   embedded?: boolean;
 };
@@ -39,7 +41,13 @@ type Props = {
 const rowBtn =
   "h-8 w-8 shrink-0 text-muted-foreground hover:bg-muted/50 hover:text-foreground";
 
-export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admin", embedded = false }: Props) {
+export function ChannelQueuePanel({
+  channelId,
+  readOnly = false,
+  variant = "admin",
+  embedded = false,
+  currentTrackId = null,
+}: Props) {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const queueCtx = useContext(ChannelQueueContext);
@@ -158,6 +166,17 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
     return () => window.removeEventListener("channel-playback-updated", onPlayback);
   }, [channelId, isListener, loadListenerQueue]);
 
+  useEffect(() => {
+    if (isListener) return;
+    function onPlayback(ev: Event) {
+      const e = ev as CustomEvent<{ channelId?: string }>;
+      if (String(e.detail?.channelId ?? "") !== String(channelId)) return;
+      void refresh();
+    }
+    window.addEventListener("channel-playback-updated", onPlayback);
+    return () => window.removeEventListener("channel-playback-updated", onPlayback);
+  }, [channelId, isListener]);
+
   const listContent = (
     <div className="space-y-2">
       {!isListener && readOnly ? (
@@ -165,16 +184,27 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
       ) : null}
       {loading ? <ListSkeleton rows={6} className="py-2" /> : null}
       {!loading &&
-        queue.map((item) => (
+        queue.map((item) => {
+          const isNowPlaying = currentTrackId != null && item.track === currentTrackId;
+          return (
           <div
             key={item.id}
+            data-testid={isNowPlaying ? "queue-item-now-playing" : undefined}
             className={cn(
-              "group flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3",
+              "group relative flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3",
               isListener
                 ? listenerItemClass
                 : "rounded-lg border border-border/80 bg-card/40 transition-colors duration-200 hover:border-border/90 hover:bg-card/35",
+              isNowPlaying &&
+                "border-brand/70 bg-gradient-to-r from-brand/20 via-brand/10 to-transparent shadow-[0_0_0_1px_rgba(var(--brand-rgb,34,197,94),0.35),0_0_24px_-4px_rgba(var(--brand-rgb,34,197,94),0.25)] ring-2 ring-brand/40",
             )}
           >
+            {isNowPlaying ? (
+              <span className="absolute end-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">
+                <Radio className="size-3 animate-pulse" aria-hidden />
+                {t("room.queue.nowPlaying")}
+              </span>
+            ) : null}
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <span
                 className={cn(
@@ -190,6 +220,9 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
                 {trackMap[item.track]?.title ?? `Track ${item.track}`}
                 {item.added_by_username ? (
                   <span className="ms-2 text-xs font-normal text-muted-foreground">· {item.added_by_username}</span>
+                ) : null}
+                {item.premium_boosted ? (
+                  <span className="ms-2 text-xs font-medium text-amber-500/90">{t("room.queue.premiumBoost")}</span>
                 ) : null}
               </span>
               {isListener && (item.upvote_count ?? 0) > 0 ? (
@@ -313,7 +346,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
               </div>
             ) : null}
           </div>
-        ))}
+        );
+        })}
       {!loading && queue.length === 0 ? (
         <EmptyState
           title="Queue is empty"
@@ -381,11 +415,24 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
             </div>
           ) : (
             <ul className="space-y-0.5 px-1">
-              {queue.map((item) => (
+              {queue.map((item) => {
+                const isNowPlaying = currentTrackId != null && item.track === currentTrackId;
+                return (
                 <li
                   key={item.id}
-                  className="flex flex-col gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center"
+                  data-testid={isNowPlaying ? "queue-item-now-playing" : undefined}
+                  className={cn(
+                    "relative flex flex-col gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center",
+                    isNowPlaying &&
+                      "border border-brand/60 bg-gradient-to-r from-brand/15 to-transparent ring-2 ring-brand/35",
+                  )}
                 >
+                  {isNowPlaying ? (
+                    <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
+                      <Radio className="size-3 animate-pulse" aria-hidden />
+                      {t("room.queue.nowPlaying")}
+                    </span>
+                  ) : null}
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="w-7 shrink-0 text-center font-mono text-xs text-muted-foreground">{item.position}</span>
                     <div className="min-w-0 flex-1">
@@ -496,7 +543,8 @@ export function ChannelQueuePanel({ channelId, readOnly = false, variant = "admi
                     </div>
                   ) : null}
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </ScrollArea>

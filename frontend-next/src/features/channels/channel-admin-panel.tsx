@@ -190,8 +190,12 @@ export function ChannelAdminPanel({
   const [expAntiRepeat, setExpAntiRepeat] = useState("0");
   const [expShuffleBias, setExpShuffleBias] = useState("0");
   const [expSuggestions, setExpSuggestions] = useState(true);
-  const [expDjRotation, setExpDjRotation] = useState(false);
-  const [expDjEvery, setExpDjEvery] = useState("1");
+  const [expChatSlow, setExpChatSlow] = useState("0");
+  const [expChatWordFilters, setExpChatWordFilters] = useState("");
+  const [expSuggestionLimit, setExpSuggestionLimit] = useState("5");
+  const [expThemePrimary, setExpThemePrimary] = useState("");
+  const [expThemeSurface, setExpThemeSurface] = useState("");
+  const [expThemeFont, setExpThemeFont] = useState("");
   const [expListeningParty, setExpListeningParty] = useState(false);
   const [expRadio, setExpRadio] = useState(false);
   const [expQueueEndMode, setExpQueueEndMode] = useState<"loop" | "stop" | "repeat_one">("loop");
@@ -249,8 +253,15 @@ export function ChannelAdminPanel({
     setExpAntiRepeat(raw.anti_repeat_window != null ? String(raw.anti_repeat_window) : "0");
     setExpShuffleBias(raw.weighted_shuffle_bias != null ? String(raw.weighted_shuffle_bias) : "0");
     setExpSuggestions(raw.suggestions_enabled !== false);
-    setExpDjRotation(Boolean(raw.dj_rotation_enabled));
-    setExpDjEvery(raw.dj_rotation_every_n != null ? String(raw.dj_rotation_every_n) : "1");
+    setExpChatSlow(raw.chat_slow_mode_seconds != null ? String(raw.chat_slow_mode_seconds) : "0");
+    const wf = raw.chat_word_filters;
+    setExpChatWordFilters(Array.isArray(wf) ? wf.map(String).join("\n") : "");
+    setExpSuggestionLimit(
+      raw.suggestion_rate_limit_per_hour != null ? String(raw.suggestion_rate_limit_per_hour) : "5",
+    );
+    setExpThemePrimary(typeof raw.theme_primary === "string" ? raw.theme_primary : "");
+    setExpThemeSurface(typeof raw.theme_surface === "string" ? raw.theme_surface : "");
+    setExpThemeFont(typeof raw.theme_font === "string" ? raw.theme_font : "");
     setExpListeningParty(Boolean(raw.listening_party_only));
     setExpRadio(Boolean(raw.radio_mode));
     const mode = raw.queue_end_mode;
@@ -376,8 +387,16 @@ export function ChannelAdminPanel({
           anti_repeat_window: Math.max(0, Number(expAntiRepeat) || 0),
           weighted_shuffle_bias: Math.max(0, Math.min(2, Number(expShuffleBias) || 0)),
           suggestions_enabled: expSuggestions,
-          dj_rotation_enabled: expDjRotation,
-          dj_rotation_every_n: Math.max(1, Number(expDjEvery) || 1),
+          chat_slow_mode_seconds: Math.max(0, Math.min(120, Number(expChatSlow) || 0)),
+          chat_word_filters: expChatWordFilters
+            .split(/\n/)
+            .map((w) => w.trim().toLowerCase())
+            .filter(Boolean)
+            .slice(0, 50),
+          suggestion_rate_limit_per_hour: Math.max(1, Math.min(20, Number(expSuggestionLimit) || 5)),
+          theme_primary: expThemePrimary.trim() || undefined,
+          theme_surface: expThemeSurface.trim() || undefined,
+          theme_font: expThemeFont.trim() || undefined,
           listening_party_only: expListeningParty,
           radio_mode: expRadio,
           queue_end_mode: expQueueEndMode,
@@ -717,13 +736,37 @@ export function ChannelAdminPanel({
                   <p className="text-sm font-medium text-foreground">{t("room.admin.settings.trackSuggestions")}</p>
                   <Switch checked={expSuggestions} onCheckedChange={setExpSuggestions} />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{t("room.admin.settings.djRotation")}</p>
-                  <Switch checked={expDjRotation} onCheckedChange={setExpDjRotation} />
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-slow-${channelId}`}>{t("room.admin.settings.chatSlowMode")}</Label>
+                  <Input id={`ch-exp-slow-${channelId}`} type="number" min={0} max={120} value={expChatSlow} onChange={(e) => setExpChatSlow(e.target.value)} className="border-border bg-card/80" />
+                  <p className="text-xs text-muted-foreground">{t("room.admin.settings.chatSlowHint")}</p>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-words-${channelId}`}>{t("room.admin.settings.chatWordFilters")}</Label>
+                  <textarea
+                    id={`ch-exp-words-${channelId}`}
+                    rows={3}
+                    value={expChatWordFilters}
+                    onChange={(e) => setExpChatWordFilters(e.target.value)}
+                    className="w-full rounded-md border border-border bg-card/80 px-3 py-2 text-sm text-foreground"
+                    placeholder={t("room.admin.settings.chatWordFiltersHint")}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("room.admin.settings.djRotateEvery")}</Label>
-                  <Input type="number" min={1} value={expDjEvery} onChange={(e) => setExpDjEvery(e.target.value)} className="border-border bg-card/80" />
+                  <Label htmlFor={`ch-exp-suglim-${channelId}`}>{t("room.admin.settings.suggestionRateLimit")}</Label>
+                  <Input id={`ch-exp-suglim-${channelId}`} type="number" min={1} max={20} value={expSuggestionLimit} onChange={(e) => setExpSuggestionLimit(e.target.value)} className="border-border bg-card/80" />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-theme-p-${channelId}`}>{t("room.admin.settings.themePrimary")}</Label>
+                  <Input id={`ch-exp-theme-p-${channelId}`} value={expThemePrimary} onChange={(e) => setExpThemePrimary(e.target.value)} placeholder="#22c55e" className="border-border bg-card/80" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-theme-s-${channelId}`}>{t("room.admin.settings.themeSurface")}</Label>
+                  <Input id={`ch-exp-theme-s-${channelId}`} value={expThemeSurface} onChange={(e) => setExpThemeSurface(e.target.value)} placeholder="#07090f" className="border-border bg-card/80" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`ch-exp-theme-f-${channelId}`}>{t("room.admin.settings.themeFont")}</Label>
+                  <Input id={`ch-exp-theme-f-${channelId}`} value={expThemeFont} onChange={(e) => setExpThemeFont(e.target.value)} placeholder="system-ui" className="border-border bg-card/80" />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-4 py-3 sm:col-span-2">
                   <p className="text-sm font-medium text-foreground">{t("room.admin.settings.listeningParty")}</p>

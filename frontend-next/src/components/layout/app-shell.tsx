@@ -13,6 +13,7 @@ import { ConnectivityBanner } from "@/components/connectivity-banner";
 import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { AppGlobalNavShell } from "@/components/layout/app-global-nav-shell";
+import { PwaInstallBanner } from "@/components/pwa/pwa-install-banner";
 import { fadeUp } from "@/lib/motion";
 import {
   desktopMain,
@@ -111,6 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           </motion.div>
           <GlobalChannelPlayerDock />
+          {me && !isAuthPage ? <PwaInstallBanner /> : null}
         </GlobalChannelPlayerProvider>
       </NotificationProvider>
     </ToastProvider>

@@ -19,7 +19,11 @@ Core event payload keys (additive-only policy):
 
 Reserved initial sync action:
 
-- `action: "initial_sync"` with optional `track`, `queue`, `experience`, `brand_logo_url`
+- `action: "initial_sync"` with optional `track`, `queue`, `experience`, `brand_logo_url`, `pending_count` (staff only)
+
+Suggestion badge updates:
+
+- `type: "SUGGESTIONS_UPDATED"` / `action: "suggestions_updated"` with `pending_count`, optional `event` (`created`|`updated`), `actor_username`
 
 Latency ping:
 

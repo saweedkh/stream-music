@@ -37,9 +37,16 @@ export function HomeActions() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-foreground/80">Manage your channels, monitor sync health, and open admin controls.</p>
-          <Link href="/dashboard">
-            <Button className="w-full">Open Dashboard</Button>
-          </Link>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link href="/dashboard" className="flex-1">
+              <Button className="w-full">Open Dashboard</Button>
+            </Link>
+            <Link href="/explore" className="flex-1">
+              <Button variant="secondary" className="w-full">
+                Explore public rooms
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
       <Card>

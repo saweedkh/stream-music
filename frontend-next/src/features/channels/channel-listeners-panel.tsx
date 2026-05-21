@@ -13,6 +13,7 @@ import { adminSectionLabel } from "@/features/channels/channel-admin-panel-style
 import { useToast } from "@/components/ui/toast-provider";
 import { getChannelMembers, type ChannelMember } from "@/lib/api";
 import { ChannelMemberRosterActions } from "@/features/channels/channel-member-roster-actions";
+import { ChannelModerationReports } from "@/features/channels/channel-moderation-reports";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -169,6 +170,7 @@ export function ChannelListenersPanel({
                       channelId={channelId}
                       member={member}
                       isOwnerViewer={isOwner}
+                      canModerate={canManage}
                       channelIsActive={channelIsActive}
                       onUpdated={loadMembers}
                     />
@@ -203,6 +205,7 @@ export function ChannelListenersPanel({
           </ul>
         )}
       </section>
+      {canManage ? <ChannelModerationReports channelId={channelId} /> : null}
     </div>
   );
 

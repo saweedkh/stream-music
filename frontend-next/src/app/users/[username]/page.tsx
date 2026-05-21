@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Radio, User } from "lucide-react";
+import { ListMusic, Radio, User, UserPlus, UserMinus } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,24 +11,63 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserVerifiedBadge } from "@/components/ui/user-verified-badge";
-import { getPublicUserProfile, type PublicUserProfile } from "@/lib/api";
+import { useToast } from "@/components/ui/toast-provider";
+import {
+  followUser,
+  getPublicUserProfile,
+  getUserFollow,
+  unfollowUser,
+  type PublicUserProfile,
+} from "@/lib/api";
 
 export default function PublicUserProfilePage() {
   const { t } = useTranslations();
+  const { showToast } = useToast();
   const params = useParams();
   const username = String(params.username ?? "");
   const [data, setData] = useState<PublicUserProfile | null>(null);
+  const [userFollowing, setUserFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [followBusy, setFollowBusy] = useState(false);
 
   useEffect(() => {
     if (!username) return;
     setLoading(true);
-    getPublicUserProfile(username)
-      .then(setData)
+    Promise.all([getPublicUserProfile(username), getUserFollow(username).catch(() => null)])
+      .then(([profile, follow]) => {
+        setData(profile);
+        if (follow) {
+          setUserFollowing(follow.following);
+          setFollowerCount(follow.follower_count);
+        }
+      })
       .catch((e) => setError(e instanceof Error ? e.message : t("profile.public.loadFailed")))
       .finally(() => setLoading(false));
   }, [username, t]);
+
+  async function toggleFollow() {
+    if (!data || data.is_self) return;
+    setFollowBusy(true);
+    try {
+      if (userFollowing) {
+        await unfollowUser(username);
+        setUserFollowing(false);
+        setFollowerCount((c) => Math.max(0, c - 1));
+        showToast(t("profile.public.unfollow"), "success");
+      } else {
+        await followUser(username);
+        setUserFollowing(true);
+        setFollowerCount((c) => c + 1);
+        showToast(t("profile.public.follow"), "success");
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Failed", "error");
+    } finally {
+      setFollowBusy(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -66,9 +105,17 @@ export default function PublicUserProfilePage() {
               {displayName}
               <UserVerifiedBadge flags={{ badges: data.user.badges }} />
             </CardTitle>
-            <CardDescription>@{data.user.username}</CardDescription>
+            <CardDescription>
+              @{data.user.username} · {t("profile.public.followers", { count: followerCount })}
+            </CardDescription>
             {data.profile.bio ? <p className="mt-3 text-sm text-foreground">{data.profile.bio}</p> : null}
           </div>
+          {!data.is_self ? (
+            <Button type="button" size="sm" variant={userFollowing ? "outline" : "default"} disabled={followBusy} onClick={() => void toggleFollow()}>
+              {userFollowing ? <UserMinus className="mr-1 h-4 w-4" /> : <UserPlus className="mr-1 h-4 w-4" />}
+              {userFollowing ? t("profile.public.unfollow") : t("profile.public.follow")}
+            </Button>
+          ) : null}
         </CardHeader>
         {data.is_self ? (
           <CardContent>
@@ -78,6 +125,24 @@ export default function PublicUserProfilePage() {
           </CardContent>
         ) : null}
       </Card>
+
+      {data.stats ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("profile.public.stats")}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground">{t("profile.public.sessionsJoined")}</p>
+              <p className="text-lg font-semibold">{data.stats.sessions_joined}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">{t("profile.public.tracksPlayed")}</p>
+              <p className="text-lg font-semibold">{data.stats.tracks_played}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -104,6 +169,22 @@ export default function PublicUserProfilePage() {
           </ul>
         )}
       </section>
+
+      {(data.public_playlists?.length ?? 0) > 0 ? (
+        <section>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <ListMusic className="h-4 w-4" />
+            {t("profile.public.playlists")}
+          </h2>
+          <ul className="space-y-2">
+            {data.public_playlists!.map((pl) => (
+              <li key={pl.id} className="rounded-xl border border-border/70 bg-card px-4 py-3 text-sm font-medium">
+                {pl.name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

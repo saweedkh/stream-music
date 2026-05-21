@@ -15,7 +15,9 @@ from rest_framework.views import APIView
 from apps.channels.models import Channel, ChannelMembership
 from apps.common.premium_limits import can_create_channel, clamp_member_limit, user_has_premium
 from apps.common.serializers import ChannelSerializer, PlaylistItemSerializer, PlaylistSerializer, TrackSerializer
-from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserPublicProfile
+from apps.common.favorites import UserPlaylistFavorite
+from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserFollow, UserPublicProfile
+from apps.playback.models import PlaybackEvent
 from apps.common.user_badges import badges_for_user
 from apps.common.views import _can_manage_channel
 from apps.playback.services.channel_queue import tracks_accessible_to_user
@@ -33,7 +35,7 @@ class GlobalSearchView(APIView):
     def get(self, request):
         q = (request.query_params.get("q") or "").strip()
         if len(q) < 2:
-            return Response({"tracks": [], "playlists": [], "channels": []})
+            return Response({"tracks": [], "playlists": [], "channels": [], "users": [], "shared_playlists": []})
         user = request.user
         track_qs = tracks_accessible_to_user(user).filter(
             Q(title__icontains=q) | Q(artist__icontains=q) | Q(album__icontains=q) | Q(genre__icontains=q)
@@ -53,11 +55,39 @@ class GlobalSearchView(APIView):
         )
         channel_ids = list(member_ids) + list(pub_ids)
         channel_rows = Channel.objects.filter(id__in=channel_ids).select_related("owner") if channel_ids else []
+        user_rows = (
+            User.objects.filter(is_active=True, public_profile__is_public=True)
+            .filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
+            .select_related("public_profile")[:12]
+        )
+        users = [
+            {
+                "id": u.id,
+                "username": u.username,
+                "display_name": (u.get_full_name() or u.username).strip(),
+            }
+            for u in user_rows
+        ]
+        shared_links = (
+            PlaylistShareLink.objects.filter(is_active=True, playlist__name__icontains=q)
+            .select_related("playlist", "playlist__owner")
+            .order_by("-created_at")[:12]
+        )
+        shared_playlists = [
+            {
+                "token": str(link.token),
+                "playlist_name": link.playlist.name if link.playlist else "",
+                "owner_username": link.playlist.owner.username if link.playlist and link.playlist.owner_id else "",
+            }
+            for link in shared_links
+        ]
         return Response(
             {
                 "tracks": TrackSerializer(track_qs, many=True, context={"request": request}).data,
                 "playlists": PlaylistSerializer(playlist_qs, many=True, context={"request": request}).data,
                 "channels": ChannelSerializer(channel_rows, many=True, context={"request": request}).data,
+                "users": users,
+                "shared_playlists": shared_playlists,
             }
         )
 
@@ -93,11 +123,38 @@ class PublicUserProfileView(APIView):
             return Response({"detail": "profile_private"}, status=status.HTTP_403_FORBIDDEN)
         channels = []
         if profile.is_public or is_self:
-            owned_public = _public_channel_qs().filter(owner_id=user.id)[:30]
+            owned_public = _public_channel_qs().filter(owner_id=user.id).select_related("owner")[:30]
             channels = ChannelSerializer(owned_public, many=True, context={"request": request}).data
         following_count = 0
+        user_following = False
+        follower_count = 0
         if is_self:
             following_count = ChannelFollow.objects.filter(user_id=user.id).count()
+        if profile.is_public or is_self:
+            follower_count = UserFollow.objects.filter(following_id=user.id).count()
+            if request.user.is_authenticated and not is_self:
+                user_following = UserFollow.objects.filter(
+                    follower_id=request.user.id,
+                    following_id=user.id,
+                ).exists()
+        sessions_joined = (
+            ChannelMembership.objects.filter(user_id=user.id, is_active=True).count()
+            if profile.is_public or is_self
+            else 0
+        )
+        tracks_played = (
+            PlaybackEvent.objects.filter(actor_id=user.id, track_id__isnull=False).values("track_id").distinct().count()
+            if profile.is_public or is_self
+            else 0
+        )
+        public_playlists = []
+        if profile.is_public or is_self:
+            fav_ids = UserPlaylistFavorite.objects.filter(user_id=user.id).values_list("playlist_id", flat=True)[:30]
+            pub_pl = (
+                Playlist.objects.filter(owner_id=user.id, channel__isnull=True, id__in=fav_ids)
+                .order_by("-created_at")[:20]
+            )
+            public_playlists = PlaylistSerializer(pub_pl, many=True, context={"request": request}).data
         return Response(
             {
                 "user": {
@@ -113,7 +170,16 @@ class PublicUserProfileView(APIView):
                     "is_public": profile.is_public,
                 },
                 "public_channels": channels,
+                "public_playlists": public_playlists,
+                "stats": {
+                    "sessions_joined": sessions_joined,
+                    "tracks_played": tracks_played,
+                    "channel_follows": following_count if is_self else None,
+                    "user_followers": follower_count,
+                },
                 "following_count": following_count,
+                "follower_count": follower_count,
+                "user_following": user_following,
                 "is_self": is_self,
             }
         )

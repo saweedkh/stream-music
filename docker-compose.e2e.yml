@@ -1,0 +1,11 @@
+# Isolated E2E stack — no host port clash with dev/prod postgres/redis.
+services:
+  postgres:
+    ports: []
+  redis:
+    ports: []
+  backend:
+    ports:
+      - "8002:8000"
+    environment:
+      E2E_RATE_LIMIT_OFF: "1"

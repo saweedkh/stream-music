@@ -39,6 +39,7 @@ import { useRoomHotkeys } from "@/hooks/use-room-hotkeys";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
 import { useChannelPresence } from "@/hooks/use-channel-presence";
+import { usePendingSuggestionsCount } from "@/hooks/use-pending-suggestions-count";
 import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
 import {
   closeChannel,
@@ -147,6 +148,10 @@ export function ChannelDashboardTabs(props: Props) {
   const [viewAsListener, setViewAsListener] = useState(false);
   const [listenerTab, setListenerTab] = useState<ListenerTabId>("chat");
   const { onlineCount } = useChannelPresence(channelId);
+  const pendingSuggestionsCount = usePendingSuggestionsCount(
+    channelId,
+    canManageChannel && !viewAsListener,
+  );
   const pushNotification = useNotificationStore((s) => s.push);
   const rttSamplesRef = useRef<number[]>([]);
   const lastTrackKeyRef = useRef<string | null>(null);
@@ -235,6 +240,35 @@ export function ChannelDashboardTabs(props: Props) {
         );
         return;
       }
+      if (type === "suggestions_updated") {
+        const sug = data as {
+          pending_count?: number;
+          event?: string;
+          actor_username?: string;
+        };
+        const pending = typeof sug.pending_count === "number" ? sug.pending_count : null;
+        if (pending != null) {
+          window.dispatchEvent(
+            new CustomEvent("channel-suggestions-changed", {
+              detail: { channelId: String(channelId), pendingCount: pending },
+            }),
+          );
+        }
+        if (
+          canManageChannel &&
+          !viewAsListener &&
+          sug.event === "created" &&
+          sug.actor_username &&
+          pending != null &&
+          pending > 0
+        ) {
+          showToast(
+            t("room.admin.suggestions.toastNewBody", { user: sug.actor_username, count: pending }),
+            "info",
+          );
+        }
+        return;
+      }
       if (type === "queue_updated" && Array.isArray(data.queue)) {
         setWsQueue(data.queue as QueueItemSummary[]);
         window.dispatchEvent(
@@ -263,10 +297,17 @@ export function ChannelDashboardTabs(props: Props) {
       }
       const action = (data.action ?? data.type ?? "").toLowerCase();
       if (action === "initial_sync") {
-        const exp = (data as { experience?: unknown }).experience;
-        if (exp && typeof exp === "object") {
+        const sync = data as { experience?: unknown; pending_count?: number };
+        if (sync.experience && typeof sync.experience === "object") {
           window.dispatchEvent(
-            new CustomEvent("channel-experience", { detail: { channelId: String(channelId), experience: exp } }),
+            new CustomEvent("channel-experience", { detail: { channelId: String(channelId), experience: sync.experience } }),
+          );
+        }
+        if (typeof sync.pending_count === "number") {
+          window.dispatchEvent(
+            new CustomEvent("channel-suggestions-changed", {
+              detail: { channelId: String(channelId), pendingCount: sync.pending_count },
+            }),
           );
         }
       }
@@ -305,7 +346,7 @@ export function ChannelDashboardTabs(props: Props) {
         }
       }
     },
-    [activeTab, channelId, channelName, pushNotification, showToast, trackPath],
+    [activeTab, canManageChannel, channelId, channelName, pushNotification, showToast, t, trackPath, viewAsListener],
   );
 
   const { socketState, sendMessage } = useReconnectingChannelSocket({
@@ -691,7 +732,7 @@ export function ChannelDashboardTabs(props: Props) {
             ) : null
           }
         >
-          <ChannelQueuePanel channelId={channelId} variant="listener" />
+          <ChannelQueuePanel channelId={channelId} variant="listener" currentTrackId={currentTrackId} />
         </ChannelListenerPanelShell>
       ),
       info: (
@@ -750,7 +791,9 @@ export function ChannelDashboardTabs(props: Props) {
     />
   );
 
-  const queuePanel = <ChannelAdminQueuePanel channelId={channelId} readOnly={!channelIsActive} />;
+  const queuePanel = (
+    <ChannelAdminQueuePanel channelId={channelId} readOnly={!channelIsActive} currentTrackId={currentTrackId} />
+  );
 
   const statusBanner =
     !channelIsActive && isChannelOwner ? (
@@ -864,6 +907,7 @@ export function ChannelDashboardTabs(props: Props) {
             onLeave={() => setLeaveDialogOpen(true)}
             onCloseChannel={isChannelOwner && channelIsActive ? () => setCloseChannelDialogOpen(true) : undefined}
             chatUnread={chatTabUnread}
+            pendingSuggestionsCount={pendingSuggestionsCount}
             canManage={canManageChannel}
             statusBanner={statusBanner}
           >

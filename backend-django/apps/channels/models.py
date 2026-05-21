@@ -137,6 +137,13 @@ class ChannelChatMessage(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="chat_messages")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_chat_messages")
     body = models.TextField(max_length=2000)
+    reply_to = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
     is_pinned = models.BooleanField(default=False)
     pinned_at = models.DateTimeField(null=True, blank=True)
     pinned_by = models.ForeignKey(
@@ -208,7 +215,17 @@ class ChannelPlaylistSuggestion(models.Model):
         REJECTED = "rejected", "Rejected"
 
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="playlist_suggestions")
-    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="channel_playlist_suggestions")
+    track = models.ForeignKey(
+        "tracks.Track",
+        on_delete=models.CASCADE,
+        related_name="channel_playlist_suggestions",
+        null=True,
+        blank=True,
+    )
+    external_url = models.URLField(max_length=500, blank=True, default="")
+    external_title = models.CharField(max_length=255, blank=True, default="")
+    external_artist = models.CharField(max_length=255, blank=True, default="")
+    external_source = models.CharField(max_length=32, blank=True, default="")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="playlist_suggestions")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     note = models.CharField(max_length=280, blank=True, default="")
@@ -224,6 +241,47 @@ class ChannelPlaylistSuggestion(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["channel", "status", "-created_at"])]
+
+
+class ChannelChatReport(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        DISMISSED = "dismissed", "Dismissed"
+
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="chat_reports")
+    message = models.ForeignKey(ChannelChatMessage, on_delete=models.CASCADE, related_name="reports")
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="channel_chat_reports_filed",
+    )
+    reason = models.CharField(max_length=500, blank=True, default="")
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["channel", "status", "-created_at"])]
+
+
+class ChannelChatBan(models.Model):
+    """Temporary chat ban for a channel member."""
+
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="chat_bans")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_chat_bans")
+    banned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="channel_chat_bans_issued",
+    )
+    reason = models.CharField(max_length=280, blank=True, default="")
+    banned_until = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("channel", "user")
+        indexes = [models.Index(fields=["channel", "banned_until"])]
 
 
 class InviteToken(models.Model):

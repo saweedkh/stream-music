@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import User
 
-from apps.channels.models import Channel, ChannelMembership
+from apps.channels.models import Channel, ChannelMembership, ChannelPlaylistSuggestion
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.channel_queue import (
@@ -300,7 +300,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         if not isinstance(ev_seq, int):
             ev_seq = 0
 
-        return {
+        payload = {
             "type": "INITIAL_SYNC",
             "action": "initial_sync",
             "event_seq": ev_seq,
@@ -316,10 +316,28 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
             "experience": channel.experience or {},
             "brand_logo_url": channel.brand_logo.url if channel.brand_logo else None,
         }
+        user = self.scope.get("user")
+        if getattr(user, "is_authenticated", False) and ChannelPlaybackConsumer._user_can_manage_channel(
+            channel.id, user.id
+        ):
+            payload["pending_count"] = ChannelPlaylistSuggestion.objects.filter(
+                channel_id=channel.id,
+                status=ChannelPlaylistSuggestion.Status.PENDING,
+            ).count()
+        return payload
 
     @staticmethod
     def _active_member(channel_id: int, user_id: int) -> bool:
         return ChannelMembership.objects.filter(channel_id=channel_id, user_id=user_id, is_active=True).exists()
+
+    @staticmethod
+    def _user_can_manage_channel(channel_id: int, user_id: int) -> bool:
+        return ChannelMembership.objects.filter(
+            channel_id=channel_id,
+            user_id=user_id,
+            is_active=True,
+            role__in=[ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR],
+        ).exists()
 
     @staticmethod
     def _apply_social(at_low: str, channel_id: int, user, data: dict) -> dict | None:
@@ -439,37 +457,10 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         playback_session.save(
             update_fields=["track", "is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"]
         )
-        ChannelPlaybackConsumer._maybe_rotate_dj(channel, playback_session.queue_version)
         action = "pause" if target_index is None else "next"
         payload = ChannelPlaybackConsumer._build_payload(channel, action, playback_session, 0.0)
         playback_state_store.save_playback_snapshot(channel.id, payload)
         return payload
-
-    @staticmethod
-    def _maybe_rotate_dj(channel: Channel, queue_version: int) -> None:
-        ex = channel.experience if isinstance(channel.experience, dict) else {}
-        if not ex.get("dj_rotation_enabled"):
-            return
-        every_n = max(1, int(ex.get("dj_rotation_every_n") or 1))
-        if queue_version % every_n != 0:
-            return
-        member_ids = list(
-            ChannelMembership.objects.filter(channel_id=channel.id, is_active=True)
-            .order_by("joined_at")
-            .values_list("user_id", flat=True)
-        )
-        if not member_ids:
-            return
-        current = ex.get("current_dj_user_id")
-        try:
-            idx = member_ids.index(int(current)) if current is not None else -1
-        except (TypeError, ValueError):
-            idx = -1
-        next_id = member_ids[(idx + 1) % len(member_ids)]
-        ex = dict(ex)
-        ex["current_dj_user_id"] = next_id
-        channel.experience = ex
-        channel.save(update_fields=["experience", "updated_at"])
 
     def _apply_auto_next(self, user_id: int, data: dict | None = None) -> dict | None:
         """Advance queue like next(); any active member may trigger after server timeline nears track end."""
@@ -538,8 +529,6 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         playback_session.save(
             update_fields=["track", "is_playing", "started_at_server_time", "paused_at_position", "queue_version", "updated_at"]
         )
-        ChannelPlaybackConsumer._maybe_rotate_dj(channel, playback_session.queue_version)
-
         action_name = "pause" if target_index is None else "next"
         payload = ChannelPlaybackConsumer._build_payload(channel=channel, action=action_name, playback_session=playback_session, position=0.0)
         playback_state_store.save_playback_snapshot(channel.id, payload)

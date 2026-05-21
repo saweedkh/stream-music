@@ -44,3 +44,21 @@ class ChannelFollow(models.Model):
     class Meta:
         unique_together = ("user", "channel")
         indexes = [models.Index(fields=["channel", "user"])]
+
+
+class UserFollow(models.Model):
+    follower = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="following_users",
+    )
+    following = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="follower_users",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("follower", "following")
+        indexes = [models.Index(fields=["following", "follower"])]

@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, History, Lightbulb, Loader2, RefreshCw, Shield, ThumbsUp } from "lucide-react";
+import { Download, ExternalLink, History, Lightbulb, ListMusic, Loader2, PartyPopper, RefreshCw, Shield, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "@/components/providers/locale-provider";
@@ -14,10 +14,13 @@ import {
   addTrackReaction,
   getAuditLogExportUrl,
   listChannelAuditLog,
+  exportChannelSessionPlaylist,
+  listChannelSuggestions,
   listPlaybackHistory,
   listTrackReactions,
   type ChannelAuditLogRow,
   type ChannelTrackReactionRow,
+  type ChannelPlaylistSuggestion,
   type PlaybackHistoryRow,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -29,7 +32,7 @@ type Props = {
   embedded?: boolean;
 };
 
-type InsightTab = "recap" | "history" | "reactions" | "audit";
+type InsightTab = "recap" | "history" | "reactions" | "suggestions" | "audit";
 
 export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embedded = true }: Props) {
   const { t } = useTranslations();
@@ -40,16 +43,20 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
   const [reactionEmoji, setReactionEmoji] = useState("🔥");
   const [loading, setLoading] = useState(true);
   const [insightTab, setInsightTab] = useState<InsightTab>("recap");
+  const [suggestions, setSuggestions] = useState<ChannelPlaylistSuggestion[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [h, a] = await Promise.all([
+      const [h, a, sug] = await Promise.all([
         listPlaybackHistory(channelId),
         canManage ? listChannelAuditLog(channelId) : Promise.resolve({ results: [] }),
+        listChannelSuggestions(channelId).catch(() => ({ results: [] })),
       ]);
       setHistory(h.results);
       setAudit(a.results);
+      setSuggestions(sug.results.filter((s) => s.status === "approved" || s.status === "pending").slice(0, 40));
       if (currentTrackId) {
         const r = await listTrackReactions(channelId, currentTrackId);
         setReactions(r.results);
@@ -95,6 +102,7 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
     { id: "recap", labelKey: "room.admin.insights.tab.recap" },
     { id: "history", labelKey: "room.admin.insights.tab.history" },
     { id: "reactions", labelKey: "room.admin.insights.tab.reactions" },
+    { id: "suggestions", labelKey: "room.admin.insights.suggestions" },
     ...(canManage ? [{ id: "audit" as const, labelKey: "room.admin.insights.tab.audit" as const }] : []),
   ];
 
@@ -124,9 +132,32 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
           ))}
         </ol>
       )}
-      <Link href={`/party/${channelId}`} className="mt-3 inline-block text-xs text-brand hover:underline">
-        {t("room.admin.insights.recapLink")} →
-      </Link>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="default" asChild>
+          <Link href={`/party/${channelId}`}>
+            <PartyPopper className="mr-1 h-4 w-4" />
+            {t("room.admin.insights.partyRecap")}
+          </Link>
+        </Button>
+        {canManage ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              void exportChannelSessionPlaylist(channelId)
+                .then(() => showToast(t("room.admin.insights.exportSession"), "success"))
+                .catch((e) => showToast(e instanceof Error ? e.message : "Export failed", "error"))
+                .finally(() => setExporting(false));
+            }}
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListMusic className="mr-1 h-4 w-4" />}
+            {t("room.admin.insights.exportSession")}
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 
@@ -175,6 +206,34 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
     </section>
   );
 
+  const suggestionsSection = (
+    <section className="px-1">
+      {suggestions.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.insights.recapEmpty")}</p>
+      ) : (
+        <ul className="space-y-2">
+          {suggestions.map((s) => (
+            <li key={s.id} className="rounded-lg border border-border/50 px-3 py-2 text-sm">
+              <p className="font-medium">
+                {s.track_title ?? s.external_title ?? "—"}
+                {s.external_artist ? ` · ${s.external_artist}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                @{s.username ?? "?"} · {s.status}
+              </p>
+              {s.external_url ? (
+                <a href={s.external_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-brand hover:underline">
+                  <ExternalLink className="h-3 w-3" />
+                  {s.external_url}
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
   const auditSection = (
     <section className="px-1">
       <div className="mb-3 flex justify-end">
@@ -211,6 +270,8 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
     historySection
   ) : insightTab === "reactions" ? (
     reactionsSection
+  ) : insightTab === "suggestions" ? (
+    suggestionsSection
   ) : (
     auditSection
   );

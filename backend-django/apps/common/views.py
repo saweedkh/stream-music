@@ -53,14 +53,17 @@ _ALLOWED_EXPERIENCE_KEYS = frozenset(
         "anti_repeat_window",
         "weighted_shuffle_bias",
         "suggestions_enabled",
-        "dj_rotation_enabled",
-        "dj_rotation_every_n",
-        "current_dj_user_id",
+        "suggestion_rate_limit_per_hour",
+        "chat_slow_mode_seconds",
+        "theme_primary",
+        "theme_surface",
+        "theme_font",
         "listening_party_only",
         "radio_mode",
         "scheduled_start_at",
         "queue_end_mode",
         "room_rules",
+        "chat_word_filters",
     },
 )
 
@@ -214,8 +217,28 @@ def _queue_serialize_context(channel_id: int, user_id: int | None, item_ids: lis
 
 
 def _serialize_queue(channel_id: int, user_id: int | None = None):
-    queue = list(ChannelQueueItem.objects.filter(channel_id=channel_id).order_by("position", "id"))
+    from apps.common.premium_limits import track_owner_is_premium
+    from apps.playback.services.queue_advance import find_current_queue_index
+
+    queue = list(
+        ChannelQueueItem.objects.filter(channel_id=channel_id)
+        .select_related("track", "track__owner", "added_by")
+        .order_by("position", "id")
+    )
     ctx = _queue_serialize_context(channel_id, user_id, [q.id for q in queue])
+    premium_track_ids = {q.track_id for q in queue if q.track_id and track_owner_is_premium(q.track)}
+    session = PlaybackSession.objects.filter(channel_id=channel_id).only("track_id").first()
+    current_idx = find_current_queue_index(queue, session.track_id if session else None)
+    tail = queue[current_idx + 1 :] if current_idx + 1 < len(queue) else []
+    premium_boosted_ids: set[int] = set()
+    if len(tail) >= 2:
+        prem = [r for r in tail if r.track_id in premium_track_ids]
+        reg = [r for r in tail if r.track_id not in premium_track_ids]
+        if prem and reg and len(prem) < len(tail):
+            for row in prem:
+                premium_boosted_ids.add(row.id)
+    ctx["premium_track_ids"] = premium_track_ids
+    ctx["premium_boosted_ids"] = premium_boosted_ids
     return QueueItemSerializer(queue, many=True, context=ctx).data
 
 
@@ -237,6 +260,35 @@ def _broadcast_queue_updated(channel_id: int, user_id: int | None = None) -> lis
             },
         )
     return serialized
+
+
+def _broadcast_suggestions_updated(
+    channel_id: int,
+    *,
+    event: str = "updated",
+    actor_username: str | None = None,
+) -> int:
+    """Notify room clients (playback WebSocket) of pending suggestion count for admin nav badge."""
+    pending = ChannelPlaylistSuggestion.objects.filter(
+        channel_id=channel_id,
+        status=ChannelPlaylistSuggestion.Status.PENDING,
+    ).count()
+    channel_layer = get_channel_layer()
+    if channel_layer is not None:
+        payload: dict = {
+            "type": "SUGGESTIONS_UPDATED",
+            "action": "suggestions_updated",
+            "channel_id": channel_id,
+            "pending_count": pending,
+            "event": event,
+        }
+        if actor_username:
+            payload["actor_username"] = actor_username
+        async_to_sync(channel_layer.group_send)(
+            f"channel_{channel_id}",
+            {"type": "broadcast_event", "payload": payload},
+        )
+    return pending
 
 
 def _log_channel_audit(channel_id: int, action: str, actor_id: int | None, *, target_type: str = "", target_id: str = "", metadata=None) -> None:
@@ -278,8 +330,10 @@ def api_time(_request):
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 @ensure_csrf_cookie
-def auth_csrf(_request):
-    return Response({"detail": "csrf_cookie_set"})
+def auth_csrf(request):
+    from django.middleware.csrf import get_token
+
+    return Response({"detail": "csrf_cookie_set", "csrfToken": get_token(request)})
 
 
 class RegisterView(APIView):
@@ -1434,6 +1488,9 @@ def perform_channel_join(user, channel: Channel, token_value) -> Response:
             status=ChannelJoinRequest.Status.PENDING,
             invite=invite if channel.privacy == Channel.Privacy.PRIVATE else None,
         )
+        from apps.common.webpush_service import notify_channel_join_request_push
+
+        notify_channel_join_request_push(channel.id, getattr(user, "username", "?"), user.id)
         return Response(
             {
                 "status": "pending",
@@ -1858,17 +1915,66 @@ class ChannelPlaylistSuggestionView(APIView):
     def post(self, request, channel_id: int):
         if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
+        channel = get_object_or_404(Channel, id=channel_id)
+        if not channel.is_active:
+            return _channel_closed_response()
+        ex = channel.experience if isinstance(channel.experience, dict) else {}
+        if ex.get("suggestions_enabled") is False:
+            return Response({"detail": "suggestions_disabled"}, status=status.HTTP_403_FORBIDDEN)
+        staff = _can_manage_channel(request.user, channel_id)
+        if not staff:
+            hour_ago = timezone.now() - timedelta(hours=1)
+            limit = max(1, min(20, int(ex.get("suggestion_rate_limit_per_hour") or 5)))
+            recent = ChannelPlaylistSuggestion.objects.filter(
+                channel_id=channel_id,
+                user_id=request.user.id,
+                created_at__gte=hour_ago,
+            ).count()
+            if recent >= limit:
+                return Response({"detail": "suggestion_rate_limited"}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         track_id = request.data.get("track_id")
-        if not track_id:
-            return Response({"detail": "track_id_required"}, status=status.HTTP_400_BAD_REQUEST)
+        external_url = str(request.data.get("external_url") or "").strip()
         note = str(request.data.get("note") or "").strip()[:280]
-        row = ChannelPlaylistSuggestion.objects.create(
-            channel_id=channel_id,
-            track_id=int(track_id),
-            user_id=request.user.id,
-            note=note,
+        external_title = str(request.data.get("external_title") or "").strip()[:255]
+        external_artist = str(request.data.get("external_artist") or "").strip()[:255]
+        if not track_id and not external_url:
+            return Response({"detail": "track_or_external_required"}, status=status.HTTP_400_BAD_REQUEST)
+        if track_id and external_url:
+            return Response({"detail": "track_or_external_not_both"}, status=status.HTTP_400_BAD_REQUEST)
+        if track_id:
+            if not tracks_accessible_to_user(request.user).filter(id=int(track_id)).exists():
+                return Response({"detail": "track_not_accessible"}, status=status.HTTP_403_FORBIDDEN)
+            row = ChannelPlaylistSuggestion.objects.create(
+                channel_id=channel_id,
+                track_id=int(track_id),
+                user_id=request.user.id,
+                note=note,
+            )
+            _log_channel_audit(channel_id, "suggestion.created", request.user.id, target_type="track", target_id=track_id)
+        else:
+            from apps.common.social_expansion_views import _parse_external_source
+
+            url, title, artist, source = _parse_external_source(external_url)
+            if not url:
+                return Response({"detail": "invalid_external_url"}, status=status.HTTP_400_BAD_REQUEST)
+            row = ChannelPlaylistSuggestion.objects.create(
+                channel_id=channel_id,
+                user_id=request.user.id,
+                note=note,
+                external_url=url,
+                external_title=external_title or title,
+                external_artist=external_artist or artist,
+                external_source=source,
+            )
+            _log_channel_audit(channel_id, "suggestion.created", request.user.id, target_type="external", target_id=url)
+        _broadcast_suggestions_updated(
+            channel_id,
+            event="created",
+            actor_username=getattr(request.user, "username", None),
         )
-        _log_channel_audit(channel_id, "suggestion.created", request.user.id, target_type="track", target_id=track_id)
+        from apps.common.webpush_service import notify_channel_new_suggestion_push
+
+        notify_channel_new_suggestion_push(channel_id, getattr(request.user, "username", "?"), request.user.id)
         return Response(ChannelPlaylistSuggestionSerializer(row).data, status=status.HTTP_201_CREATED)
 
     def patch(self, request, channel_id: int):
@@ -1884,15 +1990,24 @@ class ChannelPlaylistSuggestionView(APIView):
         row.reviewed_at = timezone.now()
         row.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         if action == "approve":
-            from apps.playback.services.channel_queue import insert_track_after_now_playing
-
             channel = get_object_or_404(Channel, id=channel_id)
-            insert_track_after_now_playing(channel, row.track, added_by_id=request.user.id)
-            session, _ = PlaybackSession.objects.get_or_create(channel=channel)
-            session.queue_version += 1
-            session.save(update_fields=["queue_version", "updated_at"])
-            _broadcast_queue_updated(channel_id, request.user.id)
+            if row.track_id and row.track:
+                from apps.playback.services.channel_queue import insert_track_after_now_playing
+
+                insert_track_after_now_playing(channel, row.track, added_by_id=row.user_id)
+                session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+                session.queue_version += 1
+                session.save(update_fields=["queue_version", "updated_at"])
+                _broadcast_queue_updated(channel_id, request.user.id)
+            elif row.external_url:
+                from apps.channels.chat_service import apply_chat_send
+
+                label = row.external_title or "Link"
+                artist = f" — {row.external_artist}" if row.external_artist else ""
+                body = f"🎧 {label}{artist}\n{row.external_url}"
+                apply_chat_send(channel_id, request.user, body)
         _log_channel_audit(channel_id, f"suggestion.{action}", request.user.id, target_type="suggestion", target_id=row.id)
+        _broadcast_suggestions_updated(channel_id)
         return Response(ChannelPlaylistSuggestionSerializer(row).data)
 
 
@@ -1974,7 +2089,11 @@ class ChannelSettingsView(APIView):
             if isinstance(raw, dict):
                 ex = dict(channel.experience or {})
                 for k, v in raw.items():
-                    if k in _ALLOWED_EXPERIENCE_KEYS:
+                    if k not in _ALLOWED_EXPERIENCE_KEYS:
+                        continue
+                    if k == "chat_word_filters" and isinstance(v, list):
+                        ex[k] = [str(w).strip().lower()[:64] for w in v if str(w).strip()][:50]
+                    else:
                         ex[k] = v
                 channel.experience = ex
                 update_fields.append("experience")
@@ -2150,21 +2269,6 @@ class ChannelAuditExportView(APIView):
                 ]
             )
         return response
-
-
-class ChannelPartyRecapView(APIView):
-    """Public read-only recap for post-party pages (public/unlisted channels)."""
-
-    permission_classes = [permissions.AllowAny]
-    authentication_classes = []
-
-    def get(self, request, channel_id: int):
-        channel = get_object_or_404(Channel, id=channel_id)
-        if channel.privacy == Channel.Privacy.PRIVATE:
-            return Response({"detail": "private"}, status=status.HTTP_403_FORBIDDEN)
-        from apps.common.party_recap import build_party_recap
-
-        return Response(build_party_recap(channel))
 
 
 class ChannelPartyRecapView(APIView):

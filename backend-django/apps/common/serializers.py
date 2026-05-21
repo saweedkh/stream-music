@@ -62,6 +62,7 @@ class ChannelSerializer(serializers.ModelSerializer):
     membership_is_active = serializers.SerializerMethodField()
     brand_logo_url = serializers.SerializerMethodField()
     is_playing = serializers.SerializerMethodField()
+    owner_username = serializers.SerializerMethodField()
 
     class Meta:
         model = Channel
@@ -70,6 +71,7 @@ class ChannelSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "owner",
+            "owner_username",
             "privacy",
             "member_limit",
             "join_requires_approval",
@@ -110,6 +112,10 @@ class ChannelSerializer(serializers.ModelSerializer):
         if session is None:
             return False
         return bool(session.is_playing)
+
+    def get_owner_username(self, obj):
+        owner = getattr(obj, "owner", None)
+        return getattr(owner, "username", None) if owner else None
 
     def get_membership_is_active(self, obj):
         request = self.context.get("request")
@@ -192,6 +198,8 @@ class QueueItemSerializer(serializers.ModelSerializer):
     upvote_count = serializers.SerializerMethodField()
     user_upvoted = serializers.SerializerMethodField()
     added_by_username = serializers.SerializerMethodField()
+    track_owner_premium = serializers.SerializerMethodField()
+    premium_boosted = serializers.SerializerMethodField()
 
     class Meta:
         model = ChannelQueueItem
@@ -205,6 +213,8 @@ class QueueItemSerializer(serializers.ModelSerializer):
             "created_at",
             "upvote_count",
             "user_upvoted",
+            "track_owner_premium",
+            "premium_boosted",
         ]
 
     def get_upvote_count(self, obj):
@@ -223,6 +233,14 @@ class QueueItemSerializer(serializers.ModelSerializer):
             return names[obj.added_by_id]
         user = getattr(obj, "added_by", None)
         return getattr(user, "username", None) if user else None
+
+    def get_track_owner_premium(self, obj):
+        premium_ids = self.context.get("premium_track_ids") or set()
+        return obj.track_id in premium_ids if obj.track_id else False
+
+    def get_premium_boosted(self, obj):
+        boosted_ids = self.context.get("premium_boosted_ids") or set()
+        return obj.id in boosted_ids
 
 
 class PlaybackSessionSerializer(serializers.ModelSerializer):
@@ -394,7 +412,7 @@ class PlaybackEventSerializer(serializers.ModelSerializer):
 
 class ChannelPlaylistSuggestionSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
-    track_title = serializers.CharField(source="track.title", read_only=True)
+    track_title = serializers.SerializerMethodField()
 
     class Meta:
         model = ChannelPlaylistSuggestion
@@ -403,6 +421,10 @@ class ChannelPlaylistSuggestionSerializer(serializers.ModelSerializer):
             "channel",
             "track",
             "track_title",
+            "external_url",
+            "external_title",
+            "external_artist",
+            "external_source",
             "user",
             "username",
             "status",
@@ -412,3 +434,10 @@ class ChannelPlaylistSuggestionSerializer(serializers.ModelSerializer):
             "reviewed_by",
         ]
         read_only_fields = ["id", "channel", "track_title", "username", "created_at", "reviewed_at", "reviewed_by"]
+
+    def get_track_title(self, obj):
+        if obj.track_id and getattr(obj, "track", None):
+            return obj.track.title
+        if obj.external_title:
+            return obj.external_title
+        return None

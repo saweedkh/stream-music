@@ -68,7 +68,17 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
         action = str(data.get("action") or "").strip().lower()
         if action == "send":
             body = data.get("body") if isinstance(data.get("body"), str) else ""
-            result, err = await sync_to_async(apply_chat_send)(self.channel_id, user, body)
+            reply_raw = data.get("reply_to_id")
+            try:
+                reply_to_id = int(reply_raw) if reply_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                reply_to_id = None
+            result, err = await sync_to_async(apply_chat_send)(
+                self.channel_id,
+                user,
+                body,
+                reply_to_id=reply_to_id,
+            )
             if err:
                 await self.send(text_data=json.dumps({"type": "CHAT_ERROR", "code": err}))
                 return

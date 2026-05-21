@@ -23,7 +23,14 @@ import { useToast } from "@/components/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { useReconnectingChannelChatSocket } from "@/hooks/use-reconnecting-channel-chat-socket";
 import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
-import { getChannelMembers, getMe, type ChannelChatMessageRow, type ChannelChatReaction, type UserBadge } from "@/lib/api";
+import {
+  getChannelMembers,
+  getMe,
+  reportChatMessage,
+  type ChannelChatMessageRow,
+  type ChannelChatReaction,
+  type UserBadge,
+} from "@/lib/api";
 import type { UserBadgeFlags } from "@/lib/user-badges";
 import { renderMessageWithMentions } from "@/lib/render-mentions";
 import { channelChatHref, useNotificationStore } from "@/lib/notifications/store";
@@ -94,6 +101,14 @@ function parseMessage(raw: unknown): ChannelChatMessageRow | null {
     created_at: o.created_at,
     edited_at: typeof o.edited_at === "string" ? o.edited_at : o.edited_at === null ? null : undefined,
     deleted_at: typeof o.deleted_at === "string" ? o.deleted_at : o.deleted_at === null ? null : undefined,
+    reply_to_id: typeof o.reply_to_id === "number" ? o.reply_to_id : o.reply_to_id === null ? null : undefined,
+    reply_preview:
+      o.reply_preview && typeof o.reply_preview === "object"
+        ? (o.reply_preview as ChannelChatMessageRow["reply_preview"])
+        : undefined,
+    track_previews: Array.isArray(o.track_previews)
+      ? (o.track_previews as ChannelChatMessageRow["track_previews"])
+      : undefined,
     reactions,
   } as ChannelChatMessageRow;
 }
@@ -158,6 +173,8 @@ export function ChannelChatPanel({
       invalid_emoji: "chat.error.invalid_emoji",
       auth: "chat.error.auth",
       rate_limited: "chat.error.rate_limited",
+      slow_mode: "chat.slowMode",
+      invalid_reply: "chat.error.not_found",
     };
     return map[code] ?? "chat.error.generic";
   };
@@ -168,6 +185,7 @@ export function ChannelChatPanel({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<ChannelChatMessageRow | null>(null);
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [myUsername, setMyUsername] = useState("");
   const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
@@ -386,9 +404,15 @@ export function ChannelChatPanel({
     if (!text || !channelIsActive || sending || !connected) return;
     setSending(true);
     try {
-      const ok = sendChat({ action: "send", body: text });
-      if (ok) setDraft("");
-      else showToast(t("chat.toast.offline"), "error");
+      const ok = sendChat({
+        action: "send",
+        body: text,
+        ...(replyTo?.id != null ? { reply_to_id: replyTo.id } : {}),
+      });
+      if (ok) {
+        setDraft("");
+        setReplyTo(null);
+      } else showToast(t("chat.toast.offline"), "error");
     } finally {
       setSending(false);
     }
@@ -504,6 +528,7 @@ export function ChannelChatPanel({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">{headerTitle}</h2>
             <span
+              data-testid={connected ? "channel-chat-connected" : undefined}
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
                 connected ? "bg-brand/15 text-brand" : "bg-amber-500/15 text-warning",
@@ -670,7 +695,25 @@ export function ChannelChatPanel({
                         ) : deleted ? (
                           <p className="italic text-muted-foreground">{t("chat.deleted")}</p>
                         ) : (
-                          <p className="whitespace-pre-wrap break-words leading-relaxed">{renderMessageWithMentions(m.body)}</p>
+                          <>
+                            {m.reply_preview ? (
+                              <p className="mb-1.5 border-s-2 border-brand/40 ps-2 text-xs text-muted-foreground line-clamp-2">
+                                @{m.reply_preview.username}: {m.reply_preview.body}
+                              </p>
+                            ) : null}
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">{renderMessageWithMentions(m.body)}</p>
+                            {(m.track_previews?.length ?? 0) > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {m.track_previews!.map((tr) => (
+                                  <div key={tr.id} className="rounded-lg border border-border/50 bg-background/50 px-2 py-1 text-xs">
+                                    <Music className="mr-1 inline h-3 w-3 text-brand" />
+                                    {tr.title}
+                                    {tr.artist ? ` · ${tr.artist}` : ""}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </>
                         )}
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                           <span>{new Date(m.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
@@ -717,6 +760,40 @@ export function ChannelChatPanel({
                             {em}
                           </Button>
                         ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 gap-1 text-xs"
+                            onClick={() => {
+                            setReplyTo(m);
+                            setOpenActionsId(null);
+                            draftInputRef.current?.focus();
+                          }}
+                          data-testid="chat-reply-btn"
+                        >
+                          {t("chat.reply")}
+                        </Button>
+                        {!mine && !deleted ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 gap-1 text-xs text-amber-400/90"
+                            data-testid="chat-report-btn"
+                            onClick={async () => {
+                              try {
+                                await reportChatMessage(channelId, m.id);
+                                showToast(t("chat.reported"), "success");
+                                setOpenActionsId(null);
+                              } catch (e) {
+                                showToast(e instanceof Error ? e.message : t("chat.reportFailed"), "error");
+                              }
+                            }}
+                          >
+                            {t("chat.report")}
+                          </Button>
+                        ) : null}
                         {canEdit ? (
                           <Button
                             type="button"
@@ -802,6 +879,14 @@ export function ChannelChatPanel({
           </div>
         </ScrollArea>
 
+        {replyTo ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs">
+            <span>{t("chat.replyingTo", { username: replyTo.username })}</span>
+            <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setReplyTo(null)}>
+              {t("chat.cancelReply")}
+            </Button>
+          </div>
+        ) : null}
         <div
           className={cn(
             "relative flex gap-2",
@@ -810,6 +895,7 @@ export function ChannelChatPanel({
         >
           <Input
             ref={draftInputRef}
+            data-testid="channel-chat-compose"
             value={draft}
             onChange={(e) => {
               const v = e.target.value;
@@ -885,6 +971,7 @@ export function ChannelChatPanel({
           ) : null}
           <Button
             type="button"
+            data-testid="channel-chat-send"
             className="shrink-0 gap-1.5 bg-brand hover:bg-brand"
             disabled={!channelIsActive || sending || !connected || !draft.trim()}
             onClick={() => void submitSend()}

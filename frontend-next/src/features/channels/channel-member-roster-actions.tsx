@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast-provider";
 import {
+  banChannelMember,
   removeChannelMember,
+  unbanChannelMember,
   updateChannelMemberRole,
-  updateChannelSettings,
   type ChannelMember,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ type Props = {
   channelId: string;
   member: ChannelMember;
   isOwnerViewer: boolean;
+  canModerate?: boolean;
   channelIsActive?: boolean;
   onUpdated: () => void | Promise<void>;
   layout?: "inline" | "stacked";
@@ -27,6 +29,7 @@ export function ChannelMemberRosterActions({
   channelId,
   member,
   isOwnerViewer,
+  canModerate = false,
   channelIsActive = true,
   onUpdated,
   layout = "stacked",
@@ -55,6 +58,33 @@ export function ChannelMemberRosterActions({
     }
   }
 
+  async function banChat() {
+    if (!canModerate || isOwnerMember) return;
+    setBusy("ban");
+    try {
+      await banChannelMember(channelId, member.user_id, 24);
+      showToast(t("room.moderation.banDone"), "success");
+      await onUpdated();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("room.member.removeFailed"), "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function unbanChat() {
+    if (!canModerate) return;
+    setBusy("unban");
+    try {
+      await unbanChannelMember(channelId, member.user_id);
+      showToast(t("room.moderation.unbanDone"), "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("room.member.removeFailed"), "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeMember() {
     if (isOwnerMember) return;
     setBusy("remove");
@@ -64,18 +94,6 @@ export function ChannelMemberRosterActions({
       await onUpdated();
     } catch (error) {
       showToast(error instanceof Error ? error.message : t("room.member.removeFailed"), "error");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function handoffDj() {
-    setBusy("dj");
-    try {
-      await updateChannelSettings(channelId, { experience: { current_dj_user_id: member.user_id } });
-      showToast(t("room.member.djHandoff", { username: member.username }), "success");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t("room.member.djHandoffFailed"), "error");
     } finally {
       setBusy(null);
     }
@@ -104,16 +122,16 @@ export function ChannelMemberRosterActions({
       >
         {busy === "role" ? "…" : t("room.member.saveRole")}
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8"
-        disabled={!channelIsActive || busy !== null}
-        onClick={() => void handoffDj()}
-      >
-        {busy === "dj" ? "…" : t("room.member.setDj")}
-      </Button>
+      {canModerate && !isOwnerMember ? (
+        <>
+          <Button type="button" variant="secondary" size="sm" className="h-8" disabled={!channelIsActive || busy !== null} onClick={() => void banChat()}>
+            {busy === "ban" ? "…" : t("room.moderation.ban24h")}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" className="h-8" disabled={busy !== null} onClick={() => void unbanChat()}>
+            {busy === "unban" ? "…" : t("room.moderation.unban")}
+          </Button>
+        </>
+      ) : null}
       <Button
         type="button"
         variant="destructive"

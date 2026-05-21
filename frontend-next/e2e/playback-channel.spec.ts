@@ -151,7 +151,10 @@ test.describe("channel playback (Chrome)", () => {
     await expect
       .poll(
         () =>
-          listenerPage.evaluate(() => Boolean(document.querySelector("audio[data-channel-audio]")?.src)),
+          listenerPage.evaluate(() => {
+            const a = document.querySelector("audio[data-channel-audio]") as HTMLAudioElement | null;
+            return Boolean(a?.src);
+          }),
         { timeout: 30_000 },
       )
       .toBe(true);

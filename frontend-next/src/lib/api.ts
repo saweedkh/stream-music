@@ -21,9 +21,11 @@ export function getApiBase(): string {
   );
 }
 
-/** WebSocket must use the same host as the page so the dev proxy can upgrade /ws/ behind :3000. */
+/** WebSocket: same host as the page in prod; optional NEXT_PUBLIC_WS_BASE_URL for local dev/E2E against a remote API. */
 export function getWsBase(): string {
   if (typeof window !== "undefined") {
+    const override = process.env.NEXT_PUBLIC_WS_BASE_URL?.replace(/\/$/, "");
+    if (override) return override.replace(/^http/i, "ws");
     return window.location.protocol === "https:" ? `wss://${window.location.host}` : `ws://${window.location.host}`;
   }
   if (process.env.INTERNAL_WS_BASE_URL) return process.env.INTERNAL_WS_BASE_URL;
@@ -105,9 +107,12 @@ export type ChannelExperienceSettings = {
   anti_repeat_window?: number;
   weighted_shuffle_bias?: number;
   suggestions_enabled?: boolean;
-  dj_rotation_enabled?: boolean;
-  dj_rotation_every_n?: number;
-  current_dj_user_id?: number | null;
+  chat_slow_mode_seconds?: number;
+  chat_word_filters?: string[];
+  suggestion_rate_limit_per_hour?: number;
+  theme_primary?: string;
+  theme_surface?: string;
+  theme_font?: string;
   listening_party_only?: boolean;
   radio_mode?: boolean;
   scheduled_start_at?: string | null;
@@ -139,6 +144,9 @@ export type ChannelSummary = {
   description: string;
   privacy: "public" | "private" | "unlisted";
   owner?: number;
+  owner_username?: string | null;
+  public_slug?: string;
+  public_join_slug?: string | null;
   member_limit?: number;
   is_playing?: boolean;
   join_requires_approval?: boolean;
@@ -244,6 +252,8 @@ export type QueueItemSummary = {
   created_at: string;
   upvote_count?: number;
   user_upvoted?: boolean;
+  track_owner_premium?: boolean;
+  premium_boosted?: boolean;
 };
 export type TrackSharePermission = {
   id: number;
@@ -912,6 +922,9 @@ export type ChannelChatMessageRow = {
   edited_at?: string | null;
   deleted_at?: string | null;
   reactions?: ChannelChatReaction[];
+  reply_to_id?: number | null;
+  reply_preview?: { id: number; username: string; body: string } | null;
+  track_previews?: Array<{ id: number; title: string; artist: string; album: string }>;
 };
 
 export async function listChannelChatMessages(channelId: string, options?: { limit?: number; before?: number }) {
@@ -1022,8 +1035,12 @@ export async function listChannelAuditLog(channelId: string, limit = 80) {
 export type ChannelPlaylistSuggestion = {
   id: number;
   channel: number;
-  track: number;
-  track_title?: string;
+  track: number | null;
+  track_title?: string | null;
+  external_url?: string;
+  external_title?: string;
+  external_artist?: string;
+  external_source?: string;
   user: number;
   username?: string;
   status: "pending" | "approved" | "rejected";
@@ -1043,7 +1060,10 @@ export async function listChannelSuggestions(channelId: string, status?: Channel
   return (await res.json()) as { results: ChannelPlaylistSuggestion[] };
 }
 
-export async function createChannelSuggestion(channelId: string, payload: { track_id: number; note?: string }) {
+export async function createChannelSuggestion(
+  channelId: string,
+  payload: { track_id?: number; external_url?: string; external_title?: string; external_artist?: string; note?: string },
+) {
   const res = await fetch(
     `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/suggestions`,
     await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
@@ -1316,14 +1336,109 @@ export async function getPartyRecap(channelId: string) {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load party recap"));
-  return (await res.json()) as {
-    channel_id: number;
-    channel_name: string;
-    description: string;
-    total_events: number;
-    top_tracks: Array<{ id: number; title: string; artist: string; play_count: number }>;
-    timeline: Array<{ track_id: number | null; title: string | null; event_type: string; at: string }>;
+  return (await res.json()) as PartyRecap;
+}
+
+export type PartyRecapHeatmapBucket = {
+  index: number;
+  score: number;
+  intensity: number;
+  label: string;
+};
+
+export type PartyRecap = {
+  channel_id: number;
+  channel_name: string;
+  description: string;
+  total_events: number;
+  top_tracks: Array<{ id: number; title: string; artist: string; play_count: number }>;
+  timeline: Array<{ track_id: number | null; title: string | null; event_type: string; at: string }>;
+  excitement_heatmap?: {
+    buckets: PartyRecapHeatmapBucket[];
+    peak_index: number | null;
+    peak_score: number;
   };
+  listener_peaks?: PartyRecapHeatmapBucket[];
+  generated_at?: string;
+};
+
+export type ChannelsOnlineRow = {
+  channel: ChannelSummary;
+  online_count: number;
+  members: Array<{ id: number; username: string }>;
+  pending_suggestions?: number;
+};
+
+export async function getMeChannelsOnline() {
+  const res = await fetch(`${getApiBase()}/api/me/channels-online`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load online channels"));
+  return (await res.json()) as { total_online: number; results: ChannelsOnlineRow[] };
+}
+
+export async function getMeChannelsPendingSuggestions() {
+  const res = await fetch(`${getApiBase()}/api/me/channels-pending-suggestions`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load pending suggestions"));
+  return (await res.json()) as { results: Array<{ channel_id: number; pending_count: number }> };
+}
+
+export async function reportChatMessage(channelId: string, messageId: number, reason?: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/chat/report`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ message_id: messageId, reason: reason ?? "" }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot report message"));
+  return (await res.json()) as { id: number; status: string };
+}
+
+export async function listModerationReports(channelId: string) {
+  const res = await fetch(`${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/moderation/reports`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load reports"));
+  return (await res.json()) as {
+    results: Array<{
+      id: number;
+      message_id: number;
+      message_body: string;
+      message_username: string;
+      reporter_username: string;
+      reason: string;
+      created_at: string;
+    }>;
+  };
+}
+
+export async function dismissModerationReport(channelId: string, reportId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/moderation/reports`,
+    await withAuthHeaders({
+      method: "PATCH",
+      body: JSON.stringify({ report_id: reportId, status: "dismissed" }),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot dismiss report"));
+  return (await res.json()) as { id: number; status: string };
+}
+
+export async function banChannelMember(channelId: string, userId: number, hours: number, reason?: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/moderation/bans/${userId}`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ hours, reason: reason ?? "" }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot ban member"));
+  return (await res.json()) as { user_id: number; banned_until: string };
+}
+
+export async function unbanChannelMember(channelId: string, userId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/moderation/bans/${userId}`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot unban member"));
 }
 
 export async function getApiMetrics() {
@@ -1607,10 +1722,19 @@ export async function removeTrackSharePermission(trackId: number, shareId: numbe
   if (!res.ok) throw new Error("Cannot remove track share permission");
 }
 
+export type GlobalSearchUser = { id: number; username: string; display_name: string };
+export type GlobalSearchSharedPlaylist = {
+  token: string;
+  playlist_name: string;
+  owner_username: string;
+};
+
 export type GlobalSearchResult = {
   tracks: TrackSummary[];
   playlists: PlaylistSummary[];
   channels: ChannelSummary[];
+  users: GlobalSearchUser[];
+  shared_playlists: GlobalSearchSharedPlaylist[];
 };
 
 export async function globalSearch(q: string): Promise<GlobalSearchResult> {
@@ -1642,7 +1766,16 @@ export type PublicUserProfile = {
   };
   profile: { bio: string; is_public: boolean };
   public_channels: ChannelSummary[];
+  public_playlists?: PlaylistSummary[];
+  stats?: {
+    sessions_joined: number;
+    tracks_played: number;
+    channel_follows: number | null;
+    user_followers: number;
+  };
   following_count: number;
+  follower_count?: number;
+  user_following?: boolean;
   is_self: boolean;
 };
 
@@ -1755,4 +1888,93 @@ export async function unfollowChannel(channelId: string): Promise<{ following: b
   );
   if (!res.ok) throw new Error("Unfollow failed");
   return (await res.json()) as { following: boolean };
+}
+
+export type FollowingChannelRow = {
+  channel: ChannelSummary;
+  notify_live: boolean;
+  is_live: boolean;
+  is_member: boolean;
+  followed_at: string | null;
+};
+
+export async function listFollowingChannels() {
+  const res = await fetch(`${getApiBase()}/api/me/following-channels`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load following feed"));
+  return (await res.json()) as { results: FollowingChannelRow[] };
+}
+
+export type ExploreFeed = {
+  live_channels: ChannelSummary[];
+  popular_channels: Array<{ channel: ChannelSummary; event_count: number }>;
+  shared_playlists: Array<{
+    token: string;
+    share_url: string;
+    playlist: PlaylistSummary;
+    owner_username: string;
+    item_count: number;
+  }>;
+};
+
+export async function getExploreFeed(params?: { q?: string; lang?: string; genre?: string; live_only?: boolean }) {
+  const sp = new URLSearchParams();
+  if (params?.q?.trim()) sp.set("q", params.q.trim());
+  if (params?.lang?.trim()) sp.set("lang", params.lang.trim());
+  if (params?.genre?.trim()) sp.set("genre", params.genre.trim());
+  if (params?.live_only) sp.set("live_only", "1");
+  const qs = sp.toString();
+  const res = await fetch(`${getApiBase()}/api/explore${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load explore"));
+  return (await res.json()) as ExploreFeed;
+}
+
+export async function getUserFollow(username: string) {
+  const res = await fetch(`${getApiBase()}/api/users/${encodeURIComponent(username)}/follow`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Cannot load follow state");
+  return (await res.json()) as { following: boolean; follower_count: number; following_count: number };
+}
+
+export async function followUser(username: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/users/${encodeURIComponent(username)}/follow`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({}) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Follow failed"));
+  return (await res.json()) as { following: boolean };
+}
+
+export async function unfollowUser(username: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/users/${encodeURIComponent(username)}/follow`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error("Unfollow failed");
+  return (await res.json()) as { following: boolean };
+}
+
+export async function importShareToChannelQueue(channelId: string, shareToken: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/queue/import-share`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ share_token: shareToken }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Queue import failed"));
+  return (await res.json()) as { added: number; results: QueueItemSummary[] };
+}
+
+export async function exportChannelSessionPlaylist(channelId: string, name?: string, saveToChannel = true) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/session/export-playlist`,
+    await withAuthHeaders({
+      method: "POST",
+      body: JSON.stringify({ name, save_to_channel: saveToChannel }),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Export failed"));
+  return (await res.json()) as { playlist: PlaylistSummary };
 }

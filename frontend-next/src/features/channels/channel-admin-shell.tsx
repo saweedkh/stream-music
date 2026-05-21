@@ -30,6 +30,7 @@ type Props = {
   onCloseChannel?: () => void;
   showLeave?: boolean;
   chatUnread: number;
+  pendingSuggestionsCount?: number;
   canManage: boolean;
   statusBanner?: ReactNode;
   children: ReactNode;
@@ -53,6 +54,7 @@ export function ChannelAdminShell({
   onCloseChannel,
   showLeave,
   chatUnread,
+  pendingSuggestionsCount = 0,
   canManage,
   statusBanner,
   children,
@@ -96,6 +98,7 @@ export function ChannelAdminShell({
     onCloseChannel,
     showLeave,
     chatUnread,
+    pendingSuggestionsCount,
     canManage,
     user,
   };
@@ -145,6 +148,7 @@ export function ChannelAdminShell({
               onSelectTab={handleSelectTab}
               canManage={canManage}
               chatUnread={chatUnread}
+              pendingSuggestionsCount={pendingSuggestionsCount}
             />
           </div>
         </div>

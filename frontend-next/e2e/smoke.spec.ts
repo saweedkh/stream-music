@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
+import { apiURL } from "./helpers/auth";
 
 test.describe("smoke", () => {
   test("backend health responds", async ({ request }) => {

@@ -1,5 +1,6 @@
 export type DashboardTab =
   | "channels"
+  | "following"
   | "tracks"
   | "playlists"
   | "sharing"
@@ -11,6 +12,7 @@ export type DashboardTab =
 
 export const DASHBOARD_TABS: DashboardTab[] = [
   "channels",
+  "following",
   "tracks",
   "playlists",
   "sharing",

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, ListMusic, Music, Radio, Search } from "lucide-react";
+import { LayoutDashboard, ListMusic, Music, Radio, Search, User, Share2 } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import {
   CommandDialog,
@@ -12,7 +12,17 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { globalSearch, type ChannelSummary, type PlaylistSummary, type TrackSummary } from "@/lib/api";
+import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import {
+  followUser,
+  getUserFollow,
+  globalSearch,
+  unfollowUser,
+  type ChannelSummary,
+  type PlaylistSummary,
+  type TrackSummary,
+} from "@/lib/api";
 
 type Props = {
   open: boolean;
@@ -21,12 +31,18 @@ type Props = {
 
 export function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const { t } = useTranslations();
+  const { showToast } = useToast();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [followState, setFollowState] = useState<Record<string, boolean>>({});
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
+  const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string }>>([]);
+  const [sharedPlaylists, setSharedPlaylists] = useState<
+    Array<{ token: string; playlist_name: string; owner_username: string }>
+  >([]);
 
   const runSearch = useCallback(async (q: string) => {
     const trimmed = q.trim();
@@ -34,6 +50,8 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setTracks([]);
       setPlaylists([]);
       setChannels([]);
+      setUsers([]);
+      setSharedPlaylists([]);
       return;
     }
     setLoading(true);
@@ -42,10 +60,27 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setTracks(res.tracks);
       setPlaylists(res.playlists);
       setChannels(res.channels);
+      const foundUsers = res.users ?? [];
+      setUsers(foundUsers);
+      setSharedPlaylists(res.shared_playlists ?? []);
+      const nextFollow: Record<string, boolean> = {};
+      await Promise.all(
+        foundUsers.map(async (u) => {
+          try {
+            const st = await getUserFollow(u.username);
+            nextFollow[u.username] = st.following;
+          } catch {
+            nextFollow[u.username] = false;
+          }
+        }),
+      );
+      setFollowState(nextFollow);
     } catch {
       setTracks([]);
       setPlaylists([]);
       setChannels([]);
+      setUsers([]);
+      setSharedPlaylists([]);
     } finally {
       setLoading(false);
     }
@@ -66,7 +101,14 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
     router.push(href);
   }
 
-  const empty = !loading && query.trim().length >= 2 && !tracks.length && !playlists.length && !channels.length;
+  const empty =
+    !loading &&
+    query.trim().length >= 2 &&
+    !tracks.length &&
+    !playlists.length &&
+    !channels.length &&
+    !users.length &&
+    !sharedPlaylists.length;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -110,6 +152,64 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
               <CommandItem key={`c-${ch.id}`} onSelect={() => go(`/channel/${ch.id}`)}>
                 <Radio className="h-4 w-4" />
                 <span className="truncate">{ch.name}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+        {users.length > 0 ? (
+          <CommandGroup heading={t("search.global.users")}>
+            {users.map((u) => {
+              const following = followState[u.username] === true;
+              return (
+                <CommandItem
+                  key={`u-${u.id}`}
+                  onSelect={() => go(`/users/${encodeURIComponent(u.username)}`)}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <User className="h-4 w-4 shrink-0" />
+                    <span className="truncate">@{u.username}</span>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={following ? "secondary" : "outline"}
+                    className="h-7 shrink-0 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void (async () => {
+                        try {
+                          if (following) {
+                            await unfollowUser(u.username);
+                            setFollowState((s) => ({ ...s, [u.username]: false }));
+                            showToast(t("search.global.unfollowed"), "success");
+                          } else {
+                            await followUser(u.username);
+                            setFollowState((s) => ({ ...s, [u.username]: true }));
+                            showToast(t("search.global.followed"), "success");
+                          }
+                        } catch (err) {
+                          showToast(err instanceof Error ? err.message : t("search.global.followFailed"), "error");
+                        }
+                      })();
+                    }}
+                  >
+                    {following ? t("search.global.unfollow") : t("search.global.follow")}
+                  </Button>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        ) : null}
+        {sharedPlaylists.length > 0 ? (
+          <CommandGroup heading={t("search.global.sharedPlaylists")}>
+            {sharedPlaylists.map((sp) => (
+              <CommandItem key={`sp-${sp.token}`} onSelect={() => go(`/share/playlist/${sp.token}`)}>
+                <Share2 className="h-4 w-4" />
+                <span className="truncate">
+                  {sp.playlist_name}
+                  {sp.owner_username ? ` — @${sp.owner_username}` : ""}
+                </span>
               </CommandItem>
             ))}
           </CommandGroup>

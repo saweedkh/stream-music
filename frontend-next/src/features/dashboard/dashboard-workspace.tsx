@@ -8,6 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
+import { ChannelsOnlineWidget } from "@/features/dashboard/channels-online-widget";
+import { PremiumLimitsCard } from "@/features/dashboard/premium-limits-card";
+import { FollowingChannelsSection } from "@/features/dashboard/following-channels-section";
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
 import {
@@ -546,8 +549,13 @@ export function DashboardWorkspace() {
       >
         {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
 
+        {activeTab === "following" ? <FollowingChannelsSection /> : null}
+
         {activeTab === "channels" ? (
-          <ChannelManagementSection
+          <div className="space-y-6">
+            <PremiumLimitsCard />
+            <ChannelsOnlineWidget />
+            <ChannelManagementSection
             channels={channels}
             channelName={channelName}
             channelPrivacy={channelPrivacy}
@@ -560,6 +568,7 @@ export function DashboardWorkspace() {
             currentUserId={currentUserId}
             onChannelsRefresh={() => void refreshAll()}
           />
+          </div>
         ) : null}
 
         {activeTab === "tracks" ? (

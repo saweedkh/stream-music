@@ -2,7 +2,7 @@
 
 from apps.common.account_badges import UserBadgeAssignment, UserBadgeDefinition
 from apps.common.favorites import UserPlaylistFavorite, UserTrackFavorite
-from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserPublicProfile
+from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserFollow, UserPublicProfile
 from apps.common.support_models import SupportMessage, SupportTicket, SupportTicketRead
 
 __all__ = [
@@ -16,4 +16,5 @@ __all__ = [
     "UserPublicProfile",
     "PlaylistShareLink",
     "ChannelFollow",
+    "UserFollow",
 ]

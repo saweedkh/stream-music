@@ -27,6 +27,7 @@ from apps.common.support_views import (
 from apps.common.health import HealthView
 from apps.common.metrics import MetricsView
 from apps.common.openapi_schema import OpenApiSchemaView
+from apps.common.dashboard_views import MeChannelsOnlineView, MeChannelsPendingSuggestionsView
 from apps.common.discovery_views import (
     ChannelFollowView,
     GlobalSearchView,
@@ -37,6 +38,19 @@ from apps.common.discovery_views import (
     PremiumLimitsView,
     PublicUserProfileView,
     TrackFacetsView,
+)
+from apps.common.moderation_views import (
+    ChannelChatBanStatusView,
+    ChannelChatBanView,
+    ChannelChatReportView,
+    ChannelModerationReportsView,
+)
+from apps.common.social_expansion_views import (
+    ChannelQueueImportShareView,
+    ChannelSessionExportPlaylistView,
+    ExploreFeedView,
+    FollowingChannelsFeedView,
+    UserFollowView,
 )
 from apps.common.views import (
     LoginView,
@@ -115,6 +129,13 @@ urlpatterns = [
     path("playlists/share/<uuid:token>", PlaylistSharePreviewView.as_view()),
     path("channels/<int:channel_id>/playlists/import-share", PlaylistShareImportView.as_view()),
     path("channels/<int:channel_id>/follow", ChannelFollowView.as_view()),
+    path("me/following-channels", FollowingChannelsFeedView.as_view()),
+    path("me/channels-online", MeChannelsOnlineView.as_view()),
+    path("me/channels-pending-suggestions", MeChannelsPendingSuggestionsView.as_view()),
+    path("explore", ExploreFeedView.as_view()),
+    path("users/<str:username>/follow", UserFollowView.as_view()),
+    path("channels/<int:channel_id>/queue/import-share", ChannelQueueImportShareView.as_view()),
+    path("channels/<int:channel_id>/session/export-playlist", ChannelSessionExportPlaylistView.as_view()),
     path("auth/me/password", UserPasswordChangeView.as_view()),
     path("auth/me/notification-settings", UserNotificationSettingsView.as_view()),
     path("auth/me/push-subscription", WebPushSubscriptionView.as_view()),
@@ -147,7 +168,11 @@ urlpatterns = [
     path("channels/<int:channel_id>/public-link/rotate", ChannelPublicLinkRotateView.as_view()),
     path("channels/<int:channel_id>/tracks/similar", ChannelSimilarTracksView.as_view()),
     path("channels/<int:channel_id>/chat", ChannelChatView.as_view()),
+    path("channels/<int:channel_id>/chat/report", ChannelChatReportView.as_view()),
     path("channels/<int:channel_id>/chat/pin", ChannelChatPinView.as_view()),
+    path("channels/<int:channel_id>/moderation/reports", ChannelModerationReportsView.as_view()),
+    path("channels/<int:channel_id>/moderation/bans", ChannelChatBanStatusView.as_view()),
+    path("channels/<int:channel_id>/moderation/bans/<int:user_id>", ChannelChatBanView.as_view()),
     path("channels/<int:channel_id>/track-reactions", ChannelTrackReactionView.as_view()),
     path("channels/<int:channel_id>/party-recap", ChannelPartyRecapView.as_view()),
     path("channels/<int:channel_id>/history", ChannelPlaybackHistoryView.as_view()),

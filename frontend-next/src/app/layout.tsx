@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import { CapacitorBootstrap } from "@/components/capacitor/capacitor-bootstrap";
 import { AppShell } from "@/components/layout/app-shell";
 import { DesignSystemProvider } from "@/components/providers/design-system-provider";
 import { LocaleInitScript } from "@/components/providers/locale-init-script";
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
+        <CapacitorBootstrap />
         <LocaleProvider>
           <ThemeProvider>
             <DesignSystemProvider>

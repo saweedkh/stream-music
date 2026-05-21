@@ -89,7 +89,11 @@ def send_web_push_to_user(
     try:
         from pywebpush import WebPushException, webpush
     except ImportError:
-        logger.warning("pywebpush not installed; skipping web push")
+        msg = "pywebpush not installed; web push disabled"
+        if getattr(settings, "DEBUG", False):
+            logger.warning(msg)
+        else:
+            logger.error(msg)
         return
 
     from apps.channels.models import WebPushSubscription
@@ -126,6 +130,80 @@ def send_web_push_to_user(
                 WebPushSubscription.objects.filter(pk=row.pk).delete()
             else:
                 logger.warning("webpush failed user=%s code=%s endpoint=%s: %s", user_id, code, row.endpoint[:48], e)
+
+
+def notify_channel_new_suggestion_push(channel_id: int, submitter_username: str, actor_user_id: int) -> None:
+    """Notify channel owner + moderators when a listener submits a track suggestion."""
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
+    from apps.playback.services.state_store import playback_state_store
+
+    channel = Channel.objects.filter(id=channel_id).first()
+    if channel is None:
+        return
+
+    staff_ids = list(
+        ChannelMembership.objects.filter(
+            channel_id=channel_id,
+            is_active=True,
+            role__in=[ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR],
+        ).values_list("user_id", flat=True)
+    )
+    if not staff_ids:
+        return
+
+    url = channel_tab_url(channel_id, tab="suggestions")
+    tag = f"stream-{channel_id}-suggestion"
+    title = f"[#{channel_id}] {channel.name}"
+    body = f"New suggestion from @{submitter_username}"
+    present = set(playback_state_store.presence_user_ids(channel_id))
+
+    for uid in staff_ids:
+        if uid == actor_user_id:
+            continue
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=uid)
+        ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=uid)
+        if ch_pref.muted or uid in present:
+            continue
+        if not prefs.push_category_moderation:
+            continue
+        send_web_push_to_user(uid, title=title[:60], body=body[:180], url=url, tag=tag, category="moderation")
+
+
+def notify_channel_join_request_push(channel_id: int, applicant_username: str, actor_user_id: int) -> None:
+    from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference, UserNotificationSettings
+    from apps.playback.services.state_store import playback_state_store
+
+    channel = Channel.objects.filter(id=channel_id).first()
+    if channel is None:
+        return
+    staff_ids = list(
+        ChannelMembership.objects.filter(
+            channel_id=channel_id,
+            is_active=True,
+            role__in=[ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR],
+        ).values_list("user_id", flat=True)
+    )
+    url = channel_tab_url(channel_id, tab="people")
+    title = f"[#{channel_id}] {channel.name}"
+    body = f"Join request from @{applicant_username}"
+    present = set(playback_state_store.presence_user_ids(channel_id))
+    for uid in staff_ids:
+        if uid == actor_user_id:
+            continue
+        prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=uid)
+        ch_pref, _ = ChannelNotificationPreference.objects.get_or_create(channel_id=channel_id, user_id=uid)
+        if ch_pref.muted or uid in present:
+            continue
+        if not prefs.push_category_moderation:
+            continue
+        send_web_push_to_user(
+            uid,
+            title=title[:60],
+            body=body[:180],
+            url=url,
+            tag=f"stream-{channel_id}-join-request",
+            category="moderation",
+        )
 
 
 def notify_channel_staff_social_push(channel_id: int, action: str, payload: dict, actor_user_id: int) -> None:

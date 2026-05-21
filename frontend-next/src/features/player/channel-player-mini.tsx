@@ -91,7 +91,12 @@ export function ChannelPlayerMini({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               {isPlaying ? <span className="status-live h-1.5 w-1.5 shrink-0" aria-hidden /> : null}
-              <p className="truncate text-sm font-semibold leading-tight text-foreground">{title || t("player.noTrack")}</p>
+              <p
+                className="truncate text-sm font-semibold leading-tight text-foreground"
+                data-testid="channel-now-playing-title"
+              >
+                {title || t("player.noTrack")}
+              </p>
             </div>
             <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{t("player.nowPlaying")}</p>
           </div>
@@ -152,7 +157,11 @@ export function ChannelPlayerMini({
             <Radio className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand/90">{t("player.nowPlaying")}</span>
           </div>
-          <p className="mt-0.5 truncate text-sm font-semibold text-foreground" title={title || undefined}>
+          <p
+            className="mt-0.5 truncate text-sm font-semibold text-foreground"
+            title={title || undefined}
+            data-testid="channel-now-playing-title"
+          >
             {title || t("player.noTrack")}
           </p>
         </div>

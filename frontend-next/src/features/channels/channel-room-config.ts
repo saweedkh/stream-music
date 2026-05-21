@@ -25,7 +25,7 @@ export const CHANNEL_TAB_IDS = [
 
 export type ChannelTabId = (typeof CHANNEL_TAB_IDS)[number];
 
-export type ChannelTabGroup = "listen" | "social" | "dj";
+export type ChannelTabGroup = "listen" | "social" | "studio";
 
 export const CHANNEL_TAB_TO_GROUP: Record<ChannelTabId, ChannelTabGroup> = {
   chat: "social",
@@ -34,14 +34,14 @@ export const CHANNEL_TAB_TO_GROUP: Record<ChannelTabId, ChannelTabGroup> = {
   suggestions: "listen",
   insights: "social",
   listeners: "social",
-  admin: "dj",
-  health: "dj",
+  admin: "studio",
+  health: "studio",
 };
 
 export const CHANNEL_GROUP_LABELS: Record<ChannelTabGroup, string> = {
   listen: "Listen",
   social: "Social",
-  dj: "Studio",
+  studio: "Studio",
 };
 
 export type ChannelNavItem = {
@@ -60,8 +60,8 @@ export const CHANNEL_NAV_ITEMS: ChannelNavItem[] = [
   { id: "suggestions", label: "Suggestions", shortLabel: "Suggest", icon: Sparkles, group: "listen" },
   { id: "insights", label: "Insights", shortLabel: "Tips", icon: Lightbulb, group: "social" },
   { id: "listeners", label: "Members", shortLabel: "People", icon: Users, group: "social", manageOnly: true },
-  { id: "admin", label: "Control", shortLabel: "Control", icon: Settings2, group: "dj", manageOnly: true },
-  { id: "health", label: "Health", shortLabel: "Sync", icon: HeartPulse, group: "dj" },
+  { id: "admin", label: "Control", shortLabel: "Control", icon: Settings2, group: "studio", manageOnly: true },
+  { id: "health", label: "Health", shortLabel: "Sync", icon: HeartPulse, group: "studio" },
 ];
 
 export function channelTabsInGroup(group: ChannelTabGroup, canManage: boolean): ChannelTabId[] {
@@ -192,11 +192,11 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     ],
   },
   {
-    id: "dj",
+    id: "studio",
     titleKey: "room.admin.section.studio",
     items: [
-      { id: "admin", labelKey: "room.admin.nav.admin", icon: Settings2, group: "dj", manageOnly: true },
-      { id: "health", labelKey: "room.admin.nav.health", icon: HeartPulse, group: "dj" },
+      { id: "admin", labelKey: "room.admin.nav.admin", icon: Settings2, group: "studio", manageOnly: true },
+      { id: "health", labelKey: "room.admin.nav.health", icon: HeartPulse, group: "studio" },
     ],
   },
 ];

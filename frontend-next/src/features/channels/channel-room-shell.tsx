@@ -37,7 +37,7 @@ export function ChannelRoomShell({
   className,
 }: Props) {
   const navItems = channelNavItemsForContext(canManage, tabGroup);
-  const groups = (["listen", "social", "dj"] as ChannelTabGroup[]).filter((g) => canManage || g !== "dj");
+  const groups = (["listen", "social", "studio"] as ChannelTabGroup[]).filter((g) => canManage || g !== "studio");
 
   return (
     <div className={cn("space-y-5 pb-28", className)}>

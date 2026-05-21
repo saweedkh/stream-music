@@ -37,11 +37,19 @@ def _allow(key: str, path: str) -> bool:
     return True
 
 
+def _rate_limit_disabled() -> bool:
+    from django.conf import settings
+
+    return bool(getattr(settings, "E2E_RATE_LIMIT_OFF", False))
+
+
 class SimpleRateLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        if _rate_limit_disabled():
+            return self.get_response(request)
         path = request.path
         if path in _LIMITS and request.method == "POST":
             if not _allow(_client_key(request), path):

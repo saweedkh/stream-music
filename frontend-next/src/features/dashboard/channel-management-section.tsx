@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslations } from "@/components/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { reopenChannel, type ChannelSummary } from "@/lib/api";
+import { getMeChannelsPendingSuggestions, reopenChannel, type ChannelSummary } from "@/lib/api";
 import { useToast } from "@/components/ui/toast-provider";
 import { filterDashboardChannels, sortChannelsForDashboard } from "@/lib/channel-filters";
 import { cn } from "@/lib/utils";
@@ -70,6 +70,26 @@ export function ChannelManagementSection(props: Props) {
   } = props;
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingByChannel, setPendingByChannel] = useState<Record<number, number>>({});
+
+  const loadPending = useCallback(async () => {
+    try {
+      const data = await getMeChannelsPendingSuggestions();
+      const map: Record<number, number> = {};
+      for (const row of data.results) {
+        map[row.channel_id] = row.pending_count;
+      }
+      setPendingByChannel(map);
+    } catch {
+      setPendingByChannel({});
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPending();
+    const id = setInterval(() => void loadPending(), 30_000);
+    return () => clearInterval(id);
+  }, [loadPending, channels.length]);
 
   const visibleChannels = useMemo(
     () => sortChannelsForDashboard(filterDashboardChannels(channels)),
@@ -162,6 +182,7 @@ export function ChannelManagementSection(props: Props) {
                     <ChannelCard
                       channel={channel}
                       currentUserId={currentUserId}
+                      pendingSuggestions={pendingByChannel[channel.id] ?? 0}
                       onChannelsRefresh={onChannelsRefresh}
                     />
                   </li>
@@ -290,10 +311,12 @@ function CreateChannelPanel({
 function ChannelCard({
   channel,
   currentUserId,
+  pendingSuggestions = 0,
   onChannelsRefresh,
 }: {
   channel: ChannelSummary;
   currentUserId: number | null;
+  pendingSuggestions?: number;
   onChannelsRefresh: () => void | Promise<void>;
 }) {
   const { t } = useTranslations();
@@ -348,7 +371,14 @@ function ChannelCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 truncate text-sm font-semibold text-foreground sm:text-base">{channel.name}</h3>
-            {statusBadge}
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+              {pendingSuggestions > 0 ? (
+                <Badge variant="warning" className="text-[10px]" data-testid={`channel-pending-${channel.id}`}>
+                  {t("room.admin.suggestions.pendingBadge", { count: pendingSuggestions })}
+                </Badge>
+              ) : null}
+              {statusBadge}
+            </div>
           </div>
 
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:text-xs">

@@ -111,6 +111,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci-secret-key
           DEBUG: "1"
+          E2E_RATE_LIMIT_OFF: "1"
         run: |
           pip install -r requirements.txt
           python manage.py migrate --noinput
@@ -142,4 +143,4 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           PLAYWRIGHT_API_URL: http://127.0.0.1:8000
           CI: "true"
-        run: npx playwright test
+        run: npx playwright test --project=chromium --project=chromium-playback
