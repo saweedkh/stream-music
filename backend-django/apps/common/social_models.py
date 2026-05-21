@@ -37,7 +37,7 @@ class PlaylistShareLink(models.Model):
 
 class ChannelFollow(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_follows")
-    channel = models.ForeignKey("channels.Channel", on_delete=models.CASCADE, related_name="followers")
+    channel = models.ForeignKey("stream_channels.Channel", on_delete=models.CASCADE, related_name="followers")
     notify_live = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
