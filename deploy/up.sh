@@ -42,48 +42,79 @@ if ! grep -qE '^POSTGRES_PASSWORD=.+' "$ENV_MAIN"; then
   exit 1
 fi
 
-_env_val() {
-  local key="$1"
-  local default="${2:-}"
-  local line val
-  if grep -qE "^${key}=" "$ENV_MAIN" 2>/dev/null; then
-    line="$(grep "^${key}=" "$ENV_MAIN" | head -1)"
-    val="${line#${key}=}"
-    val="${val//$'\r'/}"
-    printf '%s' "$val"
-  else
-    printf '%s' "$default"
+# Parse ONLY ${ENV_MAIN} on this machine (push.sh never uploads it unless you pass --with-env).
+_FILE_SITE_DOMAIN=""
+_FILE_PRIMARY_IP=""
+_FILE_TLS_CERT_NAME=""
+_FILE_TLS_CERT_DIR=""
+_FILE_TLS_CERT_HOST_DIR=""
+_ENV_SITE_DOMAIN_LINES=""
+_ENV_SITE_DOMAIN_COMMENTED=0
+while IFS= read -r _line || [[ -n "$_line" ]]; do
+  _line="${_line%$'\r'}"
+  [[ -z "${_line//[[:space:]]/}" ]] && continue
+  if [[ "$_line" =~ ^[[:space:]]*#.*SITE_DOMAIN ]]; then
+    _ENV_SITE_DOMAIN_COMMENTED=1
+    continue
   fi
-}
+  [[ "$_line" =~ ^[[:space:]]*# ]] && continue
+  [[ "$_line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]] || continue
+  _k="${BASH_REMATCH[1]}"
+  _v="${BASH_REMATCH[2]}"
+  _v="${_v#"${_v%%[![:space:]]*}"}"
+  _v="${_v%"${_v##*[![:space:]]}"}"
+  if [[ "$_v" =~ ^\"(.*)\"$ ]]; then _v="${BASH_REMATCH[1]}"; fi
+  if [[ "$_v" =~ ^\'(.*)\'$ ]]; then _v="${BASH_REMATCH[1]}"; fi
+  [[ -z "$_v" ]] && continue
+  case "$_k" in
+    SITE_DOMAIN)
+      _FILE_SITE_DOMAIN="$_v"
+      _ENV_SITE_DOMAIN_LINES+="${_line}"$'\n'
+      ;;
+    PRIMARY_IP) _FILE_PRIMARY_IP="$_v" ;;
+    TLS_CERT_NAME) _FILE_TLS_CERT_NAME="$_v" ;;
+    TLS_CERT_DIR) _FILE_TLS_CERT_DIR="$_v" ;;
+    TLS_CERT_HOST_DIR) _FILE_TLS_CERT_HOST_DIR="$_v" ;;
+  esac
+done < "$ENV_MAIN"
 
 _site_domain_shell="${SITE_DOMAIN:-}"
 SITE_DOMAIN=""
 SITE_DOMAIN_SOURCE=""
-if grep -qE '^SITE_DOMAIN=' "$ENV_MAIN" 2>/dev/null; then
-  SITE_DOMAIN="$(_env_val SITE_DOMAIN)"
+if [[ -n "$_FILE_SITE_DOMAIN" ]]; then
+  SITE_DOMAIN="$_FILE_SITE_DOMAIN"
   SITE_DOMAIN_SOURCE=".env.production"
-else
+elif [[ -n "${_site_domain_shell:-}" ]]; then
   SITE_DOMAIN="${_site_domain_shell}"
-  [[ -n "${SITE_DOMAIN:-}" ]] && SITE_DOMAIN_SOURCE="environment"
+  SITE_DOMAIN_SOURCE="environment"
 fi
 
-TLS_CERT_NAME="${TLS_CERT_NAME:-$(_env_val TLS_CERT_NAME saweedkh.ir)}"
-TLS_CERT_DIR="${TLS_CERT_DIR:-$(_env_val TLS_CERT_DIR /etc/letsencrypt/live)}"
-TLS_CERT_HOST_DIR="${TLS_CERT_HOST_DIR:-$(_env_val TLS_CERT_HOST_DIR /etc/letsencrypt)}"
+TLS_CERT_NAME="${TLS_CERT_NAME:-${_FILE_TLS_CERT_NAME:-saweedkh.ir}}"
+TLS_CERT_DIR="${TLS_CERT_DIR:-${_FILE_TLS_CERT_DIR:-/etc/letsencrypt/live}}"
+TLS_CERT_HOST_DIR="${TLS_CERT_HOST_DIR:-${_FILE_TLS_CERT_HOST_DIR:-/etc/letsencrypt}}"
 
 PRIMARY_IP_SOURCE="detected"
 if [[ -n "${PRIMARY_IP:-}" ]]; then
   PRIMARY_IP_SOURCE="environment"
-elif [[ -f "$ENV_MAIN" ]]; then
-  _line="$(grep -E '^PRIMARY_IP=[^[:space:]]+' "$ENV_MAIN" 2>/dev/null | head -1 || true)"
-  if [[ -n "$_line" ]]; then
-    PRIMARY_IP="${_line#PRIMARY_IP=}"
-    PRIMARY_IP="${PRIMARY_IP//$'\r'/}"
-    PRIMARY_IP_SOURCE=".env.production"
-  fi
+elif [[ -n "$_FILE_PRIMARY_IP" ]]; then
+  PRIMARY_IP="$_FILE_PRIMARY_IP"
+  PRIMARY_IP_SOURCE=".env.production"
 fi
 if [[ -z "${PRIMARY_IP:-}" ]]; then
   PRIMARY_IP="$("$DETECT_IP")"
+fi
+
+_ENV_ABS="$(cd "$(dirname "$ENV_MAIN")" && pwd)/$(basename "$ENV_MAIN")"
+echo "[deploy] Env source: server file only → ${_ENV_ABS}"
+echo "[deploy] Expected project root: /root/stream-music (set REMOTE_PATH=/root/stream-music in deploy/sync.env)."
+echo "[deploy] push.sh does not upload .env.production unless you pass --with-env."
+if [[ -n "$_ENV_SITE_DOMAIN_LINES" ]]; then
+  echo "[deploy] SITE_DOMAIN line(s) parsed: $(printf '%s' "$_ENV_SITE_DOMAIN_LINES" | tr '\n' ' ')"
+elif [[ "$_ENV_SITE_DOMAIN_COMMENTED" -eq 1 ]]; then
+  echo "[deploy] SITE_DOMAIN: found only as comment (# SITE_DOMAIN=…) — remove leading #"
+else
+  echo "[deploy] SITE_DOMAIN: no active line in file (expected: SITE_DOMAIN=music.saweedkh.ir)"
+  echo "[deploy] Hint: ssh to server → nano ${_ENV_ABS}"
 fi
 
 echo "[deploy] Primary IPv4 (${PRIMARY_IP_SOURCE}): ${PRIMARY_IP}"

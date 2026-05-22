@@ -2,22 +2,58 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
+import { AuthSocialButtons } from "@/features/auth/auth-social-buttons";
 import { loginUser, registerUser } from "@/lib/api";
+import { authShakeKeyframes, staggerContainer, staggerItem } from "@/lib/motion";
 import { authLoginSchema, authRegisterSchema } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   return raw;
+}
+
+function authHref(mode: Mode, next: string | null): string {
+  const base = mode === "login" ? "/login" : "/register";
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return base;
+  return `${base}?next=${encodeURIComponent(next)}`;
+}
+
+function AuthField({
+  id,
+  label,
+  icon,
+  error,
+  children,
+  focused,
+}: {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  error?: string;
+  children: ReactNode;
+  focused?: boolean;
+}) {
+  return (
+    <div className="auth-field">
+      <label htmlFor={id} className="auth-field-label">
+        {label}
+      </label>
+      <div className={cn("auth-field-control", focused && "auth-field-control--focus", error && "auth-field-control--error")}>
+        <span className="auth-field-icon">{icon}</span>
+        {children}
+      </div>
+      {error ? <p className="auth-field-error">{error}</p> : null}
+    </div>
+  );
 }
 
 export function AuthForm({ mode }: { mode: Mode }) {
@@ -27,10 +63,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string }>({});
-  const [touched, setTouched] = useState<{ username?: boolean; email?: boolean; password?: boolean }>({});
+  const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | null>("username");
+
+  const next = searchParams.get("next");
 
   async function onSubmit() {
     setBusy(true);
@@ -50,6 +91,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
+      setShakeKey((k) => k + 1);
       showToast(t("auth.fixFields"), "error");
       setBusy(false);
       return;
@@ -60,15 +102,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
       } else {
         await loginUser(username, password);
       }
-      window.location.href = safeNextPath(searchParams.get("next"));
-    } catch (error) {
+      window.location.href = safeNextPath(next);
+    } catch (err) {
       const message =
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : mode === "register"
             ? t("auth.registerFailed")
             : t("auth.invalidCredentials");
       setError(message);
+      setShakeKey((k) => k + 1);
       showToast(message, "error");
     } finally {
       setBusy(false);
@@ -76,75 +119,160 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <Card className="border-border/90 bg-card/40 shadow-none">
-      <CardHeader className="border-b border-border/80 bg-gradient-to-r from-[var(--brand-subtle)] to-transparent pb-4">
-        <CardTitle>{mode === "register" ? t("auth.createAccount") : t("auth.login")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <Label htmlFor="auth-username">{t("auth.username")}</Label>
-          <Input
+    <motion.div
+      key={shakeKey}
+      initial={false}
+      animate={shakeKey > 0 && (error || Object.keys(fieldErrors).length > 0) ? authShakeKeyframes : undefined}
+    >
+      <motion.div className="auth-form-fields" variants={staggerContainer.variants} initial="hidden" animate="visible">
+        <motion.div {...staggerItem}>
+          <AuthField
             id="auth-username"
-            placeholder={t("auth.username")}
-            value={username}
-            aria-invalid={Boolean(fieldErrors.username)}
-            valid={Boolean(touched.username && username.trim())}
-            onChange={(e) => setUsername(e.target.value)}
-            onBlur={() => setTouched((prev) => ({ ...prev, username: true }))}
-          />
-          {fieldErrors.username ? <p className="text-xs text-rose-400">{fieldErrors.username}</p> : null}
-        </div>
-        {mode === "register" ? (
-          <div className="space-y-1">
-            <Label htmlFor="auth-email">{t("auth.emailOptional")}</Label>
-            <Input
-              id="auth-email"
-              placeholder={t("auth.email")}
-              value={email}
-              aria-invalid={Boolean(fieldErrors.email)}
-              valid={Boolean(touched.email && email && email.includes("@"))}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+            label={t("auth.usernameOrEmail")}
+            icon={<User className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
+            error={fieldErrors.username}
+            focused={focusedField === "username"}
+          >
+            <input
+              id="auth-username"
+              className="auth-field-input"
+              placeholder="alexrivera"
+              value={username}
+              aria-invalid={Boolean(fieldErrors.username)}
+              onFocus={() => setFocusedField("username")}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
             />
-            {fieldErrors.email ? <p className="text-xs text-rose-400">{fieldErrors.email}</p> : null}
-          </div>
-        ) : null}
-        <div className="space-y-1">
-          <Label htmlFor="auth-password">{t("auth.password")}</Label>
-          <Input
-            id="auth-password"
-            type="password"
-            placeholder={t("auth.password")}
-            value={password}
-            aria-invalid={Boolean(fieldErrors.password)}
-            valid={Boolean(touched.password && password.trim())}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-          />
-          {fieldErrors.password ? <p className="text-xs text-rose-400">{fieldErrors.password}</p> : null}
-        </div>
-        <Button className="w-full" onClick={onSubmit} disabled={busy || !username || !password}>
-          {busy ? t("auth.pleaseWait") : mode === "register" ? t("auth.signUp") : t("auth.login")}
-        </Button>
-        {error ? <Alert tone="error">{error}</Alert> : null}
-        <p className="text-center text-xs text-muted-foreground">
+          </AuthField>
+        </motion.div>
+
+        <AnimatePresence initial={false}>
           {mode === "register" ? (
+            <motion.div
+              key="email"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <AuthField
+                id="auth-email"
+                label={t("auth.emailOptional")}
+                icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
+                error={fieldErrors.email}
+                focused={focusedField === "email"}
+              >
+                <input
+                  id="auth-email"
+                  className="auth-field-input"
+                  placeholder={t("auth.email")}
+                  value={email}
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  onFocus={() => setFocusedField("email")}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </AuthField>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        <motion.div {...staggerItem}>
+          <AuthField
+            id="auth-password"
+            label={t("auth.password")}
+            icon={<Lock className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
+            error={fieldErrors.password}
+            focused={focusedField === "password"}
+          >
+            <input
+              id="auth-password"
+              className="auth-field-input auth-field-input--password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              aria-invalid={Boolean(fieldErrors.password)}
+              onFocus={() => setFocusedField("password")}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+            />
+            <button
+              type="button"
+              className="auth-field-eye"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+            >
+              {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+            </button>
+          </AuthField>
+        </motion.div>
+
+        {mode === "login" ? (
+          <motion.div {...staggerItem} className="auth-form-meta">
+            <label className="auth-remember">
+              <input
+                type="checkbox"
+                className="auth-checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>{t("auth.rememberMe")}</span>
+            </label>
+            <button
+              type="button"
+              className="auth-link"
+              onClick={() => showToast(t("auth.forgotPasswordDisabled"), "error")}
+            >
+              {t("auth.forgotPassword")}
+            </button>
+          </motion.div>
+        ) : null}
+
+        <motion.div {...staggerItem}>
+          <button type="button" className="auth-submit" onClick={onSubmit} disabled={busy || !username || !password}>
+            {busy ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                {t("auth.pleaseWait")}
+              </span>
+            ) : mode === "login" ? (
+              t("auth.signIn")
+            ) : (
+              t("auth.signUp")
+            )}
+          </button>
+        </motion.div>
+
+        <AnimatePresence>
+          {error ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Alert tone="error">{error}</Alert>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        <motion.div {...staggerItem}>
+          <AuthSocialButtons />
+        </motion.div>
+
+        <motion.p {...staggerItem} className="auth-footer-text">
+          {mode === "login" ? (
             <>
-              {t("auth.alreadyHaveAccount")}{" "}
-              <Link href="/login" className="text-brand hover:text-brand">
-                {t("auth.login")}
+              {t("auth.newToStream")}{" "}
+              <Link href={authHref("register", next)} className="auth-link">
+                {t("auth.signUp")}
               </Link>
             </>
           ) : (
             <>
-              {t("auth.needAccount")}{" "}
-              <Link href="/register" className="text-brand hover:text-brand">
-                {t("auth.register")}
+              {t("auth.alreadyHaveAccount")}{" "}
+              <Link href={authHref("login", next)} className="auth-link">
+                {t("auth.login")}
               </Link>
             </>
           )}
-        </p>
-      </CardContent>
-    </Card>
+        </motion.p>
+      </motion.div>
+    </motion.div>
   );
 }

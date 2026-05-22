@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/toast-provider";
 import { getExploreFeed, type ExploreFeed } from "@/lib/api";
+import { hubPanelRoot } from "@/lib/mobile-page-layout";
+import { cn } from "@/lib/utils";
 
 export function ExplorePage() {
   const { t } = useTranslations();
@@ -55,7 +58,9 @@ export function ExplorePage() {
   if (!feed) return null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 py-4">
+    <div className={cn(hubPanelRoot, "lg:min-h-0 lg:flex-1 lg:overflow-hidden")}>
+      <ScrollArea className="w-full max-lg:overflow-visible lg:h-full lg:flex-1">
+        <div className="mx-auto max-w-4xl space-y-8 px-1 py-4 sm:px-0">
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Compass className="h-7 w-7 text-brand" />
@@ -185,6 +190,8 @@ export function ExplorePage() {
           </Card>
         </>
       ) : null}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

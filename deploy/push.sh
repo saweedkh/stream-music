@@ -8,15 +8,17 @@ cd "$ROOT"
 SYNC_ENV="${ROOT}/deploy/sync.env"
 DRY_RUN=0
 SYNC_ONLY=0
+WITH_ENV=0
 
 usage() {
   cat <<'EOF'
 Usage: ./deploy/push.sh [options]
 
   Sync code to the server (rsync) and run ./deploy/up.sh remotely.
-  Does NOT delete Postgres/media volumes. Does NOT overwrite .env.production on the server.
+  Does NOT delete Postgres/media volumes. By default does NOT overwrite .env.production on the server.
 
 Options:
+  --with-env    Also rsync ./.env.production to the server (overwrites remote copy)
   --dry-run     Show rsync changes without copying or deploying
   --sync-only   Rsync only; skip remote ./deploy/up.sh
   -h, --help    This help
@@ -30,12 +32,18 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --with-env) WITH_ENV=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --sync-only) SYNC_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[push] Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
+
+if [[ "$WITH_ENV" -eq 1 && ! -f "${ROOT}/.env.production" ]]; then
+  echo "[push] --with-env requires ${ROOT}/.env.production on this machine" >&2
+  exit 1
+fi
 
 if [[ ! -f "$SYNC_ENV" ]]; then
   echo "[push] Missing $SYNC_ENV" >&2
@@ -185,6 +193,15 @@ rsync "${RSYNC_OPTS[@]}" \
   -e "$(rsync_rsh)" \
   "${ROOT}/" \
   "$REMOTE"
+
+if [[ "$WITH_ENV" -eq 1 ]]; then
+  echo "[push] Uploading .env.production…"
+  # shellcheck disable=SC2046
+  rsync "${RSYNC_OPTS[@]}" \
+    -e "$(rsync_rsh)" \
+    "${ROOT}/.env.production" \
+    "${REMOTE}.env.production"
+fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "[push] Dry run complete (no deploy)."

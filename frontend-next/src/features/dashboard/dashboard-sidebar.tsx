@@ -9,6 +9,7 @@ import {
   type AdminSection,
   type ProfileSection,
   dashboardNavSections,
+  isDashboardRouteNavItem,
   type DashboardNavSection,
 } from "@/features/dashboard/dashboard-nav-config";
 import type { DashboardTab } from "@/features/dashboard/dashboard-types";
@@ -29,6 +30,7 @@ function SectionDivider() {
 }
 
 type DashboardSidebarProps = {
+  activePathname?: string | null;
   activeTab: DashboardTab;
   activeProfileSection: ProfileSection;
   activeAdminSection: AdminSection;
@@ -41,14 +43,27 @@ type DashboardSidebarProps = {
   className?: string;
 };
 
+function mainSectionRouteActive(section: DashboardNavSection, activePathname: string | null | undefined): boolean {
+  if (section.variant !== "main") return false;
+  return section.items.some(
+    (item) => isDashboardRouteNavItem(item) && Boolean(activePathname?.startsWith(item.href)),
+  );
+}
+
 function sectionHasActive(
   section: DashboardNavSection,
+  activePathname: string | null | undefined,
   activeTab: DashboardTab,
   activeProfileSection: ProfileSection,
   activeAdminSection: AdminSection,
 ): boolean {
   if (section.variant === "main") {
-    return section.items.some((item) => item.id === activeTab);
+    const routeActive = mainSectionRouteActive(section, activePathname);
+    return section.items.some((item) =>
+      isDashboardRouteNavItem(item)
+        ? activePathname?.startsWith(item.href)
+        : !routeActive && item.id === activeTab,
+    );
   }
   if (section.variant === "account") {
     return activeTab === "settings" && section.items.some((item) => item.id === activeProfileSection);
@@ -57,12 +72,13 @@ function sectionHasActive(
 }
 
 function defaultExpanded(
+  activePathname: string | null | undefined,
   activeTab: DashboardTab,
   activeProfileSection: ProfileSection,
   activeAdminSection: AdminSection,
 ): Record<CollapsibleSectionId, boolean> {
   return {
-    channels: activeTab === "channels" || activeTab === "following",
+    channels: activeTab === "channels" || activeTab === "following" || Boolean(activePathname?.startsWith("/explore")),
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
     help: activeTab === "support",
     favorites: activeTab === "favoritePlaylists" || activeTab === "favoriteTracks",
@@ -72,6 +88,7 @@ function defaultExpanded(
 }
 
 export function DashboardSidebar({
+  activePathname,
   activeTab,
   activeProfileSection,
   activeAdminSection,
@@ -87,12 +104,12 @@ export function DashboardSidebar({
   const sections = dashboardNavSections(Boolean(user?.is_superuser));
 
   const [expanded, setExpanded] = useState<Record<CollapsibleSectionId, boolean>>(() =>
-    defaultExpanded(activeTab, activeProfileSection, activeAdminSection),
+    defaultExpanded(activePathname, activeTab, activeProfileSection, activeAdminSection),
   );
   useEffect(() => {
     setExpanded((prev) => {
       const next = { ...prev };
-      if (activeTab === "channels") next.channels = true;
+      if (activeTab === "channels" || activePathname?.startsWith("/explore")) next.channels = true;
       if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
       if (activeTab === "support") next.help = true;
       if (activeTab === "favoritePlaylists" || activeTab === "favoriteTracks") next.favorites = true;
@@ -100,7 +117,7 @@ export function DashboardSidebar({
       if (activeTab === "admin") next.admin = true;
       return next;
     });
-  }, [activeTab]);
+  }, [activePathname, activeTab]);
 
   function toggleSection(id: CollapsibleSectionId) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -178,7 +195,7 @@ export function DashboardSidebar({
 
         {sections.map((section, sectionIndex) => {
           const isOpen = expanded[section.id];
-          const hasActive = sectionHasActive(section, activeTab, activeProfileSection, activeAdminSection);
+          const hasActive = sectionHasActive(section, activePathname, activeTab, activeProfileSection, activeAdminSection);
           const isAdminSection = section.variant === "admin";
 
           return (
@@ -217,33 +234,60 @@ export function DashboardSidebar({
                   {section.variant === "main"
                     ? section.items.map((item) => {
                         const Icon = item.icon;
-                        const isActive = activeTab === item.id;
+                        const isRoute = isDashboardRouteNavItem(item);
+                        const routeActiveInSection = mainSectionRouteActive(section, activePathname);
+                        const isActive = isRoute
+                          ? Boolean(activePathname?.startsWith(item.href))
+                          : !routeActiveInSection && activeTab === item.id;
+                        const rowClass = cn(
+                          "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                          isActive
+                            ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
+                            : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                        );
                         return (
                           <li key={item.id}>
-                            <button
-                              type="button"
-                              onClick={() => handleMainTab(item.id)}
-                              className={cn(
-                                "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                                isActive
-                                  ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
-                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                              )}
-                              aria-current={isActive ? "page" : undefined}
-                            >
-                              {isActive ? (
-                                <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
-                              ) : null}
-                              <span
-                                className={cn(
-                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
-                                  isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
-                                )}
+                            {isRoute ? (
+                              <Link
+                                href={item.href}
+                                onClick={onSidebarAction}
+                                className={rowClass}
+                                aria-current={isActive ? "page" : undefined}
                               >
-                                <Icon className="h-4 w-4" aria-hidden />
-                              </span>
-                              <span className="truncate">{t(item.labelKey)}</span>
-                            </button>
+                                {isActive ? (
+                                  <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
+                                ) : null}
+                                <span
+                                  className={cn(
+                                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                                    isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4" aria-hidden />
+                                </span>
+                                <span className="truncate">{t(item.labelKey)}</span>
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleMainTab(item.id)}
+                                className={rowClass}
+                                aria-current={isActive ? "page" : undefined}
+                              >
+                                {isActive ? (
+                                  <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
+                                ) : null}
+                                <span
+                                  className={cn(
+                                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                                    isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4" aria-hidden />
+                                </span>
+                                <span className="truncate">{t(item.labelKey)}</span>
+                              </button>
+                            )}
                           </li>
                         );
                       })

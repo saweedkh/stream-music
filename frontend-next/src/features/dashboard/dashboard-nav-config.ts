@@ -85,12 +85,25 @@ export type DashboardMainNavItem = {
   icon: LucideIcon;
 };
 
+export type DashboardRouteNavItem = {
+  id: "explore";
+  href: "/explore";
+  labelKey: MessageKey;
+  icon: LucideIcon;
+};
+
+export type DashboardChannelsNavItem = DashboardMainNavItem | DashboardRouteNavItem;
+
+export function isDashboardRouteNavItem(item: DashboardChannelsNavItem): item is DashboardRouteNavItem {
+  return "href" in item;
+}
+
 export type DashboardNavSection =
   | {
       id: "channels" | "library" | "help" | "favorites";
       titleKey: MessageKey;
       variant: "main";
-      items: DashboardMainNavItem[];
+      items: DashboardMainNavItem[] | DashboardChannelsNavItem[];
     }
   | {
       id: "account";
@@ -114,6 +127,7 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
       items: [
         { id: "channels", labelKey: "dashboard.tab.channels", icon: LayoutGrid },
         { id: "following", labelKey: "dashboard.tab.following", icon: Radio },
+        { id: "explore", href: "/explore", labelKey: "explore.title", icon: Compass },
       ],
     },
     {

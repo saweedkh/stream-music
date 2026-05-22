@@ -88,29 +88,32 @@ export function AppShell({ children }: { children: ReactNode }) {
           {me && !isAuthPage ? (
             <GlobalSearchDialog open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />
           ) : null}
-          <motion.div
-            className={cn(
-              "relative mx-auto w-full",
-              isSelfShelled && (inChannel ? mobilePageRootChannel : mobilePageRoot),
-              isSelfShelled && desktopPageRoot,
-              inChannel && isSelfShelled && "px-2 py-2 sm:px-4 sm:py-4",
-              isDashboard && isSelfShelled && "px-2 py-2 sm:px-3 sm:py-3",
-              (isSelfShelled || useGlobalNav) && !inChannel && cn("max-w-[1500px] px-3 py-3 sm:px-4 sm:py-4", playerDockPad),
-              isAuthPage && "max-w-lg px-4 py-6",
-              !isAuthPage && !isSelfShelled && !useGlobalNav && cn("min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-6", playerDockPad),
-              (isSelfShelled || useGlobalNav) && "max-w-[1500px]",
-            )}
-            {...fadeUp}
-          >
-            <ConnectivityBanner />
-            {useGlobalNav ? (
-              <AppGlobalNavShell>{children}</AppGlobalNavShell>
-            ) : (
-              <main className={cn(isSelfShelled && mobileMain, isSelfShelled && desktopMain)}>
-                {children}
-              </main>
-            )}
-          </motion.div>
+          {isAuthPage ? (
+            children
+          ) : (
+            <motion.div
+              className={cn(
+                "relative mx-auto w-full",
+                (isSelfShelled || useGlobalNav) && (inChannel ? mobilePageRootChannel : mobilePageRoot),
+                (isSelfShelled || useGlobalNav) && desktopPageRoot,
+                inChannel && isSelfShelled && "px-2 py-2 sm:px-4 sm:py-4",
+                isDashboard && isSelfShelled && "px-2 py-2 sm:px-3 sm:py-3",
+                (isSelfShelled || useGlobalNav) && !inChannel && cn("max-w-[1500px] px-3 py-3 sm:px-4 sm:py-4", playerDockPad),
+                !isSelfShelled && !useGlobalNav && cn("min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-6", playerDockPad),
+                (isSelfShelled || useGlobalNav) && "max-w-[1500px]",
+              )}
+              {...fadeUp}
+            >
+              <ConnectivityBanner />
+              {useGlobalNav ? (
+                <AppGlobalNavShell>{children}</AppGlobalNavShell>
+              ) : (
+                <main className={cn(isSelfShelled && mobileMain, isSelfShelled && desktopMain)}>
+                  {children}
+                </main>
+              )}
+            </motion.div>
+          )}
           <GlobalChannelPlayerDock />
           {me && !isAuthPage ? <PwaInstallBanner /> : null}
         </GlobalChannelPlayerProvider>

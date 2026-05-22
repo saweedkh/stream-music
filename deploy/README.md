@@ -13,6 +13,9 @@ chmod +x deploy/push.sh
 
 ترجیحاً `ssh-copy-id` بزنید و `SSH_PASSWORD` را خالی بگذارید. برای پسورد: `brew install hudochenkov/sshpass/sshpass`.
 
+**مسیر سرور (ثابت):** `REMOTE_PATH=/root/stream-music` در `deploy/sync.env`.  
+کد، `docker compose` و **`.env.production`** فقط همین‌جا خوانده می‌شوند — `/root/stream-music/.env.production`.
+
 ---
 
 یک دستور برای بالا آوردن کل استک روی سرور مرکزی:

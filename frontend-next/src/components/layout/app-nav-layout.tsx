@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useTranslations } from "@/components/providers/locale-provider";
@@ -34,17 +35,20 @@ export function AppNavLayout({
   onSelectAdminSection,
   children,
 }: AppNavLayoutProps) {
+  const pathname = usePathname();
   const { t } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const contentKey =
-    activeTab === "settings"
-      ? `settings-${activeProfileSection}`
-      : activeTab === "admin"
-        ? `admin-${activeAdminSection}`
-        : activeTab;
+    pathname?.startsWith("/explore")
+      ? "explore"
+      : activeTab === "settings"
+        ? `settings-${activeProfileSection}`
+        : activeTab === "admin"
+          ? `admin-${activeAdminSection}`
+          : activeTab;
 
   useEffect(() => {
     getMe()
@@ -71,6 +75,7 @@ export function AppNavLayout({
   }
 
   const sidebarProps = {
+    activePathname: pathname,
     activeTab,
     activeProfileSection,
     activeAdminSection,
