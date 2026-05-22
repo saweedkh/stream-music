@@ -1,4 +1,4 @@
-# Production stack: Postgres + Redis + Django (Daphne) + Next (standalone) + Caddy (TLS).
+# Production stack: Postgres + Redis + Django (Daphne) + Next (standalone) + nginx (TLS from host Certbot).
 # Usage: ./deploy/up.sh   (see deploy/README.md)
 
 services:
@@ -62,21 +62,22 @@ services:
     depends_on:
       - backend
 
-  caddy:
-    image: caddy:2-alpine
+  nginx:
+    image: nginx:alpine
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/nginx-prod-entrypoint.sh"]
     ports:
       - "80:80"
       - "443:443"
-      # Same TLS site as :443 (matches dev nginx convention on LAN).
+      # Same HTTPS config as :443 (matches dev nginx :8443 convention on LAN).
       - "8443:443"
-      # Plain HTTP for LAN when HTTPS stack/clients misbehave (must relax SESSION_COOKIE_SECURE — see deploy/up.sh hint).
+      # Plain HTTP for LAN (must relax SESSION_COOKIE_SECURE — see deploy/up.sh hint).
       - "8080:8080"
     volumes:
-      - ./deploy/Caddyfile.generated:/etc/caddy/Caddyfile:ro
-      - media_data:/srv/media:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./deploy/nginx-prod-entrypoint.sh:/nginx-prod-entrypoint.sh:ro
+      - ./deploy/nginx.generated.conf:/etc/nginx/conf.d/00-stream-music.conf:ro
+      - ${TLS_CERT_HOST_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+      - media_data:/media:ro
     depends_on:
       - frontend
       - backend
@@ -84,5 +85,3 @@ services:
 volumes:
   postgres_data:
   media_data:
-  caddy_data:
-  caddy_config:

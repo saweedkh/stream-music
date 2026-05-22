@@ -8,7 +8,7 @@ PRIMARY_IP="${1:?primary ip}"
 SITE_DOMAIN="${2:-}"
 
 ORIGINS="http://${PRIMARY_IP},https://${PRIMARY_IP},http://${PRIMARY_IP}:8080,https://${PRIMARY_IP}:8443"
-ALLOWED="${PRIMARY_IP},127.0.0.1,localhost,backend,caddy"
+ALLOWED="${PRIMARY_IP},127.0.0.1,localhost,backend,nginx"
 
 if [[ -n "$SITE_DOMAIN" ]]; then
   PUBLIC_HOST="$SITE_DOMAIN"

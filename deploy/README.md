@@ -25,16 +25,19 @@ cp deploy/env.production.example .env.production
 ./deploy/up.sh
 ```
 
-## دو حالت TLS
+## TLS (nginx + Certbot روی host)
 
-1. **دامنه واقعی (پیشنهادی)** — سرتی Let's Encrypt خودکار (پورت‌های **۸۰ و ۴۴۳** باید از اینترنت به همین ماشین برسند):
+1. گواهی را روی سرور بگیرید (مثلاً `certbot certonly` → `/etc/letsencrypt/live/saweedkh.ir/`).
+2. در `.env.production` تنظیم کنید:
 
-   ```bash
-   export SITE_DOMAIN=music.example.com
-   ./deploy/up.sh
+   ```env
+   SITE_DOMAIN=music.saweedkh.ir
+   TLS_CERT_NAME=saweedkh.ir
    ```
 
-2. **فقط IP** — اگر `SITE_DOMAIN` ندهید، اسکریپت IP اصلی را تشخیص می‌دهد و Caddy با **`tls internal`** بالا می‌آید (مرورگر هشدار می‌دهد مگر CA را قبول کنید).
+3. `./deploy/up.sh` — nginx همان فایل‌های `fullchain.pem` / `privkey.pem` را mount می‌کند.
+
+بدون `TLS_CERT_NAME` فقط **HTTP روی :8080** فعال است (بدون بلوک :443).
 
 اسکریپت **`deploy/render-env-generated.sh`** مقدار **`ALLOWED_HOSTS`** و **`CORS_EXTRA_ORIGINS`** را از IP تشخیص‌شده + دامنه تکمیل می‌کند.
 
@@ -70,4 +73,4 @@ docker compose --env-file deploy/.env.runtime.merged \
 
 - `deploy/.env.generated`
 - `deploy/.env.runtime.merged` (ادغام `.env.production` + generated برای Compose و سرویس‌ها)
-- `deploy/Caddyfile.generated`
+- `deploy/nginx.generated.conf`

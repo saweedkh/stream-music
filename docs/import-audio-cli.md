@@ -72,7 +72,7 @@ chmod +x deploy/import-audio.sh   # once
 
 `YOUR_USERNAME` must exist in **that** database (create a superuser inside the backend container if needed: `docker compose … exec backend python manage.py createsuperuser`).
 
-Files are copied into `/media` inside the container (persisted in the `media_data` volume); Caddy already serves `/audio/` from that volume.
+Files are copied into `/media` inside the container (persisted in the `media_data` volume); nginx already serves `/audio/` from that volume.
 
 ### Dev stack (`docker-compose.yml`)
 

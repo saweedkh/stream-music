@@ -53,7 +53,7 @@ Quick start:
 cp deploy/env.production.example .env.production
 # edit SECRET_KEY and POSTGRES_PASSWORD
 ./deploy/up.sh
-# or: SITE_DOMAIN=music.example.com ./deploy/up.sh
+# edit SITE_DOMAIN + TLS_CERT_NAME in .env.production, then ./deploy/up.sh
 ```
 
 ## Mirrors

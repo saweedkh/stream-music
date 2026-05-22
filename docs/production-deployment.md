@@ -1,6 +1,6 @@
 # راه‌اندازی پروداکشن (Docker — سرور مرکزی)
 
-این سند نصب کامل استک **Stream Music** برای محیط پروداکشن را شرح می‌دهد: PostgreSQL، Redis، Django (Daphne + Channels)، Next.js (standalone)، و **Caddy** برای HTTPS و پروکسی معکوس.
+این سند نصب کامل استک **Stream Music** برای محیط پروداکشن را شرح می‌دهد: PostgreSQL، Redis، Django (Daphne + Channels)، Next.js (standalone)، و **nginx** برای HTTPS (گواهی Certbot روی host) و پروکسی معکوس.
 
 برای راهنمای کوتاه اسکریپت‌ها، [`deploy/README.md`](../deploy/README.md) را هم ببینید.
 
@@ -14,7 +14,7 @@
 | **redis** | Channels layer و کش |
 | **backend** | API، WebSocket، فایل مدیا روی ولوم `media_data` |
 | **frontend** | Next.js با خروجی `standalone` — پورت ۳۰۰۰ فقط داخلی |
-| **caddy** | پورت‌های **۸۰** و **۴۴۳** عمومی؛ TLS؛ مسیر `/api`، `/ws`، `/audio`، و بقیه به فرانت |
+| **nginx** | پورت‌های **۸۰**، **۴۴۳**، **۸۴۴۳**، **۸۰۸۰**؛ TLS از `/etc/letsencrypt`؛ مسیر `/api`، `/ws`، `/audio`، و بقیه |
 
 کلاینت همیشه با همان **origin** صفحه به API وصل می‌شود؛ نیازی به `NEXT_PUBLIC_API_URL` جدا برای مرورگر نیست.
 
@@ -24,9 +24,9 @@
 
 - **Docker Engine** و **Docker Compose V2** (مثلاً `docker compose version`).
 - حداقل چند گیگابایت RAM برای بیلد فرانت و اجرای همزمان سرویس‌ها.
-- برای HTTPS واقعی با دامنه:
-  - رکورد **DNS A** (یا AAAA) دامنه به IP عمومی همین سرور.
-  - پورت‌های **۸۰** و **۴۴۳** باز به این ماشین (برای چالش Let's Encrypt).
+- برای HTTPS:
+  - گواهی **Certbot** روی host (مثلاً `/etc/letsencrypt/live/saweedkh.ir/`).
+  - رکورد **DNS** دامنه به IP سرور؛ پورت‌های **۸۰** و **۴۴۳** باز.
 
 ---
 
@@ -36,7 +36,7 @@
 |------|------------------------------|--------------------------------------|
 | کد روی دیسک | با volume به‌روز می‌شود | داخل ایمیج bake شده |
 | فرانت | `npm run dev` | `next build` + `node server.js` |
-| TLS | اختیاری nginx محلی :۸۴۴۳ | Caddy روی :۴۴۳ |
+| TLS | اختیاری nginx محلی :۸۴۴۳ | nginx پروداکشن :۴۴۳ (Certbot) |
 | ورود یک دستور | دستی چند سرویس | `./deploy/up.sh` |
 
 ---
@@ -49,7 +49,7 @@
 git clone https://github.com/saweedkh/stream-music.git
 cd stream-music
 chmod +x deploy/up.sh deploy/down.sh deploy/lib/detect-primary-ip.sh \
-  deploy/render-env-generated.sh deploy/render-caddyfile.sh
+  deploy/render-env-generated.sh deploy/render-nginx-prod.sh
 ```
 
 ### ۴.۲ فایل محیط پروداکشن
@@ -70,16 +70,14 @@ nano .env.production   # یا vim / هر ویرایشگر
 
 ### ۴.۳ بالا آوردن استک
 
-**بدون دامنه (فقط IP، گواهی خودامضای Caddy):**
+در `.env.production` حداقل `TLS_CERT_NAME` (نام پوشهٔ Certbot) را تنظیم کنید؛ برای دامنهٔ مرورگر `SITE_DOMAIN` را هم بگذارید:
 
-```bash
-./deploy/up.sh
+```env
+SITE_DOMAIN=music.saweedkh.ir
+TLS_CERT_NAME=saweedkh.ir
 ```
 
-**با دامنه و Let's Encrypt خودکار:**
-
 ```bash
-export SITE_DOMAIN=music.example.com
 ./deploy/up.sh
 ```
 
@@ -87,7 +85,7 @@ export SITE_DOMAIN=music.example.com
 
 1. تشخیص **IPv4 اصلی** ماشین (`deploy/lib/detect-primary-ip.sh`).
 2. نوشتن **`deploy/.env.generated`** (شامل `ALLOWED_HOSTS`, `CORS_EXTRA_ORIGINS`, `PRIMARY_IP`, `PUBLIC_HOST`, در صورت امکان `DETECTED_PUBLIC_IPV4`).
-3. نوشتن **`deploy/Caddyfile.generated`** (دامنه → HTTPS خودکار؛ بدون دامنه → `tls internal`).
+3. نوشتن **`deploy/nginx.generated.conf`** (مسیرهای `fullchain.pem` / `privkey.pem` از Certbot).
 4. ادغام **`.env.production` + `.env.generated`** در **`deploy/.env.runtime.merged`** (برای Compose و سرویس backend).
 5. **`docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml up -d --build`**
 
@@ -106,22 +104,25 @@ export SITE_DOMAIN=music.example.com
 | `MEDIA_ROOT` | درون کانتینر معمولاً `/media` و با ولوم `media_data` یکسان است. |
 | `CORS_EXTRA_ORIGINS` | در صورت نیاز به originهای اضافی؛ اسکریپت خودش بر اساس IP و دامنه مقدار می‌دهد. |
 | `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | با HTTPS روی `1` بمانند مگر TLS را جای دیگری خاتمه دهید. |
-
-متغیر **`SITE_DOMAIN`** در shell قبل از `up.sh` ست می‌شود، نه لزوماً داخل `.env.production`.
+| `SITE_DOMAIN` | hostname مرورگر (باید با SAN گواهی هم‌خوان باشد). |
+| `TLS_CERT_NAME` | نام پوشه زیر `/etc/letsencrypt/live/` (مثلاً `saweedkh.ir`). |
+| `TLS_CERT_DIR` | پیش‌فرض `/etc/letsencrypt/live` (مسیر داخل کانتینر). |
+| `TLS_CERT_HOST_DIR` | پیش‌فرض `/etc/letsencrypt` (mount به nginx). |
 
 ---
 
 ## ۶. TLS و DNS
 
-### ۶.۱ حالت دامنه (`SITE_DOMAIN`)
+### ۶.۱ گواهی Certbot روی host
 
-- Caddy به‌صورت پیش‌فرض برای نام عمومی، گواهی **Let's Encrypt** می‌گیرد.
-- باید **۸۰** و **۴۴۳** از اینترنت به همین سرور برسند و DNS درست باشد.
+- nginx فایل‌ها را از **`/etc/letsencrypt/live/<TLS_CERT_NAME>/`** می‌خواند (`fullchain.pem`, `privkey.pem`).
+- بعد از `certbot renew`:  
+  `docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml exec nginx nginx -s reload`
 
-### ۶.۲ حالت فقط IP
+### ۶.۲ `SITE_DOMAIN` و SAN گواهی
 
-- در **`deploy/render-caddyfile.sh`** از **`tls internal`** استفاده می‌شود؛ مرورگر هشدار امنیتی نشان می‌دهد مگر گواهی را به‌صورت دستی اعتماد دهید.
-- برای استفادهٔ واقعی کاربران، حالت دامنه توصیه می‌شود.
+- اگر کاربر `https://music.saweedkh.ir` باز می‌کند، گواهی باید آن subdomain را پوشش دهد (یا Certbot را با `-d music.saweedkh.ir` بگیرید).
+- بدون `TLS_CERT_NAME` فقط **HTTP :8080** فعال است.
 
 ---
 
@@ -131,7 +132,7 @@ export SITE_DOMAIN=music.example.com
 
 - `deploy/.env.generated`
 - `deploy/.env.runtime.merged` (شامل اسرار — هر بار با `./deploy/up.sh` بازسازی می‌شود)
-- `deploy/Caddyfile.generated`
+- `deploy/nginx.generated.conf`
 
 هر بار بعد از تغییر دامنه یا شبکه، دوباره **`./deploy/up.sh`** بزنید تا این فایل‌ها هماهنگ شوند.
 
@@ -143,7 +144,7 @@ export SITE_DOMAIN=music.example.com
 
 ```bash
 docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml logs -f backend
-docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml logs -f caddy
+docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml logs -f nginx
 ```
 
 ### ایجاد ادمین Django
@@ -179,7 +180,7 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 |------|--------|
 | `postgres_data` | دیتابیس |
 | `media_data` | فایل‌های صوتی و مدیا |
-| `caddy_data`, `caddy_config` | گواهی‌ها و پیکربندی Caddy |
+| (host) `/etc/letsencrypt` | گواهی TLS — mount به nginx |
 
 برای بکاپ منظم از Postgres می‌توانید دوره‌ای **`pg_dump`** از داخل کانتینر `postgres` بگیرید یا کل ولوم را snapshot کنید.
 
@@ -202,9 +203,9 @@ git pull
 |------|--------|
 | خطای `POSTGRES_PASSWORD required` | مقدار در `.env.production` و سپس دوباره `./deploy/up.sh`. |
 | خطای مربوط به `env.runtime.merged` | هرگز بدون اسکریپت Compose را با prod بالا نیاورید؛ اول `./deploy/up.sh`. |
-| لیست‌بوک Let's Encrypt | DNS، فایروال ۸۰/۴۴۳، و صحت `SITE_DOMAIN`. |
+| `ERR_SSL` / گواهی نامعتبر | مسیر Certbot، `TLS_CERT_NAME`، و تطابق `SITE_DOMAIN` با SAN گواهی. |
 | CSRF / CORS | مطمئن شوید از همان آدرسی که در مرورگر باز کرده‌اید وارد می‌شوید؛ مقادیر `ALLOWED_HOSTS` و `CORS_EXTRA_ORIGINS` بعد از تغییر شبکه با اسکریپت بازتولید شوند. |
-| وب‌سوکت قطع می‌شود | Caddy مسیر `/ws/` را به backend پروکسی می‌کند؛ پشت CDN همهٔ ارائه‌دهندگان WS را پشتیبانی نمی‌کنند. |
+| وب‌سوکت قطع می‌شود | nginx مسیر `/ws/` را به backend پروکسی می‌کند؛ پشت CDN همهٔ ارائه‌دهندگان WS را پشتیبانی نمی‌کنند. |
 
 ---
 
@@ -223,4 +224,4 @@ git pull
 - `backend-django/Dockerfile.prod` — backend بدون mirror اجباری PyPI در Dockerfile توسعه.
 - `frontend-next/Dockerfile.prod` — بیلد npm از registry عمومی؛ خروجی standalone.
 - `deploy/up.sh`, `deploy/down.sh` — ورود و خروج یکپارچه.
-- `deploy/render-env-generated.sh`, `deploy/render-caddyfile.sh` — تولید کانفیگ از IP و دامنه.
+- `deploy/render-env-generated.sh`, `deploy/render-nginx-prod.sh` — تولید کانفیگ از IP، دامنه، و مسیر Certbot.

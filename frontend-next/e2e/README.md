@@ -42,7 +42,7 @@ export NEXT_PUBLIC_WS_BASE_URL=ws://127.0.0.1:8002
 npm run test:e2e:social
 ```
 
-Do not use port **8080** if the production Caddy container is running without the dev `backend` service on the same network — API calls will return empty responses.
+Do not use port **8080** if the production nginx container is running without the dev `backend` service on the same network — API calls will return empty responses.
 
 ## Rate limits
 

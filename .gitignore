@@ -25,4 +25,4 @@ infra/nginx/ssl/*.key
 deploy/sync.env
 deploy/.env.generated
 deploy/.env.runtime.merged
-deploy/Caddyfile.generated
+deploy/nginx.generated.conf

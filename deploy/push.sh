@@ -157,7 +157,7 @@ RSYNC_EXCLUDES=(
   --exclude 'deploy/sync.env'
   --exclude 'deploy/.env.generated'
   --exclude 'deploy/.env.runtime.merged'
-  --exclude 'deploy/Caddyfile.generated'
+  --exclude 'deploy/nginx.generated.conf'
   --exclude 'media/'
   --exclude '.DS_Store'
   --exclude '.cursor/'
