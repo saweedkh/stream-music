@@ -229,7 +229,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         ) : null}
 
         <motion.div {...staggerItem}>
-          <button type="button" className="auth-submit" onClick={onSubmit} disabled={busy || !username || !password}>
+          <button type="button" className="auth-submit auth-cta-shimmer" onClick={onSubmit} disabled={busy || !username || !password}>
             {busy ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
