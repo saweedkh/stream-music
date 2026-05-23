@@ -7,6 +7,7 @@ import {
   ListMusic,
   ListPlus,
   Loader2,
+  Download,
   Pencil,
   Play,
   PlayCircle,
@@ -28,6 +29,7 @@ import { Select } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { listenerFieldClass } from "@/features/channels/channel-listener-panel-styles";
+import { ImportPlaylistToChannelDialog } from "@/features/playlists/import-playlist-to-channel-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   addPlaylistItem,
@@ -101,6 +103,7 @@ export function ChannelAdminPlaylistPanel({ channelId, canManage, sendSocketMess
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const selectedPlaylist = playlists.find((p) => String(p.id) === selectedPlaylistId);
 
@@ -545,16 +548,28 @@ export function ChannelAdminPlaylistPanel({ channelId, canManage, sendSocketMess
           </h2>
         </div>
         {canManage ? (
-          <Button
-            type="button"
-            size="sm"
-            className="h-9 shrink-0 gap-2 bg-brand px-3 text-brand-foreground shadow-md shadow-brand/15 hover:bg-brand-strong"
-            disabled={shuffling}
-            onClick={() => handleShuffleSocket()}
-          >
-            {shuffling ? <Loader2 className="size-4 animate-spin" /> : <Shuffle className="size-4" />}
-            {t("room.admin.playlist.shuffle")}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 gap-1.5 px-3"
+              onClick={() => setImportOpen(true)}
+            >
+              <Download className="size-4" aria-hidden />
+              <span className="hidden sm:inline">{t("room.admin.playlist.importButton")}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 gap-2 bg-brand px-3 text-brand-foreground shadow-md shadow-brand/15 hover:bg-brand-strong"
+              disabled={shuffling}
+              onClick={() => handleShuffleSocket()}
+            >
+              {shuffling ? <Loader2 className="size-4 animate-spin" /> : <Shuffle className="size-4" />}
+              {t("room.admin.playlist.shuffle")}
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -579,6 +594,16 @@ export function ChannelAdminPlaylistPanel({ channelId, canManage, sendSocketMess
                     className={cn("h-9 flex-1", listenerFieldClass)}
                   />
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9 w-full gap-2"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <Download className="size-4 shrink-0" aria-hidden />
+                  {t("room.admin.playlist.importButton")}
+                </Button>
               </div>
             ) : null}
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("room.admin.playlist.playlists")}</p>
@@ -1055,6 +1080,15 @@ export function ChannelAdminPlaylistPanel({ channelId, canManage, sendSocketMess
         <div className="shrink-0 border-t border-border/40 px-4 py-2.5">
           <p className="text-xs text-muted-foreground">{status}</p>
         </div>
+      ) : null}
+
+      {canManage ? (
+        <ImportPlaylistToChannelDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          channelId={channelId}
+          onComplete={refreshPlaylists}
+        />
       ) : null}
     </div>
   );

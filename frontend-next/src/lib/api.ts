@@ -219,9 +219,16 @@ export type TrackSummary = {
 export type PlaylistSummary = {
   id: number;
   name: string;
+  owner?: number;
   channel: number | null;
   is_auto_generated: boolean;
   is_favorited?: boolean;
+};
+
+export type CopyPlaylistToChannelResult = {
+  playlist: PlaylistSummary;
+  added: number;
+  skipped_inaccessible: number;
 };
 
 export type PaginatedTracks = {
@@ -278,6 +285,14 @@ async function extractApiError(res: Response, fallback: string): Promise<string>
       const { localizeMessage, localizeMessageWithVars } = await import("@/lib/i18n/localize-message");
       if (detail === "too_many_tracks" && typeof (body as { max?: number }).max === "number") {
         return localizeMessageWithVars(detail, { max: (body as { max: number }).max });
+      }
+      if (
+        detail === "playlist_has_inaccessible_tracks" &&
+        typeof (body as { inaccessible_count?: number }).inaccessible_count === "number"
+      ) {
+        return localizeMessageWithVars(detail, {
+          count: (body as { inaccessible_count: number }).inaccessible_count,
+        });
       }
       return localizeMessage(detail);
     }
@@ -693,6 +708,15 @@ export async function listAdminChannels(options?: { search?: string; limit?: num
   });
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load channels"));
   return (await res.json()) as { results: AdminChannelRow[]; total: number; offset: number; limit: number };
+}
+
+export async function patchAdminChannel(channelId: number, payload: { is_active?: boolean }) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/channels/${channelId}`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update channel"));
+  return (await res.json()) as { id: number; name: string; is_active: boolean; is_playing: boolean };
 }
 
 export async function getAdminHealth() {
@@ -1615,6 +1639,27 @@ export async function deletePlaylistItem(itemId: number) {
 export async function deletePlaylist(playlistId: number) {
   const res = await fetch(`${getApiBase()}/api/playlists/${playlistId}/`, await withAuthHeaders({ method: "DELETE" }));
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete playlist"));
+}
+
+export async function copyPlaylistToChannel(
+  playlistId: number,
+  payload: { channel_id: number; name?: string },
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/copy-to-channel/`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot copy playlist to channel"));
+  return (await res.json()) as CopyPlaylistToChannelResult;
+}
+
+export async function assignPlaylistToChannel(playlistId: number, payload: { channel_id: number }) {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/${playlistId}/assign-to-channel/`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot link playlist to channel"));
+  return (await res.json()) as PlaylistSummary;
 }
 
 export async function updatePlaylist(playlistId: number, payload: { name?: string; channel?: number | null }) {

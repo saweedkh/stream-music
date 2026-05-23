@@ -11,6 +11,7 @@ from apps.tracks.upload_views import (
 from apps.common.admin_views import (
     AdminBadgeDetailView,
     AdminBadgesView,
+    AdminChannelDetailView,
     AdminChannelsView,
     AdminHealthView,
     AdminOverviewView,
@@ -147,6 +148,7 @@ urlpatterns = [
     path("admin/badges", AdminBadgesView.as_view()),
     path("admin/badges/<int:badge_id>", AdminBadgeDetailView.as_view()),
     path("admin/channels", AdminChannelsView.as_view()),
+    path("admin/channels/<int:channel_id>", AdminChannelDetailView.as_view()),
     path("admin/health", AdminHealthView.as_view()),
     path("support/categories", SupportCategoriesView.as_view()),
     path("support/tickets", SupportTicketsView.as_view()),

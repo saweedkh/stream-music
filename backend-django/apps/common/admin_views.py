@@ -285,6 +285,30 @@ class AdminChannelsView(APIView):
         return Response({"results": results, "total": total, "offset": offset, "limit": limit})
 
 
+class AdminChannelDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
+
+    def patch(self, request, channel_id: int):
+        channel = Channel.objects.filter(id=channel_id).first()
+        if channel is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        update_fields: list[str] = []
+        if "is_active" in request.data:
+            channel.is_active = bool(request.data["is_active"])
+            update_fields.append("is_active")
+        if update_fields:
+            channel.save(update_fields=update_fields)
+        playing = PlaybackSession.objects.filter(channel_id=channel.id, is_playing=True).exists()
+        return Response(
+            {
+                "id": channel.id,
+                "name": channel.name,
+                "is_active": channel.is_active,
+                "is_playing": playing,
+            }
+        )
+
+
 class AdminHealthView(APIView):
     permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
 

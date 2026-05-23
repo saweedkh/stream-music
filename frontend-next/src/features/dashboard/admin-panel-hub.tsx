@@ -34,6 +34,7 @@ import {
   listAdminChannels,
   listAdminUsers,
   patchAdminBadge,
+  patchAdminChannel,
   patchAdminUser,
   type AdminBadgeDefinition,
   type AdminChannelRow,
@@ -102,6 +103,7 @@ export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }
   });
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const [busyChannelId, setBusyChannelId] = useState<number | null>(null);
   const [busyBadgeId, setBusyBadgeId] = useState<number | null>(null);
 
   const loadOverview = useCallback(async () => {
@@ -157,6 +159,19 @@ export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }
       showToast(e instanceof Error ? e.message : t("admin.loadFailed"), "error");
     } finally {
       setBusyUserId(null);
+    }
+  }
+
+  async function toggleChannelActive(ch: AdminChannelRow) {
+    setBusyChannelId(ch.id);
+    try {
+      await patchAdminChannel(ch.id, { is_active: !ch.is_active });
+      await loadChannels(channelSearch);
+      showToast(t("admin.channelUpdated"), "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t("admin.channelUpdateFailed"), "error");
+    } finally {
+      setBusyChannelId(null);
     }
   }
 
@@ -510,8 +525,16 @@ export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {ch.is_playing ? <Badge variant="success">{t("channels.live")}</Badge> : null}
-                    {!ch.is_active ? <Badge variant="warning">{t("channels.closed")}</Badge> : null}
+                    {!ch.is_active ? <Badge variant="warning">{t("admin.channelSuspended")}</Badge> : null}
                     <Badge variant="default">{t("admin.memberCount", { count: ch.member_count })}</Badge>
+                    <label className="flex items-center gap-2 text-xs">
+                      <Switch
+                        checked={ch.is_active}
+                        disabled={busyChannelId === ch.id}
+                        onCheckedChange={() => void toggleChannelActive(ch)}
+                      />
+                      {ch.is_active ? t("admin.channelActive") : t("admin.channelSuspended")}
+                    </label>
                     <Button size="sm" variant="secondary" asChild>
                       <Link href={`/channel/${ch.id}`}>{t("channels.enterRoom")}</Link>
                     </Button>

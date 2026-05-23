@@ -86,7 +86,8 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name ${SERVER_NAMES};
 
     ssl_certificate     ${CERT};

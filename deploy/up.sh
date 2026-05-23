@@ -104,6 +104,17 @@ if [[ -z "${PRIMARY_IP:-}" ]]; then
   PRIMARY_IP="$("$DETECT_IP")"
 fi
 
+# Do not emit :443 if Certbot files are missing on the host — nginx exits otherwise.
+if [[ -n "$TLS_CERT_NAME" ]]; then
+  _cert_dir_on_host="${TLS_CERT_HOST_DIR}/live/${TLS_CERT_NAME}"
+  if [[ ! -f "${_cert_dir_on_host}/fullchain.pem" || ! -f "${_cert_dir_on_host}/privkey.pem" ]]; then
+    echo "[deploy] WARN: TLS cert not found on host: ${_cert_dir_on_host}/"
+    echo "[deploy]        Skipping HTTPS (:443). Use http://${PRIMARY_IP}:8080/ until certbot is installed."
+    echo "[deploy]        Fix: certbot certonly … then re-run ./deploy/up.sh"
+    TLS_CERT_NAME=""
+  fi
+fi
+
 _ENV_ABS="$(cd "$(dirname "$ENV_MAIN")" && pwd)/$(basename "$ENV_MAIN")"
 echo "[deploy] Env source: server file only → ${_ENV_ABS}"
 echo "[deploy] Expected project root: /root/stream-music (set REMOTE_PATH=/root/stream-music in deploy/sync.env)."

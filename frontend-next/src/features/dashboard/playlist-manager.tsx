@@ -9,6 +9,7 @@ import {
   ListMusic,
   Loader2,
   Music,
+  Radio,
   Pencil,
   Plus,
   Search,
@@ -35,10 +36,12 @@ import { Select } from "@/components/ui/select";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { AddPlaylistToChannelDialog } from "@/features/playlists/add-playlist-to-channel-dialog";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,
   createPlaylist,
+  getMe,
   createPlaylistShareLink,
   getPlaylistShareLink,
   deletePlaylist,
@@ -60,6 +63,7 @@ import {
   type TrackSummary,
 } from "@/lib/api";
 import { uploadTrackResumable } from "@/lib/resumable-upload";
+import { cn } from "@/lib/utils";
 
 const CHUNK = 50;
 const DEBOUNCE_MS = 300;
@@ -92,7 +96,8 @@ export function PlaylistManager() {
   // ─── raw data ────────────────────────────────────────────────────────────────
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
-  const [allItems, setAllItems] = useState<PlaylistItemSummary[]>([]);
+  const [playlistItems, setPlaylistItems] = useState<PlaylistItemSummary[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
   const [libraryTracks, setLibraryTracks] = useState<TrackSummary[]>([]);
   const [libraryTotal, setLibraryTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -102,9 +107,14 @@ export function PlaylistManager() {
   const [shareBusy, setShareBusy] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const selectedPlaylist = useMemo(() => playlists.find((p) => p.id === selectedPlaylistId) ?? null, [playlists, selectedPlaylistId]);
-  const playlistItems = useMemo(
-    () => allItems.filter((i) => i.playlist === selectedPlaylistId).sort((a, b) => a.position - b.position),
-    [allItems, selectedPlaylistId],
+  const sortedPlaylistItems = useMemo(
+    () => [...playlistItems].sort((a, b) => a.position - b.position),
+    [playlistItems],
+  );
+
+  const activeChannels = useMemo(
+    () => channels.filter((ch) => ch.is_active !== false),
+    [channels],
   );
 
   // ─── library search ───────────────────────────────────────────────────────
@@ -164,6 +174,10 @@ export function PlaylistManager() {
   const [favoriteBusyTrackId, setFavoriteBusyTrackId] = useState<number | null>(null);
   const [favoriteBusyPlaylistId, setFavoriteBusyPlaylistId] = useState<number | null>(null);
 
+  const [addToChannelOpen, setAddToChannelOpen] = useState(false);
+  const [addToChannelPlaylist, setAddToChannelPlaylist] = useState<PlaylistSummary | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
   // ─── data loading ─────────────────────────────────────────────────────────
   const fetchLibrary = useCallback(
     async (search: string, offset: number, favoritedOnly = libFavoritesOnly) => {
@@ -199,12 +213,14 @@ export function PlaylistManager() {
   const refreshMeta = useCallback(
     async (favoritedOnly = playlistsFavoritesOnly) => {
       try {
-        const [c, p] = await Promise.all([
+        const [c, p, me] = await Promise.all([
           listChannels(),
           listPlaylists(undefined, { favorited: favoritedOnly || undefined }),
+          getMe(),
         ]);
         setChannels(c);
         setPlaylists(p);
+        setCurrentUserId(me?.user?.id ?? null);
       } catch {
         showToast(t("playlists.cannotRefresh"), "error");
       }
@@ -212,29 +228,44 @@ export function PlaylistManager() {
     [playlistsFavoritesOnly, showToast, t],
   );
 
-  const refreshItems = useCallback(async () => {
-    try {
-      const items = await listPlaylistItems();
-      setAllItems(items);
-    } catch {
-      showToast(t("playlists.cannotRefreshItems"), "error");
-    }
-  }, [showToast]);
+  const refreshItems = useCallback(
+    async (playlistId: number | null = selectedPlaylistId) => {
+      if (playlistId == null) {
+        setPlaylistItems([]);
+        return;
+      }
+      setItemsLoading(true);
+      try {
+        const items = await listPlaylistItems(playlistId);
+        setPlaylistItems(items);
+      } catch {
+        showToast(t("playlists.cannotRefreshItems"), "error");
+        setPlaylistItems([]);
+      } finally {
+        setItemsLoading(false);
+      }
+    },
+    [selectedPlaylistId, showToast, t],
+  );
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([refreshMeta(), refreshItems(), fetchLibrary("", 0)]).finally(() => setLoading(false));
-  }, [refreshMeta, refreshItems, fetchLibrary]);
+    Promise.all([refreshMeta(), fetchLibrary("", 0)]).finally(() => setLoading(false));
+  }, [refreshMeta, fetchLibrary]);
+
+  useEffect(() => {
+    void refreshItems(selectedPlaylistId);
+  }, [selectedPlaylistId, refreshItems]);
 
   // ─── filtered playlist items ──────────────────────────────────────────────
   const filteredPlaylistItems = useMemo(() => {
-    if (!playlistQuery.trim()) return playlistItems;
+    if (!playlistQuery.trim()) return sortedPlaylistItems;
     const q = playlistQuery.toLowerCase();
-    return playlistItems.filter((item) => {
+    return sortedPlaylistItems.filter((item) => {
       const t = item.track_detail;
       return t && (t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
     });
-  }, [playlistItems, playlistQuery]);
+  }, [sortedPlaylistItems, playlistQuery]);
 
   const isFiltering = playlistQuery.trim().length > 0;
 
@@ -329,7 +360,7 @@ export function PlaylistManager() {
       return;
     }
     try {
-      const position = playlistItems.length;
+      const position = sortedPlaylistItems.length;
       await addPlaylistItem({ playlist: selectedPlaylistId, track: trackId, position });
       showToast(t("playlists.trackAdded"), "success");
       await refreshItems();
@@ -504,10 +535,17 @@ export function PlaylistManager() {
 
   const allLibSelected = libraryTracks.length > 0 && libraryTracks.every((t) => selectedTrackIds.has(t.id));
 
+  function openAddToChannelDialog(pl?: PlaylistSummary) {
+    const target = pl ?? selectedPlaylist;
+    if (!target) return;
+    setAddToChannelPlaylist(target);
+    setAddToChannelOpen(true);
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-3 max-lg:overflow-visible md:grid md:grid-cols-[min(100%,240px)_1fr] md:gap-4 lg:min-h-0">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:grid lg:grid-cols-[min(100%,240px)_minmax(0,1fr)] lg:gap-4">
       {/* ── Sidebar: playlists list ──────────────────────────────────────── */}
-      <Card className="flex flex-col max-lg:overflow-visible lg:min-h-0 lg:overflow-hidden">
+      <Card className="flex max-h-[min(40vh,22rem)] shrink-0 flex-col overflow-hidden lg:max-h-none lg:min-h-0">
         <CardHeader className="flex flex-col gap-2 space-y-0 pb-3">
           <div className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium">{t("playlists.playlistsTitle")}</CardTitle>
@@ -573,6 +611,18 @@ export function PlaylistManager() {
                   <span className="min-w-0 flex-1 truncate text-sm">{pl.name}</span>
                 )}
                 <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  {activeChannels.length > 0 ? (
+                    <button
+                      className="rounded p-0.5 hover:text-brand"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAddToChannelDialog(pl);
+                      }}
+                      title={t("playlists.addToChannel")}
+                    >
+                      <Radio className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                   <button
                     className="rounded p-0.5 hover:text-foreground"
                     onClick={(e) => {
@@ -603,9 +653,9 @@ export function PlaylistManager() {
       </Card>
 
       {/* ── Main panel ──────────────────────────────────────────────────────── */}
-      <div className="flex min-h-0 flex-col gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-y-contain lg:overflow-hidden">
         {/* ── Track library ─────────────────────────────────────────────── */}
-        <Card className="border-border/90">
+        <Card className="shrink-0 border-border/90">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-base">
@@ -734,7 +784,7 @@ export function PlaylistManager() {
             {/* Selection bar */}
             {selectedTrackIds.size > 0 && (
               <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-[var(--brand-subtle)] px-3 py-2 text-sm text-brand">
-                <span>{selectedTrackIds.size} selected</span>
+                <span>{t("playlists.selectedCount", { count: selectedTrackIds.size })}</span>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -742,7 +792,7 @@ export function PlaylistManager() {
                     className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setSelectedTrackIds(new Set())}
                   >
-                    Clear
+                    {t("playlists.clearSelection")}
                   </Button>
                   <Button
                     size="sm"
@@ -758,7 +808,7 @@ export function PlaylistManager() {
                     ) : (
                       <>
                         <Plus className="h-3.5 w-3.5" />
-                        Add to playlist
+                        {t("playlists.addToPlaylistBulk")}
                       </>
                     )}
                   </Button>
@@ -858,14 +908,18 @@ export function PlaylistManager() {
             {libraryTotal > LIB_PAGE && (
               <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {libOffset + 1}–{Math.min(libOffset + LIB_PAGE, libraryTotal)} of {libraryTotal}
+                  {t("playlists.pageRange", {
+                    from: libOffset + 1,
+                    to: Math.min(libOffset + LIB_PAGE, libraryTotal),
+                    total: libraryTotal,
+                  })}
                 </span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="ghost" className="h-7 px-3" disabled={libOffset === 0} onClick={prevPage}>
-                    ← Prev
+                    {t("playlists.prevPage")}
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 px-3" disabled={libOffset + LIB_PAGE >= libraryTotal} onClick={nextPage}>
-                    Next →
+                    {t("playlists.nextPage")}
                   </Button>
                 </div>
               </div>
@@ -875,16 +929,33 @@ export function PlaylistManager() {
 
         {/* ── Selected playlist items ──────────────────────────────────── */}
         {selectedPlaylist ? (
-          <Card className="border-border/90">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <CardTitle className="flex-1 text-base">
+          <Card className="min-h-0 flex-1 border-border/90 lg:flex lg:flex-col lg:overflow-hidden">
+            <CardHeader className="shrink-0 pb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="min-w-0 flex-1 text-base">
                   <ListMusic className="mr-1.5 inline h-4 w-4 opacity-60" />
                   {selectedPlaylist.name}
                   <span className="ms-2 text-xs font-normal text-muted-foreground">
-                    {t("playlists.tracksCount", { count: playlistItems.length })}
+                    {t("playlists.tracksCount", { count: sortedPlaylistItems.length })}
                   </span>
+                  {selectedPlaylist.channel ? (
+                    <Badge variant="secondary" className="ms-2 align-middle text-[10px] font-normal">
+                      {t("playlists.onChannel")}
+                    </Badge>
+                  ) : null}
                 </CardTitle>
+                {activeChannels.length > 0 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1"
+                    onClick={() => openAddToChannelDialog()}
+                  >
+                    <Radio className="h-3.5 w-3.5" />
+                    {t("playlists.addToChannel")}
+                  </Button>
+                ) : null}
                 {!selectedPlaylist.channel ? (
                   <Button
                     type="button"
@@ -936,8 +1007,13 @@ export function PlaylistManager() {
                 )}
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              {filteredPlaylistItems.length === 0 ? (
+            <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0 lg:overscroll-y-contain">
+              {itemsLoading ? (
+                <div className="flex h-24 items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  {t("playlists.itemsLoading")}
+                </div>
+              ) : filteredPlaylistItems.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   {isFiltering ? t("playlists.noSearchResults") : t("playlists.playlistEmpty")}
                 </p>
@@ -1098,6 +1174,15 @@ export function PlaylistManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPlaylistToChannelDialog
+        open={addToChannelOpen}
+        onOpenChange={setAddToChannelOpen}
+        playlist={addToChannelPlaylist}
+        channels={channels}
+        currentUserId={currentUserId}
+        onComplete={refreshMeta}
+      />
 
       {/* Delete track */}
       <Dialog open={deleteTrackTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTrackTarget(null); }}>

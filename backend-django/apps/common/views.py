@@ -182,11 +182,17 @@ def _favorited_playlist_ids_for_user(user) -> set[int]:
 
 
 def _playlist_visible_to_user(user, playlist: Playlist) -> bool:
+    if is_platform_superuser(user):
+        return True
     if playlist.owner_id == user.id:
+        return True
+    if UserPlaylistFavorite.objects.filter(user_id=user.id, playlist_id=playlist.id).exists():
         return True
     if playlist.channel_id:
         return ChannelMembership.objects.filter(channel_id=playlist.channel_id, user=user, is_active=True).exists()
-    return False
+    from apps.common.social_models import PlaylistShareLink
+
+    return PlaylistShareLink.objects.filter(playlist_id=playlist.id, is_active=True).exists()
 
 
 def _queue_serialize_context(channel_id: int, user_id: int | None, item_ids: list[int]) -> dict:
@@ -642,12 +648,13 @@ class PlaylistViewSet(viewsets.ModelViewSet):
             else:
                 qs = self.queryset.filter(
                     Q(owner=user)
-                    | Q(channel__memberships__user=user, channel__memberships__is_active=True),
+                    | Q(channel__memberships__user=user, channel__memberships__is_active=True)
+                    | Q(favorited_by__user=user),
                 ).distinct()
 
         fav = (self.request.query_params.get("favorited") or "").strip().lower()
         if fav in ("1", "true", "yes"):
-            qs = qs.filter(favorited_by__user=user).distinct()
+            qs = self.queryset.filter(favorited_by__user=user).distinct()
         return qs
 
     def perform_create(self, serializer):
@@ -657,7 +664,15 @@ class PlaylistViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user)
 
     def perform_update(self, serializer):
-        if not _can_edit_channel_playlist(self.request.user, self.get_object()):
+        playlist = self.get_object()
+        user = self.request.user
+        if "channel" in serializer.validated_data:
+            new_channel = serializer.validated_data.get("channel")
+            if new_channel is not None and not _can_manage_channel(user, new_channel.id):
+                raise PermissionDenied("permission_denied")
+            if playlist.channel_id is None and new_channel is not None and playlist.owner_id != user.id:
+                raise PermissionDenied("permission_denied")
+        if not _can_edit_channel_playlist(user, playlist):
             raise PermissionDenied("permission_denied")
         serializer.save()
 
@@ -725,6 +740,79 @@ class PlaylistViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["post"], url_path="copy-to-channel")
+    def copy_to_channel(self, request, pk=None):
+        source = self.get_object()
+        try:
+            channel_id = int(request.data.get("channel_id"))
+        except (TypeError, ValueError):
+            return Response({"detail": "channel_id_required"}, status=status.HTTP_400_BAD_REQUEST)
+        channel = Channel.objects.filter(id=channel_id).first()
+        if channel is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if not channel.is_active:
+            return Response({"detail": "channel_closed"}, status=status.HTTP_403_FORBIDDEN)
+        if not _can_copy_playlist_to_channel(request.user, source, channel_id):
+            raise PermissionDenied("permission_denied")
+        name = str(request.data.get("name") or "").strip() or source.name
+        blocked = set(_playlist_inaccessible_track_ids(request.user, source))
+        with transaction.atomic():
+            dest = Playlist.objects.create(name=name[:255], owner=request.user, channel_id=channel_id)
+            items = list(PlaylistItem.objects.filter(playlist=source).order_by("position", "id"))
+            allowed_rows = [row for row in items if row.track_id not in blocked]
+            if allowed_rows:
+                PlaylistItem.objects.bulk_create(
+                    [
+                        PlaylistItem(
+                            playlist=dest,
+                            track_id=row.track_id,
+                            position=idx,
+                        )
+                        for idx, row in enumerate(allowed_rows)
+                    ]
+                )
+        payload = PlaylistSerializer(dest, context=self.get_serializer_context()).data
+        return Response(
+            {
+                "playlist": payload,
+                "added": len(allowed_rows) if items else 0,
+                "skipped_inaccessible": len(blocked),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="assign-to-channel")
+    def assign_to_channel(self, request, pk=None):
+        """Link personal playlist to a channel (same object; edits apply for channel mods)."""
+        source = self.get_object()
+        try:
+            channel_id = int(request.data.get("channel_id"))
+        except (TypeError, ValueError):
+            return Response({"detail": "channel_id_required"}, status=status.HTTP_400_BAD_REQUEST)
+        channel = Channel.objects.filter(id=channel_id).first()
+        if channel is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if not channel.is_active:
+            return Response({"detail": "channel_closed"}, status=status.HTTP_403_FORBIDDEN)
+        if not _can_manage_channel(request.user, channel_id):
+            raise PermissionDenied("permission_denied")
+        if source.channel_id is not None:
+            return Response({"detail": "playlist_already_on_channel"}, status=status.HTTP_400_BAD_REQUEST)
+        if source.owner_id != request.user.id and not is_platform_superuser(request.user):
+            return Response({"detail": "playlist_assign_owner_only"}, status=status.HTTP_403_FORBIDDEN)
+        blocked = _playlist_inaccessible_track_ids(request.user, source)
+        if blocked:
+            return Response(
+                {
+                    "detail": "playlist_has_inaccessible_tracks",
+                    "inaccessible_count": len(blocked),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        source.channel_id = channel_id
+        source.save(update_fields=["channel_id"])
+        return Response(PlaylistSerializer(source, context=self.get_serializer_context()).data)
+
 
 class PlaylistItemViewSet(viewsets.ModelViewSet):
     serializer_class = PlaylistItemSerializer
@@ -742,10 +830,7 @@ class PlaylistItemViewSet(viewsets.ModelViewSet):
             playlist = Playlist.objects.filter(id=pid).select_related("channel").first()
             if playlist is None:
                 return PlaylistItem.objects.none()
-            if playlist.channel_id:
-                if not ChannelMembership.objects.filter(channel_id=playlist.channel_id, user=user, is_active=True).exists():
-                    return PlaylistItem.objects.none()
-            elif playlist.owner_id != user.id:
+            if not _playlist_visible_to_user(user, playlist):
                 return PlaylistItem.objects.none()
             return self.queryset.filter(playlist_id=pid)
 
@@ -1684,6 +1769,28 @@ def _can_edit_channel_playlist(user, playlist: Playlist) -> bool:
     if playlist.channel_id is None:
         return playlist.owner_id == user.id
     return _can_manage_channel(user, playlist.channel_id)
+
+
+def _can_copy_playlist_to_channel(user, source: Playlist, channel_id: int) -> bool:
+    if not _can_manage_channel(user, channel_id):
+        return False
+    return _playlist_visible_to_user(user, source)
+
+
+def _playlist_inaccessible_track_ids(user, playlist: Playlist) -> list[int]:
+    track_ids = list(PlaylistItem.objects.filter(playlist=playlist).values_list("track_id", flat=True))
+    if not track_ids:
+        return []
+    allowed = set(tracks_accessible_to_user(user).filter(id__in=track_ids).values_list("id", flat=True))
+    seen: set[int] = set()
+    blocked: list[int] = []
+    for tid in track_ids:
+        if tid in seen:
+            continue
+        seen.add(tid)
+        if tid not in allowed:
+            blocked.append(tid)
+    return blocked
 
 
 class ChannelInviteView(APIView):

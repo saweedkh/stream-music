@@ -9,6 +9,7 @@ import {
   Lock,
   Plus,
   Radio,
+  Search,
   Sparkles,
   EyeOff,
   Users,
@@ -21,7 +22,11 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { getMeChannelsPendingSuggestions, reopenChannel, type ChannelSummary } from "@/lib/api";
 import { useToast } from "@/components/ui/toast-provider";
-import { filterDashboardChannels, sortChannelsForDashboard } from "@/lib/channel-filters";
+import {
+  filterChannelsBySearch,
+  filterDashboardChannels,
+  sortChannelsForDashboard,
+} from "@/lib/channel-filters";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -70,6 +75,7 @@ export function ChannelManagementSection(props: Props) {
   } = props;
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [channelSearch, setChannelSearch] = useState("");
   const [pendingByChannel, setPendingByChannel] = useState<Record<number, number>>({});
 
   const loadPending = useCallback(async () => {
@@ -92,8 +98,11 @@ export function ChannelManagementSection(props: Props) {
   }, [loadPending, channels.length]);
 
   const visibleChannels = useMemo(
-    () => sortChannelsForDashboard(filterDashboardChannels(channels)),
-    [channels],
+    () =>
+      sortChannelsForDashboard(
+        filterChannelsBySearch(filterDashboardChannels(channels), channelSearch),
+      ),
+    [channels, channelSearch],
   );
 
   const liveCount = useMemo(
@@ -155,6 +164,18 @@ export function ChannelManagementSection(props: Props) {
             </Badge>
           ) : null}
         </header>
+
+        <div className="shrink-0 border-b border-border/40 px-3 pb-3 sm:px-4">
+          <div className="relative">
+            <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              className="h-9 ps-9"
+              placeholder={t("channels.searchPlaceholder")}
+              value={channelSearch}
+              onChange={(e) => setChannelSearch(e.target.value)}
+            />
+          </div>
+        </div>
 
         <div className="flex-1 max-lg:overflow-visible xl:min-h-0 xl:overflow-y-auto xl:overscroll-y-contain">
           <div className="p-3 sm:p-4">
