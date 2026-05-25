@@ -16,10 +16,11 @@ export function Toaster(props: ToasterProps) {
       richColors
       closeButton
       className="toaster group"
+      style={{ fontFamily: "var(--font-inter)" }}
       toastOptions={{
         classNames: {
           toast:
-            "group border border-border bg-card/95 text-foreground shadow-lg shadow-black/20 backdrop-blur-md",
+            "group border border-border bg-card/95 text-foreground shadow-lg shadow-black/20 backdrop-blur-md font-sans rtl:font-fa",
           title: "text-sm font-medium",
           description: "text-xs text-muted-foreground",
           success: "!border-brand/50 !bg-[var(--brand-subtle)]",

@@ -13,7 +13,7 @@ export const metadata = {
     { media: "(prefers-color-scheme: light)", color: "#f4f6fb" },
     { media: "(prefers-color-scheme: dark)", color: "#07090f" },
   ],
-  appleWebApp: { capable: true, title: "Stream Music" },
+  appleWebApp: { capable: true, title: "Beat Room" },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: [{ url: "/icon.svg", type: "image/svg+xml" }],

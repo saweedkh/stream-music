@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { AuthSocialButtons } from "@/features/auth/auth-social-buttons";
@@ -16,17 +13,6 @@ import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
 
-function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
-  return raw;
-}
-
-function authHref(mode: Mode, next: string | null): string {
-  const base = mode === "login" ? "/login" : "/register";
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return base;
-  return `${base}?next=${encodeURIComponent(next)}`;
-}
-
 function AuthField({
   id,
   label,
@@ -34,6 +20,7 @@ function AuthField({
   error,
   children,
   focused,
+  required,
 }: {
   id: string;
   label: string;
@@ -41,50 +28,60 @@ function AuthField({
   error?: string;
   children: ReactNode;
   focused?: boolean;
+  required?: boolean;
 }) {
   return (
-    <div className="auth-field">
-      <label htmlFor={id} className="auth-field-label">
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
+        {required && <span className="text-red-400 ms-0.5">*</span>}
       </label>
-      <div className={cn("auth-field-control", focused && "auth-field-control--focus", error && "auth-field-control--error")}>
-        <span className="auth-field-icon">{icon}</span>
+      <div
+        className={cn(
+          "relative flex items-center rounded-xl border bg-slate-100 transition-all duration-200 dark:bg-[#13161d]",
+          focused
+            ? "border-brand bg-brand/[0.03] shadow-[0_0_0_3px_rgba(34,197,94,0.15),0_0_20px_-4px_rgba(34,197,94,0.2)]"
+            : "border-black/[0.08] dark:border-white/[0.07]",
+          error && "border-red-500/60 shadow-[0_0_0_2px_rgba(239,68,68,0.15)]",
+        )}
+      >
+        <span className={cn("flex w-11 shrink-0 items-center justify-center transition-colors", focused ? "text-brand" : "text-slate-400 dark:text-slate-500")}>
+          {icon}
+        </span>
         {children}
       </div>
-      {error ? <p className="auth-field-error">{error}</p> : null}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m: Mode) => void }) {
   const { t } = useTranslations();
-  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
-  const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string }>({});
-  const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | null>("username");
-
-  const next = searchParams.get("next");
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
+  const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | "confirmPassword" | null>(null);
 
   async function onSubmit() {
     setBusy(true);
     setError(null);
     const parseResult =
       mode === "register"
-        ? authRegisterSchema(t).safeParse({ username, email, password })
+        ? authRegisterSchema(t).safeParse({ username, email, password, confirmPassword })
         : authLoginSchema(t).safeParse({ username, password });
-    const nextErrors: { username?: string; email?: string; password?: string } = {};
+    const nextErrors: { username?: string; email?: string; password?: string; confirmPassword?: string } = {};
     if (!parseResult.success) {
       for (const issue of parseResult.error.issues) {
         const field = String(issue.path[0] ?? "");
-        if (field === "username" || field === "email" || field === "password") {
+        if (field === "username" || field === "email" || field === "password" || field === "confirmPassword") {
           nextErrors[field] = issue.message;
         }
       }
@@ -102,7 +99,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       } else {
         await loginUser(username, password);
       }
-      window.location.href = safeNextPath(next);
+      window.location.href = "/dashboard";
     } catch (err) {
       const message =
         err instanceof Error
@@ -124,112 +121,143 @@ export function AuthForm({ mode }: { mode: Mode }) {
       initial={false}
       animate={shakeKey > 0 && (error || Object.keys(fieldErrors).length > 0) ? authShakeKeyframes : undefined}
     >
-      <motion.div className="auth-form-fields" variants={staggerContainer.variants} initial="hidden" animate="visible">
+      <motion.div className="flex flex-col gap-4" variants={staggerContainer.variants} initial="hidden" animate="visible">
         <motion.div {...staggerItem}>
           <AuthField
             id="auth-username"
             label={t("auth.usernameOrEmail")}
-            icon={<User className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
+            icon={<User className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />}
             error={fieldErrors.username}
             focused={focusedField === "username"}
+            required
           >
             <input
               id="auth-username"
-              className="auth-field-input"
+              className="h-11 flex-1 border-0 bg-transparent pe-3 ps-0 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
               placeholder="alexrivera"
               value={username}
               aria-invalid={Boolean(fieldErrors.username)}
               onFocus={() => setFocusedField("username")}
+              onBlur={() => setFocusedField(null)}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
             />
           </AuthField>
         </motion.div>
 
-        <AnimatePresence initial={false}>
-          {mode === "register" ? (
-            <motion.div
-              key="email"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
+        {mode === "register" && (
+          <motion.div {...staggerItem}>
+            <AuthField
+              id="auth-email"
+              label={t("auth.emailOptional")}
+              icon={<Mail className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />}
+              error={fieldErrors.email}
+              focused={focusedField === "email"}
             >
-              <AuthField
+              <input
                 id="auth-email"
-                label={t("auth.emailOptional")}
-                icon={<Mail className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
-                error={fieldErrors.email}
-                focused={focusedField === "email"}
+                className="h-11 flex-1 border-0 bg-transparent pe-3 ps-0 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                placeholder={t("auth.email")}
+                value={email}
+                aria-invalid={Boolean(fieldErrors.email)}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </AuthField>
+          </motion.div>
+        )}
+
+        <motion.div {...staggerItem} className={mode === "register" ? "flex gap-3" : undefined}>
+          <div className={mode === "register" ? "flex-1 min-w-0" : undefined}>
+            <AuthField
+              id="auth-password"
+              label={t("auth.password")}
+              icon={<Lock className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />}
+              error={fieldErrors.password}
+              focused={focusedField === "password"}
+              required
+            >
+              <input
+                id="auth-password"
+                className="h-11 flex-1 border-0 bg-transparent pe-11 ps-0 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                aria-invalid={Boolean(fieldErrors.password)}
+                onFocus={() => setFocusedField("password")}
+                onBlur={() => setFocusedField(null)}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
+              />
+              <button
+                type="button"
+                className="absolute end-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-black/[0.04] hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/[0.06] dark:hover:text-slate-200"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              >
+                {showPassword ? <EyeOff className="h-[16px] w-[16px]" strokeWidth={1.75} /> : <Eye className="h-[16px] w-[16px]" strokeWidth={1.75} />}
+              </button>
+            </AuthField>
+          </div>
+
+          {mode === "register" && (
+            <div className="flex-1 min-w-0">
+              <AuthField
+                id="auth-confirm-password"
+                label={t("auth.confirmPassword")}
+                icon={<Lock className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />}
+                error={fieldErrors.confirmPassword || (confirmPassword.length > 0 && password !== confirmPassword ? t("validation.passwordMismatch") : undefined)}
+                focused={focusedField === "confirmPassword"}
+                required
               >
                 <input
-                  id="auth-email"
-                  className="auth-field-input"
-                  placeholder={t("auth.email")}
-                  value={email}
-                  aria-invalid={Boolean(fieldErrors.email)}
-                  onFocus={() => setFocusedField("email")}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
+                  id="auth-confirm-password"
+                  className="h-11 flex-1 border-0 bg-transparent pe-3 ps-0 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  aria-invalid={Boolean(fieldErrors.confirmPassword) || (confirmPassword.length > 0 && password !== confirmPassword)}
+                  onFocus={() => setFocusedField("confirmPassword")}
+                  onBlur={() => setFocusedField(null)}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
                 />
               </AuthField>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        <motion.div {...staggerItem}>
-          <AuthField
-            id="auth-password"
-            label={t("auth.password")}
-            icon={<Lock className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />}
-            error={fieldErrors.password}
-            focused={focusedField === "password"}
-          >
-            <input
-              id="auth-password"
-              className="auth-field-input auth-field-input--password"
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              value={password}
-              aria-invalid={Boolean(fieldErrors.password)}
-              onFocus={() => setFocusedField("password")}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "register" ? "new-password" : "current-password"}
-            />
-            <button
-              type="button"
-              className="auth-field-eye"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
-            >
-              {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
-            </button>
-          </AuthField>
+            </div>
+          )}
         </motion.div>
 
-        {mode === "login" ? (
-          <motion.div {...staggerItem} className="auth-form-meta">
-            <label className="auth-remember">
+        {mode === "login" && (
+          <motion.div {...staggerItem} className="flex items-center justify-between text-[13px]">
+            <label className="flex cursor-pointer items-center gap-2 text-slate-500 dark:text-slate-400">
               <input
                 type="checkbox"
-                className="auth-checkbox"
+                className="h-4 w-4 cursor-pointer appearance-none rounded border-[1.5px] border-black/15 bg-slate-100 transition-all checked:border-brand checked:bg-brand checked:shadow-[0_0_8px_rgba(34,197,94,0.3)] dark:border-white/15 dark:bg-[#13161d]"
+                style={rememberMe ? { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M10.2 3.2 4.8 8.6 1.8 5.6l1-1 2 2 4.4-4.4z'/%3E%3C/svg%3E\")", backgroundSize: "10px", backgroundPosition: "center", backgroundRepeat: "no-repeat" } : undefined}
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <span>{t("auth.rememberMe")}</span>
+              {t("auth.rememberMe")}
             </label>
             <button
               type="button"
-              className="auth-link"
+              className="font-medium text-brand transition-opacity hover:opacity-80"
               onClick={() => showToast(t("auth.forgotPasswordDisabled"), "error")}
             >
               {t("auth.forgotPassword")}
             </button>
           </motion.div>
-        ) : null}
+        )}
 
         <motion.div {...staggerItem}>
-          <button type="button" className="auth-submit auth-cta-shimmer" onClick={onSubmit} disabled={busy || !username || !password}>
+          <button
+            type="button"
+            className="flex h-11 w-full items-center justify-center rounded-xl border-0 bg-brand text-sm font-bold tracking-wide text-white shadow-[0_1px_0_rgba(255,255,255,0.12)_inset,0_8px_28px_-4px_rgba(34,197,94,0.5)] transition-all hover:brightness-110 hover:shadow-[0_1px_0_rgba(255,255,255,0.15)_inset,0_12px_40px_-4px_rgba(34,197,94,0.6)] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={onSubmit}
+            disabled={busy || !username || !password || (mode === "register" && !confirmPassword)}
+          >
             {busy ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -243,32 +271,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </button>
         </motion.div>
 
-        <AnimatePresence>
-          {error ? (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Alert tone="error">{error}</Alert>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
         <motion.div {...staggerItem}>
           <AuthSocialButtons />
         </motion.div>
 
-        <motion.p {...staggerItem} className="auth-footer-text">
+        <motion.p {...staggerItem} className="text-center text-[13px] text-slate-400 dark:text-slate-500">
           {mode === "login" ? (
             <>
               {t("auth.newToStream")}{" "}
-              <Link href={authHref("register", next)} className="auth-link">
+              <button type="button" className="font-medium text-brand transition-opacity hover:opacity-80" onClick={() => onSwitchMode?.("register")}>
                 {t("auth.signUp")}
-              </Link>
+              </button>
             </>
           ) : (
             <>
               {t("auth.alreadyHaveAccount")}{" "}
-              <Link href={authHref("login", next)} className="auth-link">
+              <button type="button" className="font-medium text-brand transition-opacity hover:opacity-80" onClick={() => onSwitchMode?.("login")}>
                 {t("auth.login")}
-              </Link>
+              </button>
             </>
           )}
         </motion.p>

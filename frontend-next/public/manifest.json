@@ -1,7 +1,7 @@
 {
-  "name": "Stream Music",
-  "short_name": "Stream",
-  "description": "Synchronized group music for LAN and web",
+  "name": "Beat Room",
+  "short_name": "Beat Room",
+  "description": "Listen together — real-time rooms for shared music",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "any",

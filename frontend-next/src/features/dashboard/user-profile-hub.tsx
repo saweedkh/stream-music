@@ -183,7 +183,7 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
       <Card className="border-dashed border-border/70 bg-muted/10">
         <CardHeader>
           <CardTitle>{t("guard.notLoggedIn")}</CardTitle>
-          <CardDescription>{t("auth.loginDescription")}</CardDescription>
+          <CardDescription>{t("auth.needAccount")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button asChild>

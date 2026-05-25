@@ -11,13 +11,19 @@ export function authLoginSchema(t: T) {
 }
 
 export function authRegisterSchema(t: T) {
-  return authLoginSchema(t).extend({
-    email: z
-      .string()
-      .trim()
-      .optional()
-      .refine((value) => !value || value.includes("@"), t("validation.emailInvalid")),
-  });
+  return authLoginSchema(t)
+    .extend({
+      email: z
+        .string()
+        .trim()
+        .optional()
+        .refine((value) => !value || value.includes("@"), t("validation.emailInvalid")),
+      confirmPassword: z.string().trim().min(1, t("validation.passwordRequired")),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("validation.passwordMismatch"),
+      path: ["confirmPassword"],
+    });
 }
 
 export function createChannelSchema(t: T) {

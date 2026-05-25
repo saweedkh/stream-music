@@ -4,14 +4,27 @@ import { cn } from "@/lib/utils";
 
 export function AuthPanelLogo({ className }: { className?: string }) {
   return (
-    <div className={cn("auth-panel-logo", className)}>
-      <div className="auth-logo-bars" aria-hidden>
-        <span className="auth-logo-bar" style={{ height: 16 }} />
-        <span className="auth-logo-bar" style={{ height: 26 }} />
-        <span className="auth-logo-bar auth-logo-bar--peak" style={{ height: 34 }} />
+    <div className={cn("flex items-center gap-2.5", className)}>
+      <div className="flex items-center gap-1" aria-hidden>
+        <span
+          className="block w-[5px] rounded-full bg-gradient-to-b from-emerald-400 to-brand"
+          style={{ height: 18 }}
+        />
+        <span
+          className="block w-[5px] rounded-full bg-gradient-to-b from-emerald-400 to-brand shadow-[0_0_14px_rgba(34,197,94,0.6)]"
+          style={{ height: 28 }}
+        />
+        <span
+          className="block w-[5px] rounded-full bg-gradient-to-b from-emerald-400 to-brand"
+          style={{ height: 21 }}
+        />
+        <span
+          className="block w-[5px] rounded-full bg-gradient-to-b from-emerald-400 to-brand"
+          style={{ height: 13 }}
+        />
       </div>
-      <p className="auth-logo-wordmark">
-        <span>Stream</span> <span className="auth-logo-wordmark-accent">Music</span>
+      <p className="font-display text-xl font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+        <span>Beat</span> <span className="text-emerald-500 dark:text-emerald-400">Room</span>
       </p>
     </div>
   );

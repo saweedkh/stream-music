@@ -13,6 +13,7 @@ export function LocaleInitScript() {
       document.documentElement.dir = "ltr";
     }
   } catch (e) {}
+  document.documentElement.style.opacity = "0";
 })();
 `.trim();
 

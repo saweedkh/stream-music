@@ -52,6 +52,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     setLocaleState(initial);
     applyDocumentLocale(initial);
     setReady(true);
+    document.documentElement.style.opacity = "1";
   }, []);
 
   const setLocale = useCallback((next: Locale) => {
@@ -79,11 +80,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [locale, setLocale, t],
   );
 
-  if (!ready) {
-    return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
-  }
-
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={value}>
+      {ready ? children : null}
+    </LocaleContext.Provider>
+  );
 }
 
 export function useLocale() {

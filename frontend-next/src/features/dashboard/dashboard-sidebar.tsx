@@ -156,8 +156,8 @@ export function DashboardSidebar({
               <Radio className="h-6 w-6" aria-hidden />
             </span>
             <span className="min-w-0 font-display text-lg font-semibold leading-tight tracking-tight">
-              <span className="text-gradient-brand">Stream</span>{" "}
-              <span className="text-foreground">Music</span>
+              <span className="text-gradient-brand">Beat</span>{" "}
+              <span className="text-foreground">Room</span>
             </span>
           </Link>
           {user ? (

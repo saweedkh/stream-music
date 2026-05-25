@@ -201,7 +201,7 @@ export function NotificationPreferencesCard() {
               </li>
               <li>
                 <strong>iPhone:</strong> Install profile → Settings → General → About →{" "}
-                <strong>Certificate Trust Settings</strong> → enable <em>Stream Music Dev CA</em>.
+                <strong>Certificate Trust Settings</strong> → enable <em>Beat Room Dev CA</em>.
               </li>
               <li>
                 <strong>Android:</strong> Settings → Security → Install certificate → CA certificate.

@@ -28,7 +28,7 @@ export function DashboardMobileHeader({ onMenuClick, user }: DashboardMobileHead
       </Button>
 
       <p className="truncate text-center font-display text-sm font-semibold tracking-tight">
-        <span className="text-gradient-brand">Stream</span> <span className="text-foreground">Music</span>
+        <span className="text-gradient-brand">Beat</span> <span className="text-foreground">Room</span>
       </p>
 
       <div className="flex shrink-0 justify-self-end">
