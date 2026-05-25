@@ -31,7 +31,11 @@ _YOUTUBE_RE = re.compile(r"(?:youtube\.com/watch|youtu\.be/)", re.I)
 
 
 def _public_channel_qs():
-    return Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC).select_related("owner")
+    return (
+        Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC)
+        .exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
+        .select_related("owner")
+    )
 
 
 def _channel_live(channel: Channel) -> bool:

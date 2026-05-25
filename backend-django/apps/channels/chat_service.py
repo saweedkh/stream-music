@@ -118,9 +118,14 @@ def fetch_chat_history(channel_id: int, *, limit: int = 80, before_id: int | Non
 
 
 def can_access_chat(channel_id: int, user_id: int) -> bool:
+    from django.contrib.auth.models import User
+
     ch = Channel.objects.filter(id=channel_id).only("id", "is_active", "owner_id").first()
     if ch is None:
         return False
+    user = User.objects.filter(id=user_id).only("is_superuser").first()
+    if user and getattr(user, "is_superuser", False):
+        return True
     if ChannelMembership.objects.filter(channel_id=channel_id, user_id=user_id, is_active=True).exists():
         return True
     if not ch.is_active and ch.owner_id == user_id:

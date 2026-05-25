@@ -328,10 +328,20 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
 
     @staticmethod
     def _active_member(channel_id: int, user_id: int) -> bool:
+        from django.contrib.auth.models import User
+
+        user = User.objects.filter(id=user_id).only("is_superuser").first()
+        if user and getattr(user, "is_superuser", False):
+            return True
         return ChannelMembership.objects.filter(channel_id=channel_id, user_id=user_id, is_active=True).exists()
 
     @staticmethod
     def _user_can_manage_channel(channel_id: int, user_id: int) -> bool:
+        from django.contrib.auth.models import User
+
+        user = User.objects.filter(id=user_id).only("is_superuser").first()
+        if user and getattr(user, "is_superuser", False):
+            return True
         return ChannelMembership.objects.filter(
             channel_id=channel_id,
             user_id=user_id,
@@ -469,7 +479,11 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
         channel = Channel.objects.filter(id=channel_id_int).first()
         if channel is None or not channel.is_active:
             return None
-        if not ChannelMembership.objects.filter(channel=channel, user_id=user_id, is_active=True).exists():
+        from django.contrib.auth.models import User
+
+        user = User.objects.filter(id=user_id).only("is_superuser").first()
+        is_su = user and getattr(user, "is_superuser", False)
+        if not is_su and not ChannelMembership.objects.filter(channel=channel, user_id=user_id, is_active=True).exists():
             return None
         if not playback_state_store.try_auto_next_lock(channel.id):
             return None

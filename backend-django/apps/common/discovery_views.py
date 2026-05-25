@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
 from apps.common.premium_limits import can_create_channel, clamp_member_limit, user_has_premium
+from apps.common.user_badges import is_platform_superuser
 from apps.common.serializers import ChannelSerializer, PlaylistItemSerializer, PlaylistSerializer, TrackSerializer
 from apps.common.favorites import UserPlaylistFavorite
 from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserFollow, UserPublicProfile
@@ -26,7 +27,11 @@ from apps.tracks.models import Track
 
 
 def _public_channel_qs():
-    return Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC).select_related("owner")
+    return (
+        Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC)
+        .exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
+        .select_related("owner")
+    )
 
 
 class GlobalSearchView(APIView):
@@ -282,7 +287,7 @@ class PlaylistShareImportView(APIView):
             return Response({"detail": "invalid_share"}, status=status.HTTP_404_NOT_FOUND)
         if link.expires_at and link.expires_at < timezone.now():
             return Response({"detail": "share_expired"}, status=status.HTTP_410_GONE)
-        if not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
+        if not is_platform_superuser(request.user) and not ChannelMembership.objects.filter(channel_id=channel_id, user=request.user, is_active=True).exists():
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
         if not _can_manage_channel(request.user, channel_id):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
@@ -300,7 +305,7 @@ class ChannelFollowView(APIView):
 
     def get(self, request, channel_id: int):
         channel = get_object_or_404(Channel, id=channel_id)
-        if channel.privacy != Channel.Privacy.PUBLIC and not ChannelMembership.objects.filter(
+        if not is_platform_superuser(request.user) and channel.privacy != Channel.Privacy.PUBLIC and not ChannelMembership.objects.filter(
             channel=channel, user=request.user, is_active=True
         ).exists():
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
