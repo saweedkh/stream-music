@@ -69,14 +69,8 @@ export function AuthExperience({ mode: initialMode }: { mode: AuthMode }) {
                 </p>
               </header>
 
-              {/* Tabs - Segmented Control */}
-              <div className="relative grid grid-cols-2 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]" role="tablist">
-                <motion.span
-                  className="absolute inset-y-1 w-[calc(50%-4px)] rounded-[10px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)] dark:bg-white/[0.12] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
-                  animate={{ x: mode === "login" ? 4 : "calc(100% + 4px)" }}
-                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                  aria-hidden
-                />
+              {/* Tabs */}
+              <div className="relative flex" role="tablist">
                 {(["login", "register"] as const).map((tab) => (
                   <button
                     key={tab}
@@ -84,16 +78,24 @@ export function AuthExperience({ mode: initialMode }: { mode: AuthMode }) {
                     role="tab"
                     aria-selected={mode === tab}
                     className={cn(
-                      "relative z-[1] flex h-9 items-center justify-center rounded-[10px] text-sm font-semibold transition-colors duration-200",
+                      "relative flex-1 pb-2.5 text-sm font-semibold transition-colors duration-200",
                       mode === tab
                         ? "text-slate-900 dark:text-white"
-                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                        : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300",
                     )}
                     onClick={() => setMode(tab)}
                   >
                     {tab === "login" ? t("auth.login") : t("auth.signUp")}
+                    {mode === tab && (
+                      <motion.span
+                        layoutId="auth-tab-underline"
+                        className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-brand"
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      />
+                    )}
                   </button>
                 ))}
+                <span className="absolute inset-x-0 bottom-0 h-px bg-slate-200/70 dark:bg-white/[0.06]" aria-hidden />
               </div>
 
               {/* Form */}
