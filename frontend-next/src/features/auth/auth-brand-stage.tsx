@@ -63,11 +63,11 @@ export function AuthBrandStage() {
       >
         <motion.div variants={authStageItem} className="flex flex-1 flex-col items-center justify-center text-center">
           <AuthStageVisual />
-          <h1 className="auth-stage-headline mt-12">
+          <h1 className="auth-stage-headline mt-10">
             {t("auth.stageTitle")}{" "}
             <span className="auth-stage-headline-accent">{t("auth.stageTitleAccent")}</span>
           </h1>
-          <p className="auth-stage-subtitle mt-4 max-w-md">{t("auth.stageSubtitle")}</p>
+          <p className="auth-stage-subtitle mt-3 max-w-md">{t("auth.stageSubtitle")}</p>
         </motion.div>
 
         <motion.ul variants={authStageItem} className="grid grid-cols-3 gap-3">

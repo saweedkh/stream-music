@@ -1,103 +1,225 @@
-# Stream Music (LAN Sync)
+# Stream Music
 
-Advanced LAN synchronized group music playback with:
+A self-hosted, real-time synchronized group music playback platform. Multiple users join **channels** and listen to the same audio in sync, with sub-second drift correction via WebSockets. Includes chat, playlists, queue management, reactions, moderation tools, and social features.
 
-- Next.js frontend (`frontend-next`)
-- Django + Channels backend (`backend-django`)
-- Redis pub/sub and PostgreSQL
-- Nginx static audio serving
+## Architecture
 
-## Import audio from disk (CLI)
-
-Bulk-register files from a folder on the server into `MEDIA_ROOT` as tracks (default: **`public_lan`** for all users). See **[docs/import-audio-cli.md](docs/import-audio-cli.md)**.
-
-Quick example:
-
-```bash
-docker compose exec backend python manage.py import_audio /path/inside/container/to/music --owner yourusername
+```
+Browser/App  ──►  Nginx (TLS + static audio)  ──►  Next.js (SSR + UI)  ──►  Django/Daphne (API + WS)
+                        │                                                         │
+                        ├── /audio/* (static files)                               ├── PostgreSQL 16
+                        └── /ws/* (proxy to Daphne)                               ├── Redis 7 (pub/sub)
+                                                                                  └── Celery (background tasks)
 ```
 
-## Run
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15, React 18, TypeScript, Tailwind CSS, Radix UI, Zustand |
+| Backend | Django 4.2, Django REST Framework, Django Channels (Daphne) |
+| Database | PostgreSQL 16 |
+| Cache / Pub-Sub | Redis 7 |
+| Background Tasks | Celery 5 |
+| Error Tracking | Sentry (optional) |
+| Native Apps | Capacitor 7 (Android + iOS WebView) |
+| Deployment | Docker Compose, rsync to VPS, Certbot TLS |
 
-1. Copy env files (includes **Web Push VAPID** keys for dev):
-   - `cp backend-django/.env.example backend-django/.env`
-   - `cp frontend-next/.env.example frontend-next/.env.local` *(optional for local `npm run dev`; Docker reads `.env.example` automatically)*
-2. Start stack:
-   - `docker compose up --build`
-3. Apply migrations:
-   - `docker compose exec backend python manage.py migrate`
-   - if tables already exist from prior sync mode: `docker compose exec backend python manage.py migrate --fake-initial`
-4. Open **http://localhost:8080** (nginx), log in, go to **Dashboard → Notifications → Enable push on this device**.
+## Features
 
-### Web Push (free, built-in)
+- **Synchronized playback** — sub-second drift correction across all listeners
+- **Channels** — public, private, unlisted rooms with join/approval workflows
+- **Queue system** — reorder, upvote, shuffle, play-next, queue-end modes (loop/stop/repeat)
+- **Real-time chat** — send, edit, delete, reply, react, pin, slow mode, word filters
+- **Playlists** — create, share via link, copy to channel, import
+- **Chunked uploads** — resumable uploads up to 500 MB
+- **Moderation** — chat bans, report system, audit logs, role-based permissions
+- **Push notifications** — Web Push (VAPID), no third-party service required
+- **Discovery** — explore feed, global search, user profiles, follow channels/users
+- **Admin panel** — user management, badge system, channel oversight, health checks
+- **Support tickets** — built-in helpdesk with real-time WebSocket updates
+- **PWA** — installable, service worker for push notifications
+- **Party recap** — session heatmap and playback history visualization
 
-Uses **Web Push + VAPID** (no Firebase/OneSignal required). Keys are pre-filled in `backend-django/.env.example`.
+## Quick Start (Development)
 
-| Variable | Where |
-|----------|--------|
-| `WEBPUSH_VAPID_PUBLIC_KEY` / `WEBPUSH_VAPID_PRIVATE_KEY` | Django (`backend-django/.env` or `.env.example`) |
-| `NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY` | Next (`frontend-next/.env.local` or `.env.example`) |
-| `FRONTEND_BASE_URL` | Django — base URL for notification click links (`http://localhost:8080` in Docker) |
+### Prerequisites
 
-Rotate keys: `bash scripts/generate-vapid-keys.sh` then restart backend + frontend.
+- Docker & Docker Compose
+- Node.js 20+ (for local frontend dev)
+- Python 3.12+ (for local backend dev)
 
-Production: set the same variables in `.env.production` (see `deploy/env.production.example`); `deploy/up.sh` sets `FRONTEND_BASE_URL` from your host/IP.
+### 1. Clone & configure
 
-## Production (central server, Docker + TLS)
+```bash
+git clone <repo-url> && cd stream-music
+cp backend-django/.env.example backend-django/.env
+cp frontend-next/.env.example frontend-next/.env.local  # optional for local npm run dev
+```
 
-Full guide (Persian): **[docs/production-deployment.md](docs/production-deployment.md)**.
+### 2. Start the stack
 
-Quick start:
+```bash
+docker compose up --build
+```
+
+### 3. Open the app
+
+- **http://localhost:8080** — main app (via nginx)
+- **https://localhost:8443** — HTTPS (self-signed cert for LAN testing)
+- **http://localhost:3000** — Next.js dev server (direct)
+
+Migrations run automatically on container startup.
+
+### Local development (without Docker)
+
+```bash
+# Backend
+cd backend-django
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+daphne -b 0.0.0.0 -p 8000 config.asgi:application
+
+# Frontend
+cd frontend-next
+npm ci
+npm run dev
+```
+
+## Production Deployment
+
+Full guide: **[docs/production-deployment.md](docs/production-deployment.md)**
 
 ```bash
 cp deploy/env.production.example .env.production
-# edit SECRET_KEY and POSTGRES_PASSWORD
+# Edit SECRET_KEY, POSTGRES_PASSWORD, SITE_DOMAIN
 ./deploy/up.sh
-# edit SITE_DOMAIN + TLS_CERT_NAME in .env.production, then ./deploy/up.sh
 ```
 
-## Mirrors
+The deploy stack includes:
+- TLS via Certbot (Let's Encrypt)
+- Nginx reverse proxy with static audio serving
+- Celery worker for background tasks
+- Automatic migrations on startup
 
-- Python packages are installed via `https://pypi.devneeds.ir/simple/`.
-- Frontend npm packages are installed via `https://npm.devneeds.ir/`.
-- Docker images should use a daemon registry mirror (do not prefix image names in `docker-compose.yml` or `Dockerfile`).
-  - Mirror: `https://docker.devneeds.ir`
-  - Docker Desktop: Settings -> Docker Engine -> add:
-    - `"registry-mirrors": ["https://docker.devneeds.ir"]`
+### CI/CD
 
-## Key Endpoints
+- **CI** runs on every push: ruff lint, TypeScript checks, ESLint, Django checks, backend tests, Playwright E2E
+- **CD** deploys to production via rsync on push to `main` (requires `DEPLOY_SSH_KEY` secret)
+- **Backup** runs daily at 3 AM UTC (cron) with artifact retention
 
-- `GET /api/time`
-- `GET /api/auth/csrf`
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /api/channels/{id}/state`
-- `POST /api/channels/{id}/control`
-- `POST /api/channels/{id}/join`
-- `POST /api/channels/{id}/invite`
-- `GET /api/channels/{id}/invite`
-- `POST /api/channels/{id}/invite/rotate`
-- `POST /api/channels/{id}/public-link/rotate`
-- `PATCH /api/channels/{id}/settings`
-- `GET /api/channels/{id}/members`
-- `PATCH /api/channels/{id}/members/{memberId}`
-- `DELETE /api/channels/{id}/members/{memberId}`
-- `GET/POST /api/playlist-items/`
-- `POST /api/channels/{channelId}/playlists/{playlistId}/play`
-- `GET /api/auth/users`
-- `GET/POST/DELETE /api/tracks/{trackId}/share-permissions`
-- `PATCH /api/playlist-items/{id}` (reorder by `position`)
-- `WS /ws/channels/{id}` (playback + control)
-- `WS /ws/channels/{id}/chat` (text chat: `send`, `edit`, `delete`, `react`, `history`, staff-only `purge_all`; client fullscreen is UI-only)
+## Project Structure
 
-## Control + Sync Contract
+```
+stream-music/
+├── backend-django/           # Django project
+│   ├── apps/
+│   │   ├── channels/         # Channel, Membership, Chat, Invite, Moderation
+│   │   ├── common/           # Auth, Admin, Social, Support, Discovery
+│   │   ├── playback/         # PlaybackSession, Events, WS consumers
+│   │   ├── playlists/        # Playlist, Queue models
+│   │   └── tracks/           # Track, chunked upload, share permissions
+│   └── config/               # Settings, URLs, ASGI, Celery, middleware
+├── frontend-next/            # Next.js app
+│   ├── src/
+│   │   ├── app/              # App Router pages
+│   │   ├── components/       # UI primitives (shadcn/Radix)
+│   │   ├── features/         # Feature modules (auth, channels, player, etc.)
+│   │   ├── hooks/            # WebSocket, presence, hotkeys
+│   │   └── lib/              # API client, i18n, utilities
+│   ├── e2e/                  # Playwright E2E tests
+│   └── public/               # PWA manifest, service worker
+├── deploy/                   # Production deployment scripts
+├── scripts/                  # Backup, VAPID key generation
+├── docs/                     # Documentation
+└── .github/workflows/        # CI/CD pipelines
+```
 
-- UI control actions go to `POST /api/channels/{id}/control`.
-- Backend now updates playback state and emits a matching WS event to `channel_{id}`.
-- WS payload contract includes:
-  - `type` (`PLAY`, `PAUSE`, `SEEK`, `NEXT`, `PREV`)
-  - `action` (lowercase version)
-  - `server_time`, `started_at_server_time`, `position`, `is_playing`, `queue_version`
-- Player clients consume this single contract for realtime updates and drift correction feedback.
+## API Overview
+
+### REST API (`/api/`)
+
+| Group | Endpoints |
+|-------|-----------|
+| Auth | `csrf`, `register`, `login`, `logout`, `me`, `me/password`, `me/notification-settings`, `me/push-subscription` |
+| Channels | CRUD, `state`, `control`, `join`, `leave`, `close`, `reopen`, `invite`, `members`, `settings`, `queue`, `chat`, `suggestions` |
+| Tracks | CRUD, chunked upload (`init`, `chunk`, `finalize`), `share-permissions`, `facets` |
+| Playlists | CRUD, `playlist-items`, `add-tracks`, `copy-to-channel`, `share` |
+| Admin | `overview`, `users`, `badges`, `channels`, `health` |
+| Support | `categories`, `tickets`, `messages`, `staff-users` |
+| Discovery | `explore`, `search/global`, user profiles, channel/user follows |
+
+### WebSocket
+
+| Endpoint | Purpose |
+|----------|---------|
+| `ws/channels/{id}` | Playback sync + control events |
+| `ws/channels/{id}/chat` | Real-time text chat |
+| `ws/support/tickets/{id}` | Support ticket updates |
+
+### Sync Contract
+
+UI control actions go to `POST /api/channels/{id}/control`. The backend updates playback state and emits a WS event to all channel members with:
+- `type` — `PLAY`, `PAUSE`, `SEEK`, `NEXT`, `PREV`
+- `server_time`, `started_at_server_time`, `position`, `is_playing`, `queue_version`
+
+## Web Push Notifications
+
+Uses **Web Push + VAPID** (no Firebase/OneSignal required). Keys are pre-filled in `.env.example` for development.
+
+| Variable | Where |
+|----------|-------|
+| `WEBPUSH_VAPID_PUBLIC_KEY` / `PRIVATE_KEY` | Django `.env` |
+| `NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY` | Next.js `.env.local` |
+| `FRONTEND_BASE_URL` | Django — base URL for notification click links |
+
+Generate new keys: `bash scripts/generate-vapid-keys.sh`
+
+## Import Audio from Disk
+
+Bulk-register audio files from a server folder:
+
+```bash
+docker compose exec backend python manage.py import_audio /path/to/music --owner yourusername
+```
+
+See **[docs/import-audio-cli.md](docs/import-audio-cli.md)** for details.
+
+## Testing
+
+```bash
+# Backend unit tests
+cd backend-django && python manage.py test --verbosity=2
+
+# Frontend unit tests
+cd frontend-next && npm test
+
+# E2E tests (Playwright)
+cd frontend-next && npm run test:e2e
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SECRET_KEY` | `dev-secret` | Django secret key |
+| `DEBUG` | `0` | Enable debug mode |
+| `POSTGRES_*` | `stream_music` | Database credentials |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
+| `SENTRY_DSN` | *(empty)* | Sentry error tracking DSN |
+| `CELERY_BROKER_URL` | *(from REDIS_URL)* | Celery broker |
+| `CORS_EXTRA_ORIGINS` | *(empty)* | Additional CORS origins (comma-separated) |
+| `TRUST_LAN_CSRF` | `0` | Allow private IP CSRF bypass for LAN |
+
+## Mirrors (Iran)
+
+```
+Python:  https://pypi.devneeds.ir/simple/
+NPM:     https://npm.devneeds.ir/
+Docker:  https://docker.devneeds.ir  (daemon registry mirror)
+```
+
+## License
+
+Private project — all rights reserved.

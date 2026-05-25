@@ -22,4 +22,15 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+let exportedConfig = nextConfig;
+
+if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  const { withSentryConfig } = await import("@sentry/nextjs");
+  exportedConfig = withSentryConfig(nextConfig, {
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+  });
+}
+
+export default exportedConfig;

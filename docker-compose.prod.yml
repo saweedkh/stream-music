@@ -45,6 +45,28 @@ services:
       redis:
         condition: service_started
 
+  celery-worker:
+    build:
+      context: ./backend-django
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file:
+      - deploy/.env.runtime.merged
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MEDIA_ROOT: /media
+      DJANGO_SETTINGS_MODULE: config.settings
+    volumes:
+      - media_data:/media
+    command: celery -A config worker -l info --concurrency=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   frontend:
     build:
       context: ./frontend-next

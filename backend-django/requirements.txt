@@ -10,3 +10,5 @@ redis>=5.0
 Pillow>=10.0
 pywebpush>=2.0.0
 http-ece>=1.2.0
+celery>=5.4
+sentry-sdk[django]>=2.0

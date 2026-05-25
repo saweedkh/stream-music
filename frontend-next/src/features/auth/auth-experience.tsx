@@ -78,43 +78,35 @@ export function AuthExperience({ mode }: AuthExperienceProps) {
 
         <motion.div className="auth-form-center" {...authFormPanel}>
           <div className="auth-panel-card">
-            <div className="auth-mobile-hero lg:hidden">
-              <AuthStageVisual className="max-w-[220px]" />
-              <p className="auth-mobile-eyebrow">{t("auth.stageEyebrow")}</p>
-              <h2 className="auth-mobile-title">
-                {isLogin ? t("auth.welcomeBack") : t("auth.createYourAccount")}
-              </h2>
-              <p className="auth-mobile-subtitle">
-                {isLogin ? t("auth.loginDescription") : t("auth.registerDescription")}
-              </p>
-            </div>
+            <div className="auth-panel-inner">
+              <header className="auth-panel-head">
+                <AuthPanelLogo className="auth-panel-logo-mark" />
+                <div className="auth-panel-intro">
+                  <p className="auth-panel-eyebrow">{t("auth.stageEyebrow")}</p>
+                  <h2 className="auth-panel-intro-title">
+                    {isLogin ? t("auth.welcomeBack") : t("auth.createYourAccount")}
+                  </h2>
+                  <p className="auth-panel-intro-desc">
+                    {isLogin ? t("auth.loginDescription") : t("auth.registerDescription")}
+                  </p>
+                </div>
+              </header>
 
-            <div className="hidden lg:block">
-              <AuthPanelLogo />
-            </div>
-            <div className="auth-panel-logo-compact lg:hidden">
-              <AuthPanelLogo />
-            </div>
+              <div className="auth-panel-visual-mobile" aria-hidden>
+                <AuthStageVisual size="compact" />
+              </div>
 
-            <div className="auth-panel-welcome hidden lg:block">
-              <h2 className="auth-panel-welcome-title">
-                {isLogin ? t("auth.welcomeBack") : t("auth.createYourAccount")}
-              </h2>
-              <p className="auth-panel-welcome-desc">
-                {isLogin ? t("auth.loginDescription") : t("auth.registerDescription")}
-              </p>
-            </div>
+              <div className="auth-panel-tabs">
+                <Suspense fallback={<div className="auth-tabs auth-tabs--skeleton" aria-hidden />}>
+                  <AuthTabs mode={mode} />
+                </Suspense>
+              </div>
 
-            <div className="auth-panel-tabs">
-              <Suspense fallback={<div className="auth-tabs auth-tabs--skeleton" aria-hidden />}>
-                <AuthTabs mode={mode} />
-              </Suspense>
-            </div>
-
-            <div className="auth-panel-body">
-              <Suspense fallback={<p className="auth-panel-loading">{t("common.loading")}</p>}>
-                <AuthForm mode={mode} />
-              </Suspense>
+              <div className="auth-panel-body">
+                <Suspense fallback={<p className="auth-panel-loading">{t("common.loading")}</p>}>
+                  <AuthForm mode={mode} />
+                </Suspense>
+              </div>
             </div>
           </div>
         </motion.div>

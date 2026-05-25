@@ -1,0 +1,44 @@
+name: Scheduled Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # Daily at 3 AM UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ vars.SSH_PORT || 22 }} ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run remote backup
+        run: |
+          ssh -p ${{ vars.SSH_PORT || 22 }} ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }} \
+            "cd ${{ vars.DEPLOY_PATH || '/root/stream-music' }} && bash scripts/backup.sh"
+
+      - name: Download backup
+        run: |
+          mkdir -p /tmp/backups
+          scp -P ${{ vars.SSH_PORT || 22 }} \
+            ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH || '/root/stream-music' }}/backups/latest/*.gz \
+            /tmp/backups/ || echo "No backup files to download"
+
+      - name: Upload backup artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_id }}
+          path: /tmp/backups/
+          retention-days: 30
+          if-no-files-found: warn
