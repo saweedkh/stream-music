@@ -7,6 +7,7 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
+import { WorkspaceList, WorkspaceListItem } from "@/components/layout/workspace";
 import {
   followChannel,
   listFollowingChannels,
@@ -91,10 +92,8 @@ export function FollowingChannelsSection() {
     const busy = busyId === row.channel.id;
     const href = row.is_member ? `/channel/${row.channel.id}` : `/join/public/${row.channel.public_join_slug ?? row.channel.public_slug}`;
     return (
-      <li
-        key={row.channel.id}
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-4 py-3"
-      >
+      <WorkspaceListItem key={row.channel.id} accent={row.is_live ? "brand" : "none"}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link href={href} className="truncate font-medium text-foreground hover:text-brand">
@@ -123,7 +122,8 @@ export function FollowingChannelsSection() {
             <UserMinus className="h-4 w-4" />
           </Button>
         </div>
-      </li>
+        </div>
+      </WorkspaceListItem>
     );
   }
 
@@ -135,13 +135,13 @@ export function FollowingChannelsSection() {
             <Radio className="h-4 w-4 text-brand" />
             {t("dashboard.following.liveNow", { count: live.length })}
           </h3>
-          <ul className="space-y-2">{live.map(renderRow)}</ul>
+          <WorkspaceList>{live.map(renderRow)}</WorkspaceList>
         </section>
       ) : null}
       {idle.length > 0 ? (
         <section>
           <h3 className="mb-3 text-sm font-semibold text-muted-foreground">{t("dashboard.following.all")}</h3>
-          <ul className="space-y-2">{idle.map(renderRow)}</ul>
+          <WorkspaceList>{idle.map(renderRow)}</WorkspaceList>
         </section>
       ) : null}
       <p className="text-center text-xs text-muted-foreground">

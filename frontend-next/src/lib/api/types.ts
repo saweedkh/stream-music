@@ -113,8 +113,9 @@ export type ChannelSummary = {
   is_playing?: boolean;
   join_requires_approval?: boolean;
   is_active?: boolean;
-  /** False after leaving the room; user can reopen / reconnect via join. */
+  /** False after leaving the room; user can reconnect via join. */
   membership_is_active?: boolean | null;
+  brand_logo_url?: string | null;
 };
 
 /** Thrown when GET /channels/:id/state returns 410 (room closed for non-owners). */

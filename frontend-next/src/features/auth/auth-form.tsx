@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
@@ -70,7 +70,8 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | "confirmPassword" | null>(null);
 
-  async function onSubmit() {
+  async function onSubmit(e?: FormEvent) {
+    e?.preventDefault();
     setBusy(true);
     setError(null);
     const parseResult =
@@ -116,12 +117,15 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
   }
 
   return (
-    <motion.div
+    <motion.form
       key={shakeKey}
+      className="min-w-0"
       initial={false}
       animate={shakeKey > 0 && (error || Object.keys(fieldErrors).length > 0) ? authShakeKeyframes : undefined}
+      onSubmit={(e) => void onSubmit(e)}
+      noValidate
     >
-      <motion.div className="flex flex-col gap-4" variants={staggerContainer.variants} initial="hidden" animate="visible">
+      <motion.div className="flex min-w-0 flex-col gap-3.5" variants={staggerContainer.variants} initial={false} animate="visible">
         <motion.div {...staggerItem}>
           <AuthField
             id="auth-username"
@@ -169,8 +173,8 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
           </motion.div>
         )}
 
-        <motion.div {...staggerItem} className={mode === "register" ? "flex gap-3" : undefined}>
-          <div className={mode === "register" ? "flex-1 min-w-0" : undefined}>
+        <motion.div {...staggerItem} className={mode === "register" ? "flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:gap-3" : undefined}>
+          <div className={mode === "register" ? "min-w-0 sm:flex-1" : undefined}>
             <AuthField
               id="auth-password"
               label={t("auth.password")}
@@ -203,7 +207,7 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
           </div>
 
           {mode === "register" && (
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 sm:flex-1">
               <AuthField
                 id="auth-confirm-password"
                 label={t("auth.confirmPassword")}
@@ -253,9 +257,8 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
 
         <motion.div {...staggerItem}>
           <button
-            type="button"
+            type="submit"
             className="flex h-11 w-full items-center justify-center rounded-xl border-0 bg-brand text-sm font-bold tracking-wide text-white shadow-[0_1px_0_rgba(255,255,255,0.12)_inset,0_8px_28px_-4px_rgba(34,197,94,0.5)] transition-all hover:brightness-110 hover:shadow-[0_1px_0_rgba(255,255,255,0.15)_inset,0_12px_40px_-4px_rgba(34,197,94,0.6)] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={onSubmit}
             disabled={busy || !username || !password || (mode === "register" && !confirmPassword)}
           >
             {busy ? (
@@ -293,6 +296,6 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
           )}
         </motion.p>
       </motion.div>
-    </motion.div>
+    </motion.form>
   );
 }

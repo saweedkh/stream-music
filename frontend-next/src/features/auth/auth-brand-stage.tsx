@@ -16,7 +16,7 @@ export function AuthBrandStage() {
   const { t } = useTranslations();
 
   return (
-    <aside className="relative z-[1] hidden min-h-dvh lg:flex lg:flex-col">
+    <aside className="relative z-[1] hidden h-dvh min-h-0 min-w-0 overflow-hidden lg:flex lg:flex-col">
       <motion.div
         className="relative z-[2] flex min-h-0 flex-1 flex-col items-center justify-center px-10 py-11 xl:px-14 xl:py-12"
         {...authStageContainer}

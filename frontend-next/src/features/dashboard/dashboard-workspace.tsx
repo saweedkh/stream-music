@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { useToast } from "@/components/ui/toast-provider";
 import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
-import { PremiumLimitsCard } from "@/features/dashboard/premium-limits-card";
 import { FollowingChannelsSection } from "@/features/dashboard/following-channels-section";
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
@@ -551,9 +550,7 @@ export function DashboardWorkspace() {
         {activeTab === "following" ? <FollowingChannelsSection /> : null}
 
         {activeTab === "channels" ? (
-          <div className="space-y-6">
-            <PremiumLimitsCard />
-            <ChannelManagementSection
+          <ChannelManagementSection
             channels={channels}
             channelName={channelName}
             channelPrivacy={channelPrivacy}
@@ -566,7 +563,6 @@ export function DashboardWorkspace() {
             currentUserId={currentUserId}
             onChannelsRefresh={() => void refreshAll()}
           />
-          </div>
         ) : null}
 
         {activeTab === "tracks" ? (

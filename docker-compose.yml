@@ -24,6 +24,7 @@ services:
       - ./backend-django/.env.example
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
+      MEDIA_ROOT: /media
       # LAN phone/tablet via https://<host-ip>:8443 — CSRF/CORS private-IP regex (disable for locked-down prod).
       TRUST_LAN_CSRF: "1"
     volumes:

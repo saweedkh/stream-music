@@ -18,7 +18,7 @@ export function AuthExperience({ mode: initialMode }: { mode: AuthMode }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
 
   return (
-    <div className="relative grid min-h-dvh grid-cols-1 overflow-hidden bg-gradient-to-b from-[#f5f7f6] via-[#eef1ef] to-[#e8ede9] text-slate-900 dark:from-[#020304] dark:via-[#060809] dark:to-[#040606] dark:text-slate-100 lg:grid-cols-[minmax(0,1.1fr)_minmax(24rem,0.9fr)]">
+    <div className="relative grid min-h-dvh w-full max-w-[100dvw] grid-cols-1 overflow-x-hidden bg-gradient-to-b from-[#f5f7f6] via-[#eef1ef] to-[#e8ede9] text-slate-900 dark:from-[#020304] dark:via-[#060809] dark:to-[#040606] dark:text-slate-100 lg:h-dvh lg:max-h-dvh lg:grid-cols-[minmax(0,1.1fr)_minmax(24rem,0.9fr)] lg:overflow-hidden">
       {/* Waves */}
       <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
         <svg className="absolute inset-x-0 bottom-0 h-[62%] w-full" viewBox="0 0 1440 560" preserveAspectRatio="none">
@@ -53,24 +53,21 @@ export function AuthExperience({ mode: initialMode }: { mode: AuthMode }) {
 
       <AuthBrandStage />
 
-      <div className="relative z-[1] flex min-h-dvh flex-col">
-        {/* Form center */}
+      <div className="relative z-[1] flex min-h-dvh min-w-0 flex-col overflow-x-hidden lg:h-dvh lg:min-h-0 lg:overflow-hidden">
         <motion.div
-          className="relative z-[1] flex flex-1 items-center justify-center px-5 pb-6 pt-10 sm:px-8 lg:px-10 lg:py-10"
+          className="relative z-[1] mx-auto flex w-full min-w-0 flex-1 flex-col justify-center px-5 py-6 sm:px-8 sm:py-8 lg:max-h-full lg:px-10 lg:py-10"
           {...authFormPanel}
         >
-          <div className="w-full max-w-[26rem] rounded-2xl border border-black/[0.06] bg-white/80 p-6 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#0c0f14] dark:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] sm:p-8 lg:rounded-3xl lg:p-10">
-            <div className="relative z-[1] flex flex-col gap-7">
-              {/* Head */}
-              <header className="flex flex-col items-center gap-2 text-center">
+          <div className="mx-auto w-full min-w-0 max-w-[26rem] shrink-0 overflow-visible rounded-2xl border border-black/[0.06] bg-white/80 p-6 shadow-[0_16px_48px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#0c0f14] dark:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)] sm:p-8 lg:rounded-3xl lg:p-10">
+            <div className="relative z-[1] flex flex-col">
+              <header className="flex shrink-0 flex-col items-center gap-2 pb-5 text-center">
                 <AuthPanelLogo />
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand/80">
                   {t("auth.stageEyebrow")}
                 </p>
               </header>
 
-              {/* Tabs */}
-              <div className="relative flex" role="tablist">
+              <div className="relative flex shrink-0 border-b border-slate-200/70 dark:border-white/[0.06]" role="tablist">
                 {(["login", "register"] as const).map((tab) => (
                   <button
                     key={tab}
@@ -95,14 +92,13 @@ export function AuthExperience({ mode: initialMode }: { mode: AuthMode }) {
                     )}
                   </button>
                 ))}
-                <span className="absolute inset-x-0 bottom-0 h-px bg-slate-200/70 dark:bg-white/[0.06]" aria-hidden />
               </div>
 
-              {/* Form */}
-              <AuthForm mode={mode} onSwitchMode={setMode} />
+              <div className="auth-form-slot min-w-0 overflow-visible pt-5">
+                <AuthForm key={mode} mode={mode} onSwitchMode={setMode} />
+              </div>
 
-              {/* Settings */}
-              <div className="flex items-center justify-center gap-1 pt-1">
+              <div className="flex shrink-0 items-center justify-center gap-1 pt-5">
                 <LanguageToggle side="top" align="center" className="h-8 w-8 rounded-lg text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-300" />
                 <ThemeToggle className="h-8 w-8 rounded-lg text-slate-300 transition-colors hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-300" />
               </div>

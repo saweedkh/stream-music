@@ -25,7 +25,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-[210] flex flex-col gap-4 border border-border bg-card/98 p-5 text-foreground shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
+  "fixed z-[210] flex flex-col gap-4 border p-5 text-foreground shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
     variants: {
       side: {
@@ -48,12 +48,19 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Co
   ({ side = "right", className, children, ...props }, ref) => (
     <SheetPortal>
       <SheetOverlay />
-      <DialogPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          sheetVariants({ side }),
+          "border-[color-mix(in_srgb,var(--border)_55%,transparent)] bg-[var(--surface-glass)] backdrop-blur-2xl backdrop-saturate-150",
+          "shadow-[0_28px_80px_-32px_rgba(0,0,0,0.55)]",
+          "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent before:opacity-80 dark:before:from-white/6 dark:before:via-white/3",
+          "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-white/10 dark:after:ring-white/6",
+          className,
+        )}
+        {...props}
+      >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md opacity-70 ring-offset-background transition hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-brand/50">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </SheetPortal>
   ),

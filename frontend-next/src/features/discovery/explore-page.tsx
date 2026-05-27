@@ -1,56 +1,224 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { Compass, ListMusic, Loader2, Radio, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Search, UserRound, X } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast-provider";
-import { getExploreFeed, type ExploreFeed } from "@/lib/api";
-import { hubPanelRoot } from "@/lib/mobile-page-layout";
-import { cn } from "@/lib/utils";
+import {
+  WorkspaceEmpty,
+  WorkspaceList,
+  WorkspaceNotice,
+  WorkspacePage,
+  WorkspaceSection,
+} from "@/components/layout/workspace";
+import { ExploreUserRow } from "@/features/discovery/explore-user-row";
+import {
+  followUser,
+  getExploreFeed,
+  getPublicUserProfile,
+  getUserFollow,
+  globalSearch,
+  unfollowUser,
+  type ExploreFeed,
+  type PublicUserProfile,
+} from "@/lib/api";
+
+type DiscoverableUser = {
+  id: number;
+  username: string;
+  display_name: string;
+};
+
+function displayNameFromProfile(profile: PublicUserProfile | undefined, fallback: string) {
+  if (!profile) return fallback;
+  const full = [profile.user.first_name, profile.user.last_name].filter(Boolean).join(" ").trim();
+  return full || profile.user.username || fallback;
+}
+
+function ExploreUserRowSkeleton() {
+  return (
+    <li className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 sm:px-3">
+      <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+      <div className="min-w-0 flex-1">
+        <Skeleton className="h-4 w-40 max-w-[70%]" />
+        <Skeleton className="mt-2 h-3 w-56 max-w-[85%]" />
+      </div>
+      <Skeleton className="h-9 w-[7.25rem] shrink-0 rounded-lg" />
+    </li>
+  );
+}
 
 export function ExplorePage() {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const [feed, setFeed] = useState<ExploreFeed | null>(null);
+  const [users, setUsers] = useState<DiscoverableUser[]>([]);
+  const [suggestedPublicUsers, setSuggestedPublicUsers] = useState<DiscoverableUser[]>([]);
+  const [publicProfiles, setPublicProfiles] = useState<Record<string, PublicUserProfile>>({});
+  const [followState, setFollowState] = useState<Record<string, boolean>>({});
+  const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [q, setQ] = useState("");
-  const [lang, setLang] = useState("");
-  const [genre, setGenre] = useState("");
-  const [liveOnly, setLiveOnly] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setFeed(
-        await getExploreFeed({
-          q: q.trim() || undefined,
-          lang: lang.trim() || undefined,
-          genre: genre.trim() || undefined,
-          live_only: liveOnly,
-        }),
-      );
+      setFeed(await getExploreFeed());
     } catch (e) {
       showToast(e instanceof Error ? e.message : t("explore.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
-  }, [genre, lang, liveOnly, q, showToast, t]);
+  }, [showToast, t]);
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(), 300);
-    return () => clearTimeout(timer);
+    void load();
   }, [load]);
+
+  const filterPublicUsers = useCallback(async (list: DiscoverableUser[]) => {
+    const checks = await Promise.all(
+      list.map(async (user) => {
+        try {
+          const profile = await getPublicUserProfile(user.username);
+          return { user, profile };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const publicRows = checks.filter((row): row is { user: DiscoverableUser; profile: PublicUserProfile } => row !== null);
+    setPublicProfiles((prev) => {
+      const next = { ...prev };
+      for (const row of publicRows) {
+        next[row.user.username] = row.profile;
+        row.user.display_name = displayNameFromProfile(row.profile, row.user.username);
+      }
+      return next;
+    });
+    return publicRows.map((row) => row.user);
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    const query = q.trim();
+    if (query.length < 2) {
+      setUsers([]);
+      return;
+    }
+    setUsersLoading(true);
+    try {
+      const result = await globalSearch(query);
+      const foundUsers = (result.users ?? []).map((u) => ({
+        id: u.id,
+        username: u.username,
+        display_name: u.display_name?.trim() || u.username,
+      }));
+      const publicUsers = await filterPublicUsers(foundUsers);
+      setUsers(publicUsers);
+      const nextFollow: Record<string, boolean> = {};
+      await Promise.all(
+        publicUsers.map(async (user) => {
+          try {
+            const st = await getUserFollow(user.username);
+            nextFollow[user.username] = st.following;
+          } catch {
+            nextFollow[user.username] = false;
+          }
+        }),
+      );
+      setFollowState((prev) => ({ ...prev, ...nextFollow }));
+    } catch (e) {
+      setUsers([]);
+      showToast(e instanceof Error ? e.message : t("search.global.followFailed"), "error");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [filterPublicUsers, q, showToast, t]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => void loadUsers(), 320);
+    return () => clearTimeout(timer);
+  }, [loadUsers]);
+
+  const suggestedUsers = useMemo<DiscoverableUser[]>(() => {
+    if (!feed) return [];
+    const seen = new Set<string>();
+    const next: DiscoverableUser[] = [];
+    const pushUser = (username?: string | null) => {
+      const handle = username?.trim();
+      if (!handle || seen.has(handle)) return;
+      seen.add(handle);
+      next.push({
+        id: next.length + 1,
+        username: handle,
+        display_name: handle,
+      });
+    };
+    for (const row of feed.shared_playlists) pushUser(row.owner_username);
+    for (const row of feed.popular_channels) pushUser(row.channel.owner_username);
+    for (const row of feed.live_channels) pushUser(row.owner_username);
+    return next.slice(0, 12);
+  }, [feed]);
+
+  useEffect(() => {
+    if (suggestedUsers.length === 0) {
+      setSuggestedPublicUsers([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const filtered = await filterPublicUsers(suggestedUsers);
+      const suggestedFollow: Record<string, boolean> = {};
+      await Promise.all(
+        filtered.map(async (user) => {
+          try {
+            const st = await getUserFollow(user.username);
+            suggestedFollow[user.username] = st.following;
+          } catch {
+            suggestedFollow[user.username] = false;
+          }
+        }),
+      );
+      if (!cancelled) {
+        setSuggestedPublicUsers(filtered);
+        setFollowState((prev) => ({ ...suggestedFollow, ...prev }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filterPublicUsers, suggestedUsers]);
+
+  const isSearchingPeople = q.trim().length >= 2;
+  const visibleUsers = isSearchingPeople ? users : suggestedPublicUsers;
+
+  async function toggleFollow(username: string) {
+    const following = followState[username] === true;
+    setFollowBusy((prev) => ({ ...prev, [username]: true }));
+    try {
+      if (following) {
+        await unfollowUser(username);
+        setFollowState((prev) => ({ ...prev, [username]: false }));
+        showToast(t("search.global.unfollowed"), "success");
+      } else {
+        await followUser(username);
+        setFollowState((prev) => ({ ...prev, [username]: true }));
+        showToast(t("search.global.followed"), "success");
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : t("search.global.followFailed"), "error");
+    } finally {
+      setFollowBusy((prev) => ({ ...prev, [username]: false }));
+    }
+  }
 
   if (loading && !feed) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-[30vh] items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -58,140 +226,77 @@ export function ExplorePage() {
   if (!feed) return null;
 
   return (
-    <div className={cn(hubPanelRoot, "lg:min-h-0 lg:flex-1 lg:overflow-hidden")}>
-      <ScrollArea className="w-full max-lg:overflow-visible lg:h-full lg:flex-1">
-        <div className="mx-auto max-w-4xl space-y-8 px-1 py-4 sm:px-0">
-      <header>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Compass className="h-7 w-7 text-brand" />
-          {t("explore.title")}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("explore.subtitle")}</p>
-      </header>
+    <WorkspacePage className="gap-4">
+      <WorkspaceSection
+        title={t("explore.title")}
+        description={t("explore.peopleOnlySubtitle")}
+      >
+        <div className="space-y-3">
+          <section className="surface-card p-3.5 sm:p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">{t("explore.peopleHint")}</p>
+              <Badge className="ms-auto" variant={isSearchingPeople ? "default" : "secondary"}>
+                {t("profile.public.followers", { count: visibleUsers.length })}
+              </Badge>
+            </div>
+            <div className="relative mt-3">
+              <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                className="h-11 bg-transparent ps-9 pe-10"
+                placeholder={t("explore.userSearchPlaceholder")}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label={t("explore.userSearchPlaceholder")}
+              />
+              {q ? (
+                <button
+                  type="button"
+                  className="focus-ring absolute end-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  onClick={() => setQ("")}
+                  aria-label={t("channels.clearSearch")}
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+            {!isSearchingPeople ? (
+              <WorkspaceNotice className="mt-3 py-2.5">
+                <span className="text-sm">{t("explore.peopleEmptySuggested")}</span>
+              </WorkspaceNotice>
+            ) : null}
+          </section>
 
-      <Card className="border-border/90 bg-card/60">
-        <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="min-w-[12rem] flex-1">
-            <label className="text-xs font-medium text-muted-foreground">{t("explore.filterSearch")}</label>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("explore.filterSearchPlaceholder")} />
-          </div>
-          <div className="w-full sm:w-36">
-            <label className="text-xs font-medium text-muted-foreground">{t("explore.filterLang")}</label>
-            <Input value={lang} onChange={(e) => setLang(e.target.value)} placeholder="en" />
-          </div>
-          <div className="w-full sm:w-36">
-            <label className="text-xs font-medium text-muted-foreground">{t("explore.filterGenre")}</label>
-            <Input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="electronic" />
-          </div>
-          <Button
-            type="button"
-            variant={liveOnly ? "default" : "secondary"}
-            className="shrink-0"
-            onClick={() => setLiveOnly((v) => !v)}
-          >
-            {t("explore.filterLiveOnly")}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Radio className="h-4 w-4 text-brand" />
-            {t("explore.liveChannels")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
-          ) : feed.live_channels.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("explore.noLive")}</p>
-          ) : (
-            <ul className="space-y-2">
-              {feed.live_channels.map((ch) => (
-                <li key={ch.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
-                  <span className="truncate font-medium">{ch.name}</span>
-                  <Button size="sm" asChild>
-                    <Link href={`/join/public/${ch.public_join_slug ?? ch.public_slug}`}>{t("explore.join")}</Link>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      {!liveOnly ? (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="h-4 w-4 text-brand" />
-                {t("explore.popularWeek")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {feed.popular_channels.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("explore.noPopular")}</p>
-              ) : (
-                <ul className="space-y-2">
-                  {feed.popular_channels.map((row) => (
-                    <li
-                      key={row.channel.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2"
-                    >
-                      <span className="truncate font-medium">{row.channel.name}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {t("explore.eventCount", { count: row.event_count })}
-                        </Badge>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/party/${row.channel.id}`}>{t("explore.recap")}</Link>
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ListMusic className="h-4 w-4 text-brand" />
-                {t("explore.sharedPlaylists")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {feed.shared_playlists.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("explore.noShared")}</p>
-              ) : (
-                <ul className="space-y-2">
-                  {feed.shared_playlists.map((sp) => (
-                    <li
-                      key={sp.token}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{sp.playlist.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          @{sp.owner_username} · {t("explore.trackCount", { count: sp.item_count })}
-                        </p>
-                      </div>
-                      <Button size="sm" asChild>
-                        <Link href={sp.share_url}>{t("explore.openPlaylist")}</Link>
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
+          <section className="workspace-rail overflow-hidden">
+            {usersLoading ? (
+              <WorkspaceList className="gap-1 p-1.5 sm:p-2">
+                {Array.from({ length: 7 }).map((_, idx) => (
+                  <ExploreUserRowSkeleton key={idx} />
+                ))}
+              </WorkspaceList>
+            ) : visibleUsers.length === 0 ? (
+              <div className="p-2 sm:p-3">
+                <WorkspaceEmpty icon={UserRound} title={t("explore.peopleEmpty")}>
+                  <p>{isSearchingPeople ? t("explore.peopleEmpty") : t("explore.peopleEmptySuggested")}</p>
+                </WorkspaceEmpty>
+              </div>
+            ) : (
+              <WorkspaceList className="gap-0 p-1.5 sm:p-2">
+                {visibleUsers.map((user) => (
+                  <ExploreUserRow
+                    key={user.username}
+                    username={user.username}
+                    displayName={displayNameFromProfile(publicProfiles[user.username], user.display_name)}
+                    profile={publicProfiles[user.username]}
+                    following={followState[user.username] === true}
+                    busy={followBusy[user.username] === true}
+                    onToggleFollow={() => void toggleFollow(user.username)}
+                  />
+                ))}
+              </WorkspaceList>
+            )}
+          </section>
         </div>
-      </ScrollArea>
-    </div>
+      </WorkspaceSection>
+    </WorkspacePage>
   );
 }

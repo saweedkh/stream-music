@@ -36,7 +36,7 @@ export function AppNavLayout({
   children,
 }: AppNavLayoutProps) {
   const pathname = usePathname();
-  const { t } = useTranslations();
+  const { t, dir } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -106,7 +106,10 @@ export function AppNavLayout({
         <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent side="left" className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
+          <SheetContent
+            side={dir === "rtl" ? "right" : "left"}
+            className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0"
+          >
             <SheetTitle className="sr-only">{t("dashboard.navTitle")}</SheetTitle>
             <DashboardSidebar {...sidebarProps} className="h-full w-full border-0 bg-transparent" />
           </SheetContent>

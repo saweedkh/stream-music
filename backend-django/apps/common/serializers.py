@@ -101,10 +101,9 @@ class ChannelSerializer(serializers.ModelSerializer):
     def get_brand_logo_url(self, obj):
         if not obj.brand_logo:
             return None
-        request = self.context.get("request")
         url = obj.brand_logo.url
-        if request:
-            return request.build_absolute_uri(url)
+        # Always return relative media path to avoid broken absolute hosts
+        # when requests pass through local proxies/tunnels.
         return url
 
     def get_is_playing(self, obj):

@@ -20,7 +20,7 @@ export const mobileMain = "flex w-full flex-col max-lg:flex-none max-lg:overflow
 export const desktopMain = "lg:min-h-0 lg:overflow-hidden";
 
 export const shellFrame =
-  "relative flex w-full flex-col max-lg:flex-none max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border/50 lg:bg-card/40 lg:flex-row";
+  "relative flex w-full flex-col max-lg:flex-none max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:rounded-2xl lg:bg-[var(--workspace-canvas)] lg:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] lg:flex-row dark:lg:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]";
 
 export const shellMain =
   "relative flex w-full flex-col max-lg:flex-none max-lg:overflow-visible lg:min-h-0 lg:min-w-0 lg:flex-1 lg:overflow-hidden";
@@ -37,5 +37,8 @@ export const hubPanelRoot = "flex w-full flex-col max-lg:flex-none lg:min-h-0 lg
 export const panelMobileFlat =
   "max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none max-lg:before:hidden";
 
-export const panelLgCage =
-  "lg:rounded-2xl lg:border lg:border-border/60 lg:bg-gradient-to-br lg:from-background/95 lg:via-[var(--brand-subtle)] lg:to-background/95 lg:backdrop-blur-2xl";
+export const panelLgSurface =
+  "lg:rounded-xl lg:bg-[var(--workspace-panel)] lg:backdrop-blur-xl";
+
+/** @deprecated Use panelLgSurface — kept for channel room panels until migrated */
+export const panelLgCage = panelLgSurface;
