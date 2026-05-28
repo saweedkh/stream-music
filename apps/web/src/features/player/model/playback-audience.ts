@@ -1,4 +1,4 @@
-import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
 
 export function shouldAudienceHear(
   positionSec: number,

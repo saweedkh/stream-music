@@ -16,15 +16,15 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { Switch } from "@/shared/ui/switch";
+import { UsernameWithBadges } from "@/shared/ui/user-verified-badge";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   createAdminBadge,
   deleteAdminBadge,
@@ -41,8 +41,8 @@ import {
   type AdminOverview,
   type AdminUserRow,
 } from "@/lib/api";
-import type { AdminSection } from "@/features/dashboard/dashboard-nav-config";
-export type { AdminSection } from "@/features/dashboard/dashboard-nav-config";
+import type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
+export type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
 import { manualBadgeSlugsForUser } from "@/lib/user-badges";
 import { cn } from "@/lib/utils";
 

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Crown, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, UserCircle } from "lucide-react";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 export type DashboardTabMeta = {

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Check, UserPlus } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import type { PublicUserProfile } from "@/lib/api";
 

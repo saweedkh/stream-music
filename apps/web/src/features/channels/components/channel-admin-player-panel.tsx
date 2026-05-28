@@ -1,6 +1,6 @@
 "use client";
 
-import { ChannelAdminPlaylistPanel } from "@/features/channels/channel-admin-playlist-panel";
+import { ChannelAdminPlaylistPanel } from "@/features/channels/components/channel-admin-playlist-panel";
 
 type Props = {
   channelId: string;

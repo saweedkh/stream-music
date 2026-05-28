@@ -1,8 +1,8 @@
 "use client";
 
 import { Volume2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/shared/ui/dialog";
 
 type Props = {
   open: boolean;

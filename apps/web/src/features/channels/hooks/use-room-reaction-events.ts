@@ -8,7 +8,7 @@ import {
   randomReactionY,
   type RoomReactionBurst,
   type RoomReactionFloater,
-} from "@/features/channels/room-reaction-constants";
+} from "@/features/channels/components/room-reaction-constants";
 
 const MAX_BURSTS = 8;
 

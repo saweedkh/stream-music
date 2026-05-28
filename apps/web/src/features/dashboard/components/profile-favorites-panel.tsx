@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ListMusic, Music } from "lucide-react";
-import { FavoriteStarButton } from "@/components/ui/favorite-star-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+import { FavoriteStarButton } from "@/shared/ui/favorite-star-button";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import {
   listPlaylists,

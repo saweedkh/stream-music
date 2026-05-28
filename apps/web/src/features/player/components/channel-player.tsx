@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useToast } from "@/components/ui/toast-provider";
-import { ChannelPlayerFull } from "@/features/player/channel-player-full";
-import { ChannelPlayerMini } from "@/features/player/channel-player-mini";
-import { NowPlayingReactions } from "@/features/player/now-playing-reactions";
-import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
-import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
-import { useChannelPlaybackEngine } from "@/features/player/use-channel-playback-engine";
+import { useToast } from "@/shared/ui/toast-provider";
+import { ChannelPlayerFull } from "@/features/player/components/channel-player-full";
+import { ChannelPlayerMini } from "@/features/player/components/channel-player-mini";
+import { NowPlayingReactions } from "@/features/player/components/now-playing-reactions";
+import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
+import { useChannelPlaybackEngine } from "@/features/player/hooks/use-channel-playback-engine";
 
-export type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
+export type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
 
 type Props = {
   channelId: string;

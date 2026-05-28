@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Radio, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { WorkspaceChip, WorkspaceChipGroup, WorkspaceEmpty, WorkspaceList, WorkspacePage, WorkspaceRail, WorkspaceRailCard, WorkspaceSplit } from "@/components/layout/workspace";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
+import { WorkspaceChip, WorkspaceChipGroup, WorkspaceEmpty, WorkspaceList, WorkspacePage, WorkspaceRail, WorkspaceRailCard, WorkspaceSplit } from "@/shared/layout/workspace";
 import { ChannelCard } from "@/features/dashboard/channels/channel-card";
 import { ChannelRow } from "@/features/dashboard/channels/channel-row";
 import { ChannelViewToggle, type ChannelViewMode } from "@/features/dashboard/channels/channel-view-toggle";
 import { CreateChannelForm } from "@/features/dashboard/channels/create-channel-form";
 import { ChannelsPremiumNotice } from "@/features/dashboard/channels/channels-premium-notice";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { getMeChannelsPendingSuggestions, type ChannelSummary } from "@/lib/api";
 import {
   filterChannelsBySearch,

@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { resolvePlayerAccent } from "@/features/player/player-accent";
+import { resolvePlayerAccent } from "@/features/player/model/player-accent";
 
 export type ArtworkSize = "xs" | "sm" | "md" | "lg" | "xl";
 

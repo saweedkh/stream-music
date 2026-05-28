@@ -4,16 +4,16 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ToastProvider } from "@/components/ui/toast-provider";
-import { ChannelCommandMenu } from "@/components/room/channel-command-menu";
+import { ToastProvider } from "@/shared/ui/toast-provider";
+import { ChannelCommandMenu } from "@/shared/room/channel-command-menu";
 import { GlobalSearchDialog } from "@/features/discovery";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, type AuthUser } from "@/lib/api";
-import { ConnectivityBanner } from "@/components/connectivity-banner";
-import { NotificationProvider } from "@/components/notifications/notification-provider";
+import { ConnectivityBanner } from "@/shared/connectivity-banner";
+import { NotificationProvider } from "@/shared/notifications/notification-provider";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
-import { AppGlobalNavShell } from "@/components/layout/app-global-nav-shell";
-import { PwaInstallBanner } from "@/components/pwa/pwa-install-banner";
+import { AppGlobalNavShell } from "@/shared/layout/app-global-nav-shell";
+import { PwaInstallBanner } from "@/shared/pwa/pwa-install-banner";
 import { fadeUp } from "@/lib/motion";
 import {
   desktopMain,

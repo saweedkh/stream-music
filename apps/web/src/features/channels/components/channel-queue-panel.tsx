@@ -2,17 +2,17 @@
 
 import { ChevronDown, ChevronUp, ListMusic, Loader2, Play, Radio, RefreshCw, ThumbsUp, Trash2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useState } from "react";
-import { ChannelQueueContext } from "@/features/channels/channel-queue-context";
-import { listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ListSkeleton } from "@/components/ui/list-skeleton";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ui/toast-provider";
+import { ChannelQueueContext } from "@/features/channels/components/channel-queue-context";
+import { listenerItemClass } from "@/features/channels/components/channel-listener-panel-styles";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { ListSkeleton } from "@/shared/ui/list-skeleton";
+import { Alert } from "@/shared/ui/alert";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Separator } from "@/shared/ui/separator";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   ChannelClosedError,
   jumpToChannelQueueItem,

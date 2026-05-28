@@ -2,7 +2,7 @@
 
 import { Check, Languages } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +10,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useTranslations } from "@/components/providers/locale-provider";
+} from "@/shared/ui/dropdown-menu";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
 

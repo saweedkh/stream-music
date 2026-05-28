@@ -4,17 +4,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Check, ChevronDown, Languages, LogOut, Moon, Sun } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
-import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
+} from "@/shared/ui/dropdown-menu";
+import { Separator } from "@/shared/ui/separator";
+import { UsernameWithBadges } from "@/shared/ui/user-verified-badge";
 import { logoutUser, type AuthUser } from "@/lib/api";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";

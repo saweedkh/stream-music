@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,18 +12,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import { joinChannelFromLink } from "@/lib/api";
 import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 import { Camera, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const JoinQrCameraScanner = dynamic(
-  () => import("@/features/dashboard/join-qr-camera-scanner").then((m) => m.JoinQrCameraScanner),
+  () => import("@/features/dashboard/components/join-qr-camera-scanner").then((m) => m.JoinQrCameraScanner),
   {
     ssr: false,
     loading: () => <p className="text-xs text-muted-foreground">Starting camera…</p>,

@@ -3,14 +3,14 @@
 import type { ComponentType } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import {
   ADMIN_NAV_ITEMS,
   LISTENER_NAV_ITEMS,
   type ChannelTabId,
   type ListenerTabId,
-} from "@/features/channels/channel-room-config";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+} from "@/features/channels/components/channel-room-config";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { cn } from "@/lib/utils";
 
 const ADMIN_PRIMARY: ChannelTabId[] = ["chat", "player", "queue", "suggestions"];

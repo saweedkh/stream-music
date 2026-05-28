@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, Loader2, UserPlus, UserMinus } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { useToast } from "@/shared/ui/toast-provider";
 import { followChannel, getChannelFollow, unfollowChannel } from "@/lib/api";
 
 type Props = {

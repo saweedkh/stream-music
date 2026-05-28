@@ -1,6 +1,6 @@
 "use client";
 
-import type { RoomReactionFloater } from "@/features/channels/room-reaction-constants";
+import type { RoomReactionFloater } from "@/features/channels/components/room-reaction-constants";
 import { cn } from "@/lib/utils";
 
 type Props = {

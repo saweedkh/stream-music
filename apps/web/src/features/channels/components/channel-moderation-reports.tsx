@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Shield } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { useToast } from "@/shared/ui/toast-provider";
 import { dismissModerationReport, listModerationReports } from "@/lib/api";
-import { adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
+import { adminSectionLabel } from "@/features/channels/components/channel-admin-panel-styles";
 
 type Props = { channelId: string };
 

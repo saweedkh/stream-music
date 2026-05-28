@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, CheckCircle2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
+import { Switch } from "@/shared/ui/switch";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   deleteWebPushSubscriptions,
   getMe,

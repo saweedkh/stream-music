@@ -3,12 +3,12 @@
 import type { ReactNode } from "react";
 import { useRef } from "react";
 import { ChevronUp, Radio } from "lucide-react";
-import { usePlayerMiniInset } from "@/hooks/use-player-mini-inset";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
-import { ChannelPlayerArtwork } from "@/features/player/channel-player-artwork";
-import { ChannelPlayerPlaybackControls, ChannelPlayerSeekBar } from "@/features/player/channel-player-controls";
-import { resolvePlayerAccent } from "@/features/player/player-accent";
+import { usePlayerMiniInset } from "@/shared/hooks/use-player-mini-inset";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { AudioWaveVisualizer } from "@/features/player/components/audio-wave-visualizer";
+import { ChannelPlayerArtwork } from "@/features/player/components/channel-player-artwork";
+import { ChannelPlayerPlaybackControls, ChannelPlayerSeekBar } from "@/features/player/components/channel-player-controls";
+import { resolvePlayerAccent } from "@/features/player/model/player-accent";
 import { cn } from "@/lib/utils";
 
 type Props = {

@@ -1,10 +1,10 @@
 "use client";
 
 import { Search, UserRound, X } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspaceEmpty, WorkspaceList, WorkspaceSection } from "@/components/layout/workspace";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspaceEmpty, WorkspaceList, WorkspaceSection } from "@/shared/layout/workspace";
+import { Input } from "@/shared/ui/input";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ExploreUserRow } from "@/features/discovery/components/explore-user-row";
 import { displayNameFromProfile } from "@/features/discovery/model/explore-utils";
 import type { DiscoverableUser } from "@/features/discovery/hooks/use-discoverable-users";

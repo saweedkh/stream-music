@@ -1,9 +1,9 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { NotificationCenter } from "@/components/notifications/notification-center";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { NotificationCenter } from "@/shared/notifications/notification-center";
+import { Button } from "@/shared/ui/button";
 import type { AuthUser } from "@/lib/api";
 
 type DashboardMobileHeaderProps = {

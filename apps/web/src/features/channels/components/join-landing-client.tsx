@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { joinChannelFromLink } from "@/lib/api";
 import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 

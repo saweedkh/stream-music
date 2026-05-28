@@ -1,8 +1,8 @@
 "use client";
 
-import { useTranslations } from "@/components/providers/locale-provider";
-import { DASHBOARD_TAB_META } from "@/features/dashboard/dashboard-nav-meta";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { DASHBOARD_TAB_META } from "@/features/dashboard/model/dashboard-nav-meta";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 
 type DashboardPageHeaderProps = {
   activeTab: DashboardTab;

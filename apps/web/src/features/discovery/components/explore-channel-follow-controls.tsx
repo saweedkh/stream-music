@@ -1,8 +1,8 @@
 "use client";
 
 import { Bell, BellOff, Loader2, UserMinus, UserPlus } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
 import type { ExploreChannelFollowActions } from "@/features/discovery/hooks/use-explore-channel-follow";
 import { cn } from "@/lib/utils";
 

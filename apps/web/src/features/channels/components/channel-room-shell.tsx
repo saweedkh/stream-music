@@ -9,7 +9,7 @@ import {
   channelNavItemsForContext,
   type ChannelTabGroup,
   type ChannelTabId,
-} from "@/features/channels/channel-room-config";
+} from "@/features/channels/components/channel-room-config";
 
 type Props = {
   activeTab: ChannelTabId;

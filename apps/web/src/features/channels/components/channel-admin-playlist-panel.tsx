@@ -20,17 +20,17 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { listenerFieldClass } from "@/features/channels/channel-listener-panel-styles";
-import { ImportPlaylistToChannelDialog } from "@/features/playlists/import-playlist-to-channel-dialog";
-import { useToast } from "@/components/ui/toast-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Select } from "@/shared/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { listenerFieldClass } from "@/features/channels/components/channel-listener-panel-styles";
+import { ImportPlaylistToChannelDialog } from "@/features/playlists/components/import-playlist-to-channel-dialog";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,

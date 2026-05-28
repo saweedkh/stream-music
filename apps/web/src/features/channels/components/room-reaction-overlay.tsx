@@ -1,7 +1,7 @@
 "use client";
 
-import { useRoomReactionsOptional } from "@/features/channels/room-reaction-context";
-import { RoomReactionFloatLayer } from "@/features/channels/room-reaction-float-layer";
+import { useRoomReactionsOptional } from "@/features/channels/components/room-reaction-context";
+import { RoomReactionFloatLayer } from "@/features/channels/components/room-reaction-float-layer";
 
 export function RoomReactionOverlay() {
   const reactions = useRoomReactionsOptional();

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { JoinPublicClient } from "@/features/channels/join-public-client";
+import { JoinPublicClient } from "@/features/channels/components/join-public-client";
 
 type Props = {
   params: Promise<{ slug: string }>;

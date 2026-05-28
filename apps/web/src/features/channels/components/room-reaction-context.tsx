@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { useRoomReactionEvents } from "@/features/channels/use-room-reaction-events";
-import type { RoomReactionBurst, RoomReactionFloater } from "@/features/channels/room-reaction-constants";
+import { useRoomReactionEvents } from "@/features/channels/hooks/use-room-reaction-events";
+import type { RoomReactionBurst, RoomReactionFloater } from "@/features/channels/components/room-reaction-constants";
 
 type RoomReactionContextValue = {
   floaters: RoomReactionFloater[];

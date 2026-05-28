@@ -12,18 +12,18 @@ import {
   Shield,
   X,
 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/toast-provider";
-import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
-import { useSupportStaffInboxSocket } from "@/hooks/use-support-staff-inbox-socket";
-import { useSupportTicketSocket } from "@/hooks/use-support-ticket-socket";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { Switch } from "@/shared/ui/switch";
+import { useToast } from "@/shared/ui/toast-provider";
+import { UsernameWithBadges } from "@/shared/ui/user-verified-badge";
+import { useSupportStaffInboxSocket } from "@/shared/hooks/use-support-staff-inbox-socket";
+import { useSupportTicketSocket } from "@/shared/hooks/use-support-ticket-socket";
 import {
   createSupportTicket,
   getSupportCategories,

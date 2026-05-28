@@ -1,7 +1,7 @@
 "use client";
 
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 
 function GoogleIcon() {
   return (

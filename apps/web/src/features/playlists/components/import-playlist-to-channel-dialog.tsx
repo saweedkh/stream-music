@@ -2,19 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ListMusic, Loader2, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
-import { AddPlaylistToChannelDialog } from "@/features/playlists/add-playlist-to-channel-dialog";
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
+import { AddPlaylistToChannelDialog } from "@/features/playlists/components/add-playlist-to-channel-dialog";
 import { getMe, listChannels, listPlaylists, type ChannelSummary, type PlaylistSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

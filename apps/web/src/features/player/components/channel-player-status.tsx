@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { cn } from "@/lib/utils";
 
 type Props = {

@@ -12,7 +12,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import type { UserBadge, UserBadgeFlags } from "@/lib/user-badges";
 import { resolveUserBadges } from "@/lib/user-badges";

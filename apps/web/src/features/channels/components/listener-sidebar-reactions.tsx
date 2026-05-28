@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ROOM_REACTION_EMOJIS } from "@/features/channels/room-reaction-constants";
-import { useRoomReactions } from "@/features/channels/room-reaction-context";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ROOM_REACTION_EMOJIS } from "@/features/channels/components/room-reaction-constants";
+import { useRoomReactions } from "@/features/channels/components/room-reaction-context";
 import { cn } from "@/lib/utils";
 
 type Props = {

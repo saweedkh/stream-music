@@ -1,9 +1,9 @@
 "use client";
 
 import { Radio } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspaceEmpty, WorkspaceSection } from "@/components/layout/workspace";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspaceEmpty, WorkspaceSection } from "@/shared/layout/workspace";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ExploreHorizontalRail } from "@/features/discovery/components/explore-horizontal-rail";
 import { ExploreRoomCard } from "@/features/discovery/components/explore-room-card";
 import type { useExploreChannelFollow } from "@/features/discovery/hooks/use-explore-channel-follow";

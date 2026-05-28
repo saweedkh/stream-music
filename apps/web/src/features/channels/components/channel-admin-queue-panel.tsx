@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Link2, Loader2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ChannelQueuePanel } from "@/features/channels/components/channel-queue-panel";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { useToast } from "@/shared/ui/toast-provider";
 import { importShareToChannelQueue } from "@/lib/api";
 
 type Props = {

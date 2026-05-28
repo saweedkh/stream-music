@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { reopenChannel, type ChannelSummary } from "@/lib/api";
-import { useToast } from "@/components/ui/toast-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import { cn } from "@/lib/utils";
 import { channelInitials, getChannelDisplayMeta, resolveLogoCandidates } from "@/features/dashboard/channels/channel-shared";
 

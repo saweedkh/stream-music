@@ -1,4 +1,4 @@
-import type { ChannelTabId } from "@/features/channels/channel-room-config";
+import type { ChannelTabId } from "@/features/channels/components/channel-room-config";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 export type AdminTabMeta = {

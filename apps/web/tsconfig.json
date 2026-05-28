@@ -16,8 +16,18 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/shared/ui/*": ["src/components/ui/*"],
-      "@/shared/layout/*": ["src/components/layout/*"]
+      "@/shared/ui/*": ["src/shared/ui/*"],
+      "@/shared/layout/*": ["src/shared/layout/*"],
+      "@/shared/hooks/*": ["src/shared/hooks/*"],
+      "@/shared/providers/*": ["src/shared/providers/*"],
+      "@/shared/notifications/*": ["src/shared/notifications/*"],
+      "@/shared/pwa/*": ["src/shared/pwa/*"],
+      "@/shared/room/*": ["src/shared/room/*"],
+      "@/components/ui/*": ["src/shared/ui/*"],
+      "@/components/layout/*": ["src/shared/layout/*"],
+      "@/components/providers/*": ["src/shared/providers/*"],
+      "@/components/notifications/*": ["src/shared/notifications/*"],
+      "@/components/room/*": ["src/shared/room/*"]
     },
     "plugins": [{ "name": "next" }]
   },

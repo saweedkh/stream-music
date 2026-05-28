@@ -18,17 +18,17 @@ import {
   Sun,
   User,
 } from "lucide-react";
-import type { ProfileSection } from "@/features/dashboard/dashboard-nav-config";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { UserVerifiedBadge } from "@/components/ui/user-verified-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/toast-provider";
-import { NotificationPreferencesCard } from "@/features/dashboard/notification-preferences-card";
+import type { ProfileSection } from "@/features/dashboard/model/dashboard-nav-config";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { UserVerifiedBadge } from "@/shared/ui/user-verified-badge";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { useToast } from "@/shared/ui/toast-provider";
+import { NotificationPreferencesCard } from "@/features/dashboard/components/notification-preferences-card";
 import { getMe, patchMeProfile, patchMePublicProfile, postChangePassword, type AuthUser } from "@/lib/api";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { dispatchUserSessionRefresh } from "@/lib/user-session-events";
@@ -39,7 +39,7 @@ const LOCALE_LABEL_KEYS = {
   fa: "lang.fa",
 } as const satisfies Record<Locale, "lang.en" | "lang.fa">;
 
-export type { ProfileSection } from "@/features/dashboard/dashboard-nav-config";
+export type { ProfileSection } from "@/features/dashboard/model/dashboard-nav-config";
 
 export type UserProfileHubProps = {
   activeSection: ProfileSection;

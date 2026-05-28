@@ -2,13 +2,13 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ChannelMobileHeader } from "@/features/channels/channel-mobile-header";
-import { ChannelAdminSidebar } from "@/features/channels/channel-admin-sidebar";
-import { ChannelRoomMobileTabs } from "@/features/channels/channel-room-mobile-tabs";
-import { RoomReactionOverlay } from "@/features/channels/room-reaction-overlay";
-import type { ChannelTabId } from "@/features/channels/channel-room-config";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ChannelMobileHeader } from "@/features/channels/components/channel-mobile-header";
+import { ChannelAdminSidebar } from "@/features/channels/components/channel-admin-sidebar";
+import { ChannelRoomMobileTabs } from "@/features/channels/components/channel-room-mobile-tabs";
+import { RoomReactionOverlay } from "@/features/channels/components/room-reaction-overlay";
+import type { ChannelTabId } from "@/features/channels/components/channel-room-config";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";

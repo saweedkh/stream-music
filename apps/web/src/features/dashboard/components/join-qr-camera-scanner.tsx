@@ -2,7 +2,7 @@
 
 import { Html5Qrcode } from "html5-qrcode";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import { extractJoinInputFromScannedText } from "@/lib/join-qr-utils";
 import { cn } from "@/lib/utils";
 

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/shared/ui/button";
+import { useToast } from "@/shared/ui/toast-provider";
 import type { PartyRecap } from "@/lib/api";
-import { PartyRecapHeatmap } from "@/features/party/party-recap-heatmap";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PartyRecapHeatmap } from "@/features/party/components/party-recap-heatmap";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 
 export function PartyRecapClient({ recap, channelId }: { recap: PartyRecap; channelId: string }) {
   const { showToast } = useToast();

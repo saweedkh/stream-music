@@ -1,9 +1,9 @@
 "use client";
 
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspaceToolbar } from "@/components/layout/workspace";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspaceToolbar } from "@/shared/layout/workspace";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
 import { Loader2 } from "lucide-react";
 import type { ExploreFilters } from "@/features/discovery/hooks/use-explore-feed";
 import { cn } from "@/lib/utils";

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { Radio, Share2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { DashboardAccountSection } from "@/features/dashboard/dashboard-account-section";
-import { LISTENER_LINK_ITEMS, LISTENER_NAV_SECTIONS } from "@/features/channels/channel-room-config";
-import type { ListenerTabId } from "@/features/channels/channel-room-config";
-import { ListenerSidebarReactions } from "@/features/channels/listener-sidebar-reactions";
-import { NotificationCenter } from "@/components/notifications/notification-center";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
+import { LISTENER_LINK_ITEMS, LISTENER_NAV_SECTIONS } from "@/features/channels/components/channel-room-config";
+import type { ListenerTabId } from "@/features/channels/components/channel-room-config";
+import { ListenerSidebarReactions } from "@/features/channels/components/listener-sidebar-reactions";
+import { NotificationCenter } from "@/shared/notifications/notification-center";
+import { Button } from "@/shared/ui/button";
+import { Separator } from "@/shared/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

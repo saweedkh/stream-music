@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, Loader2, Radio, UserMinus, UserPlus } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
-import { WorkspaceList, WorkspaceListItem } from "@/components/layout/workspace";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { useToast } from "@/shared/ui/toast-provider";
+import { WorkspaceList, WorkspaceListItem } from "@/shared/layout/workspace";
 import {
   followChannel,
   listFollowingChannels,

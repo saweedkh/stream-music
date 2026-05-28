@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { getMe } from "@/lib/api";
 import { useNotificationStore } from "@/lib/notifications/store";
 import type { AppNotification } from "@/lib/notifications/types";
-import { useToast } from "@/components/ui/toast-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 
 /** Loads notification prefs and shows a brief toast for new in-app items. */
 export function NotificationProvider({ children }: { children: React.ReactNode }) {

@@ -3,20 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronRight, DoorClosed, Eye, LogOut, Radio, Share2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { DashboardAccountSection } from "@/features/dashboard/dashboard-account-section";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
 import {
   ADMIN_LINK_ITEMS,
   adminNavSectionsForContext,
   channelGroupForTab,
   type ChannelTabGroup,
   type ChannelTabId,
-} from "@/features/channels/channel-room-config";
-import { ListenerSidebarReactions } from "@/features/channels/listener-sidebar-reactions";
-import { NotificationCenter } from "@/components/notifications/notification-center";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+} from "@/features/channels/components/channel-room-config";
+import { ListenerSidebarReactions } from "@/features/channels/components/listener-sidebar-reactions";
+import { NotificationCenter } from "@/shared/notifications/notification-center";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Separator } from "@/shared/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

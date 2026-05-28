@@ -3,9 +3,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
-import { AuthSocialButtons } from "@/features/auth/auth-social-buttons";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
+import { AuthSocialButtons } from "@/features/auth/components/auth-social-buttons";
 import { loginUser, registerUser } from "@/lib/api";
 import { authShakeKeyframes, staggerContainer, staggerItem } from "@/lib/motion";
 import { authLoginSchema, authRegisterSchema } from "@/lib/validation";

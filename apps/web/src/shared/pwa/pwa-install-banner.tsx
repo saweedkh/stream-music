@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 
 type BeforeInstallPromptEvent = Event & {

@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { LanguageToggle } from "@/components/ui/language-toggle";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { AuthBrandStage } from "@/features/auth/auth-brand-stage";
-import { AuthForm } from "@/features/auth/auth-form";
-import { AuthPanelLogo } from "@/features/auth/auth-panel-logo";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { LanguageToggle } from "@/shared/ui/language-toggle";
+import { ThemeToggle } from "@/shared/ui/theme-toggle";
+import { AuthBrandStage } from "@/features/auth/components/auth-brand-stage";
+import { AuthForm } from "@/features/auth/components/auth-form";
+import { AuthPanelLogo } from "@/features/auth/components/auth-panel-logo";
 import { authFormPanel } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 

@@ -2,18 +2,18 @@
 
 import type { ReactNode } from "react";
 import { ChevronDown, Volume2 } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
-import { AudioWaveVisualizer } from "@/features/player/audio-wave-visualizer";
-import { ChannelPlayerArtwork } from "@/features/player/channel-player-artwork";
+import { Alert } from "@/shared/ui/alert";
+import { Button } from "@/shared/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Drawer, DrawerContent, DrawerTitle } from "@/shared/ui/drawer";
+import { AudioWaveVisualizer } from "@/features/player/components/audio-wave-visualizer";
+import { ChannelPlayerArtwork } from "@/features/player/components/channel-player-artwork";
 import {
   ChannelPlayerPlaybackControls,
   ChannelPlayerSeekBar,
-} from "@/features/player/channel-player-controls";
-import { formatPlayerTime, resolvePlayerAccent } from "@/features/player/player-accent";
-import { Slider } from "@/components/ui/slider";
+} from "@/features/player/components/channel-player-controls";
+import { formatPlayerTime, resolvePlayerAccent } from "@/features/player/model/player-accent";
+import { Slider } from "@/shared/ui/slider";
 import { cn } from "@/lib/utils";
 
 type Props = {

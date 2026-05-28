@@ -2,18 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Loader2, RefreshCw, Users } from "lucide-react";
-import { useChannelPresence } from "@/hooks/use-channel-presence";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { UsernameWithBadges } from "@/components/ui/user-verified-badge";
-import { Button } from "@/components/ui/button";
-import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
-import { adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
-import { useToast } from "@/components/ui/toast-provider";
+import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Badge } from "@/shared/ui/badge";
+import { UsernameWithBadges } from "@/shared/ui/user-verified-badge";
+import { Button } from "@/shared/ui/button";
+import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
+import { adminSectionLabel } from "@/features/channels/components/channel-admin-panel-styles";
+import { useToast } from "@/shared/ui/toast-provider";
 import { getChannelMembers, type ChannelMember } from "@/lib/api";
-import { ChannelMemberRosterActions } from "@/features/channels/channel-member-roster-actions";
-import { ChannelModerationReports } from "@/features/channels/channel-moderation-reports";
+import { ChannelMemberRosterActions } from "@/features/channels/components/channel-member-roster-actions";
+import { ChannelModerationReports } from "@/features/channels/components/channel-moderation-reports";
 import { cn } from "@/lib/utils";
 
 type Props = {

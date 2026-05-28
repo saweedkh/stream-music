@@ -1,9 +1,9 @@
 "use client";
 
 import { TrendingUp } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspaceEmpty, WorkspaceList, WorkspaceSection } from "@/components/layout/workspace";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspaceEmpty, WorkspaceList, WorkspaceSection } from "@/shared/layout/workspace";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ExploreRoomCard } from "@/features/discovery/components/explore-room-card";
 import type { useExploreChannelFollow } from "@/features/discovery/hooks/use-explore-channel-follow";
 import type { ExploreFeed } from "@/lib/api";

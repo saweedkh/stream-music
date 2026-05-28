@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChannelPlaybackEventPayload } from "@/features/player/playback-payload";
-import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
-import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/playback-payload";
-import { resumeSharedAudioContext } from "@/features/player/audio-wave-visualizer";
+import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
+import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/model/playback-payload";
+import { resumeSharedAudioContext } from "@/features/player/components/audio-wave-visualizer";
 import {
   createChannelAudio,
   haltChannelAudio,
@@ -13,9 +13,9 @@ import {
   readDuration,
   readPosition,
   seekChannelAudio,
-} from "@/features/player/channel-audio-transport";
-import { audienceVolume } from "@/features/player/playback-audience";
-import { applyDriftCorrection, expectedTimeSeconds } from "@/features/player/sync-client";
+} from "@/features/player/model/channel-audio-transport";
+import { audienceVolume } from "@/features/player/model/playback-audience";
+import { applyDriftCorrection, expectedTimeSeconds } from "@/features/player/model/sync-client";
 import { ChannelClosedError, getChannelState, getServerTime } from "@/lib/api";
 import { resolveTrackMediaSrc } from "@/lib/media-url";
 

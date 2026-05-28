@@ -2,29 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
-import { ChannelManagementSection } from "@/features/dashboard/channel-management-section";
-import { FollowingChannelsSection } from "@/features/dashboard/following-channels-section";
-import { DashboardShell } from "@/features/dashboard/dashboard-shell";
-import { DashboardPanelShell } from "@/features/dashboard/dashboard-panel-shell";
+import { Alert } from "@/shared/ui/alert";
+import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
+import { ChannelManagementSection } from "@/features/dashboard/components/channel-management-section";
+import { FollowingChannelsSection } from "@/features/dashboard/components/following-channels-section";
+import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
+import { DashboardPanelShell } from "@/features/dashboard/components/dashboard-panel-shell";
 import {
   adminSectionFromSearch,
   profileSectionFromSearch,
   type AdminSection,
   type ProfileSection,
-} from "@/features/dashboard/dashboard-nav-config";
-import { type DashboardTab, isDashboardTab } from "@/features/dashboard/dashboard-types";
-import { AdminPanelHub } from "@/features/dashboard/admin-panel-hub";
-import { SupportHub } from "@/features/dashboard/support-hub";
-import { ProfileFavoritesPanel } from "@/features/dashboard/profile-favorites-panel";
-import { UserProfileHub } from "@/features/dashboard/user-profile-hub";
-import { PlaylistManager } from "@/features/dashboard/playlist-manager";
-import { TrackLibrarySection } from "@/features/dashboard/track-library-section";
-import { TrackSharingSection } from "@/features/dashboard/track-sharing-section";
+} from "@/features/dashboard/model/dashboard-nav-config";
+import { type DashboardTab, isDashboardTab } from "@/features/dashboard/model/dashboard-types";
+import { AdminPanelHub } from "@/features/dashboard/components/admin-panel-hub";
+import { SupportHub } from "@/features/dashboard/components/support-hub";
+import { ProfileFavoritesPanel } from "@/features/dashboard/components/profile-favorites-panel";
+import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
+import { PlaylistManager } from "@/features/dashboard/components/playlist-manager";
+import { TrackLibrarySection } from "@/features/dashboard/components/track-library-section";
+import { TrackSharingSection } from "@/features/dashboard/components/track-sharing-section";
 import {
   addPlaylistItem,
   addTrackSharePermission,

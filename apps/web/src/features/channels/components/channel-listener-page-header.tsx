@@ -1,8 +1,8 @@
 "use client";
 
-import { useTranslations } from "@/components/providers/locale-provider";
-import { LISTENER_TAB_META } from "@/features/channels/channel-listener-nav-meta";
-import type { ListenerTabId } from "@/features/channels/channel-room-config";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { LISTENER_TAB_META } from "@/features/channels/components/channel-listener-nav-meta";
+import type { ListenerTabId } from "@/features/channels/components/channel-room-config";
 
 type Props = {
   activeTab: ListenerTabId;

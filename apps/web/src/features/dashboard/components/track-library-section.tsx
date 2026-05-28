@@ -1,14 +1,14 @@
 "use client";
 
 import { Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FavoriteStarButton } from "@/components/ui/favorite-star-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { Badge } from "@/shared/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { FavoriteStarButton } from "@/shared/ui/favorite-star-button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import type { TrackSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";

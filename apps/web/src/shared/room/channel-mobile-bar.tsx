@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { MessageSquare, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/shared/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/shared/ui/sheet";
 import { cn } from "@/lib/utils";
 import { fadeUp } from "@/lib/motion";
 

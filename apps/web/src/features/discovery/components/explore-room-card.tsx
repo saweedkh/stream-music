@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Radio } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import { ChannelAvatar } from "@/features/dashboard/channels/channel-shared";
 import { ExploreChannelFollowControls } from "@/features/discovery/components/explore-channel-follow-controls";
 import { exploreJoinHref } from "@/features/discovery/model/explore-utils";

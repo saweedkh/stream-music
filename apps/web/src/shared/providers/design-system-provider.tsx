@@ -2,7 +2,7 @@
 
 import { MotionConfig } from "framer-motion";
 import type { ReactNode } from "react";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/shared/ui/tooltip";
 
 export function DesignSystemProvider({ children }: { children: ReactNode }) {
   return (

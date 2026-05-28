@@ -2,12 +2,12 @@
 
 import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { formatPlayerTime, resolvePlayerAccent } from "@/features/player/player-accent";
+import { Button } from "@/shared/ui/button";
+import { Label } from "@/shared/ui/label";
+import { Slider } from "@/shared/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { formatPlayerTime, resolvePlayerAccent } from "@/features/player/model/player-accent";
 import { cn } from "@/lib/utils";
 
 export type PlayerControlDensity = "compact" | "touch" | "full";

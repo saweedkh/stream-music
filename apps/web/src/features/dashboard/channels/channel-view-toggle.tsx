@@ -1,8 +1,8 @@
 "use client";
 
 import { LayoutGrid, List } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { cn } from "@/lib/utils";
 
 export type ChannelViewMode = "list" | "grid";

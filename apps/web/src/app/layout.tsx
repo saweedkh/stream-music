@@ -1,11 +1,11 @@
 import "./globals.css";
 import type { ReactNode } from "react";
-import { CapacitorBootstrap } from "@/components/capacitor/capacitor-bootstrap";
-import { AppShell } from "@/components/layout/app-shell";
-import { DesignSystemProvider } from "@/components/providers/design-system-provider";
-import { LocaleInitScript } from "@/components/providers/locale-init-script";
-import { LocaleProvider } from "@/components/providers/locale-provider";
-import { ThemeProvider } from "@/components/providers/theme-provider";
+import { CapacitorBootstrap } from "@/shared/capacitor/capacitor-bootstrap";
+import { AppShell } from "@/shared/layout/app-shell";
+import { DesignSystemProvider } from "@/shared/providers/design-system-provider";
+import { LocaleInitScript } from "@/shared/providers/locale-init-script";
+import { LocaleProvider } from "@/shared/providers/locale-provider";
+import { ThemeProvider } from "@/shared/providers/theme-provider";
 
 export const metadata = {
   manifest: "/manifest.json",

@@ -3,10 +3,10 @@
 import type { LucideIcon } from "lucide-react";
 import { Info, ListMusic, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { LISTENER_TAB_META } from "@/features/channels/channel-listener-nav-meta";
-import type { ListenerTabId } from "@/features/channels/channel-room-config";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { LISTENER_TAB_META } from "@/features/channels/components/channel-listener-nav-meta";
+import type { ListenerTabId } from "@/features/channels/components/channel-room-config";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 import { panelLgCage, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 

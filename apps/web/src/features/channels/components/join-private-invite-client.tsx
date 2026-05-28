@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import { joinChannelFromLink } from "@/lib/api";
 
 export function JoinPrivateInviteClient({ token }: { token: string }) {

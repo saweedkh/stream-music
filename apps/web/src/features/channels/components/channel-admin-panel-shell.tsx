@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 import { panelLgCage, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 

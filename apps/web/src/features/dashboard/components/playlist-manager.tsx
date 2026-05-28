@@ -17,10 +17,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FavoriteStarButton } from "@/components/ui/favorite-star-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FavoriteStarButton } from "@/shared/ui/favorite-star-button";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -28,15 +28,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Select } from "@/shared/ui/select";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { AddPlaylistToChannelDialog } from "@/features/playlists/add-playlist-to-channel-dialog";
+import { AddPlaylistToChannelDialog } from "@/features/playlists/components/add-playlist-to-channel-dialog";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,

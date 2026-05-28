@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspacePage } from "@/components/layout/workspace";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspacePage } from "@/shared/layout/workspace";
+import { useToast } from "@/shared/ui/toast-provider";
 import { ExploreFiltersBar } from "@/features/discovery/components/explore-filters";
 import { ExploreLiveRail } from "@/features/discovery/components/explore-live-rail";
 import { ExplorePeopleSection } from "@/features/discovery/components/explore-people-section";

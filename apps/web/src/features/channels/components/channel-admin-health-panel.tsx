@@ -1,9 +1,9 @@
 "use client";
 
 import { Activity, HeartPulse, Server } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
-import { adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
+import { adminSectionLabel } from "@/features/channels/components/channel-admin-panel-styles";
 import type { getApiMetrics } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function ListSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {

@@ -1,10 +1,10 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import type { ChannelSummary, TrackSharePermission, TrackSummary } from "@/lib/api";
 
 type Props = {

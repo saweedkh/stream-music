@@ -17,9 +17,9 @@ import {
 import QRCode from "react-qr-code";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,15 +27,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Select } from "@/shared/ui/select";
+import { Switch } from "@/shared/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   approveJoinRequest,
   buildPrivateInviteJoinUrl,
@@ -55,9 +55,9 @@ import {
   type JoinRequestRow,
   type PlaylistSummary,
 } from "@/lib/api";
-import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
-import { adminSegmentBtn } from "@/features/channels/channel-admin-panel-styles";
-import { ChannelMemberRosterActions } from "@/features/channels/channel-member-roster-actions";
+import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
+import { adminSegmentBtn } from "@/features/channels/components/channel-admin-panel-styles";
+import { ChannelMemberRosterActions } from "@/features/channels/components/channel-member-roster-actions";
 import { channelSettingsSchema } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Radio, Users } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { useToast } from "@/shared/ui/toast-provider";
 import { getMeChannelsOnline, type ChannelsOnlineRow } from "@/lib/api";
 
 export function ChannelsOnlineWidget() {

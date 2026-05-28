@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/shared/ui/sonner";
 import { localizeMessage } from "@/lib/i18n/localize-message";
 
 type ToastTone = "info" | "error" | "success";

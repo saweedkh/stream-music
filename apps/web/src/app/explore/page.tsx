@@ -1,5 +1,5 @@
-import { WorkspacePanel } from "@/components/layout/workspace";
-import { AuthGuard } from "@/features/auth/auth-guard";
+import { WorkspacePanel } from "@/shared/layout/workspace";
+import { AuthGuard } from "@/features/auth";
 import { ExplorePage } from "@/features/discovery";
 
 export default function ExploreRoute() {

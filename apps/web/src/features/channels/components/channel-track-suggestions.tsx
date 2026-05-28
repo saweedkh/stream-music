@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, Music2, RefreshCw, Search, Send, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast-provider";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { listenerFieldClass, listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
-import { useChannelQueue } from "@/features/channels/channel-queue-context";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Select } from "@/shared/ui/select";
+import { useToast } from "@/shared/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { listenerFieldClass, listenerItemClass } from "@/features/channels/components/channel-listener-panel-styles";
+import { useChannelQueue } from "@/features/channels/components/channel-queue-context";
 import {
   createChannelSuggestion,
   getMe,

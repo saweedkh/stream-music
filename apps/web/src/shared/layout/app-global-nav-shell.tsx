@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { AppNavLayout } from "@/components/layout/app-nav-layout";
-import type { AdminSection, ProfileSection } from "@/features/dashboard/dashboard-nav-config";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
+import { AppNavLayout } from "@/shared/layout/app-nav-layout";
+import type { AdminSection, ProfileSection } from "@/features/dashboard/model/dashboard-nav-config";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 
 export function AppGlobalNavShell({ children }: { children: ReactNode }) {
   const router = useRouter();

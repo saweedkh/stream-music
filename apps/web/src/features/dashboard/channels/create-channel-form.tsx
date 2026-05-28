@@ -1,10 +1,10 @@
 "use client";
 
 import { Globe, Lock, EyeOff, Plus, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import type { ChannelSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";

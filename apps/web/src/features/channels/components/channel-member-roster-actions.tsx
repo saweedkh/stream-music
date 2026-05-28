@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { Select } from "@/shared/ui/select";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   banChannelMember,
   removeChannelMember,

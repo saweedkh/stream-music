@@ -18,7 +18,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 export const PROFILE_SECTIONS = ["overview", "profile", "appearance", "security", "notifications"] as const;

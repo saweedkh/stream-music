@@ -3,19 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronRight, Crown, LogIn, Radio } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { DashboardAccountSection } from "@/features/dashboard/dashboard-account-section";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
 import {
   type AdminSection,
   type ProfileSection,
   dashboardNavSections,
   isDashboardRouteNavItem,
   type DashboardNavSection,
-} from "@/features/dashboard/dashboard-nav-config";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
-import { NotificationCenter } from "@/components/notifications/notification-center";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+} from "@/features/dashboard/model/dashboard-nav-config";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
+import { NotificationCenter } from "@/shared/notifications/notification-center";
+import { Button } from "@/shared/ui/button";
+import { Separator } from "@/shared/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

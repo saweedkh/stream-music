@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ListMusic } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { WorkspaceEmpty, WorkspaceSection } from "@/components/layout/workspace";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { WorkspaceEmpty, WorkspaceSection } from "@/shared/layout/workspace";
+import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { ExploreHorizontalRail } from "@/features/discovery/components/explore-horizontal-rail";
 import type { ExploreFeed } from "@/lib/api";
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { DoorClosed, LogOut, Share2, Users } from "lucide-react";
-import { NowPlayingHero } from "@/components/room/now-playing-hero";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { NowPlayingHero } from "@/shared/room/now-playing-hero";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import type { AccentKey } from "@/lib/theme";
 import { accentLabelClass } from "@/lib/theme";

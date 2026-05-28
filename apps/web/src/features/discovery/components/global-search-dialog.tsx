@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, ListMusic, Music, Radio, Search, User, Share2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import {
   CommandDialog,
   CommandEmpty,
@@ -11,9 +11,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { useToast } from "@/components/ui/toast-provider";
-import { Button } from "@/components/ui/button";
+} from "@/shared/ui/command";
+import { useToast } from "@/shared/ui/toast-provider";
+import { Button } from "@/shared/ui/button";
 import {
   followUser,
   getUserFollow,

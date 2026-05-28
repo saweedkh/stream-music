@@ -2,15 +2,15 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Eye } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ChannelMobileHeader } from "@/features/channels/channel-mobile-header";
-import { ChannelListenerSidebar } from "@/features/channels/channel-listener-sidebar";
-import { ChannelRoomMobileTabs } from "@/features/channels/channel-room-mobile-tabs";
-import { RoomReactionOverlay } from "@/features/channels/room-reaction-overlay";
-import { RoomReactionProvider } from "@/features/channels/room-reaction-context";
-import type { ListenerTabId } from "@/features/channels/channel-room-config";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ChannelMobileHeader } from "@/features/channels/components/channel-mobile-header";
+import { ChannelListenerSidebar } from "@/features/channels/components/channel-listener-sidebar";
+import { ChannelRoomMobileTabs } from "@/features/channels/components/channel-room-mobile-tabs";
+import { RoomReactionOverlay } from "@/features/channels/components/room-reaction-overlay";
+import { RoomReactionProvider } from "@/features/channels/components/room-reaction-context";
+import type { ListenerTabId } from "@/features/channels/components/channel-room-config";
+import { Button } from "@/shared/ui/button";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";

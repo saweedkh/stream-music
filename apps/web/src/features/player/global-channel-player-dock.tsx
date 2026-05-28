@@ -1,6 +1,6 @@
 "use client";
 
-import { ChannelPlayer } from "@/features/player/channel-player";
+import { ChannelPlayer } from "@/features/player/components/channel-player";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
 
 export function GlobalChannelPlayerDock() {

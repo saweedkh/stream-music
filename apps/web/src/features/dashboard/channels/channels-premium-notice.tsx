@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Crown } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
 import { getPremiumLimits, type PremiumLimits } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

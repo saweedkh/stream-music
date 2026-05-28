@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
 
 export function ChannelClosedView() {
   const { t } = useTranslations();

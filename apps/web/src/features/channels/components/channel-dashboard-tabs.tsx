@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,35 +12,35 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { useToast } from "@/components/ui/toast-provider";
-import { ChannelAdminPanel } from "@/features/channels/channel-admin-panel";
-import { ChannelChatPanel } from "@/features/channels/channel-chat-panel";
-import { ChannelListenerMeta, ChannelRoomLoading } from "@/features/channels/channel-listener-view";
-import { ChannelListenerPanelShell } from "@/features/channels/channel-listener-panel-shell";
-import { ChannelListenerShell } from "@/features/channels/channel-listener-shell";
-import { RoomReactionProvider } from "@/features/channels/room-reaction-context";
-import { ChannelListenersPanel } from "@/features/channels/channel-listeners-panel";
-import { ChannelAdminQueuePanel } from "@/features/channels/channel-admin-queue-panel";
-import { ChannelAdminSuggestionsPanel } from "@/features/channels/channel-admin-suggestions-panel";
-import { ChannelQueuePanel } from "@/features/channels/channel-queue-panel";
-import { ChannelTrackSuggestions } from "@/features/channels/channel-track-suggestions";
-import { ChannelQueueProvider } from "@/features/channels/channel-queue-context";
-import { ChannelAdminHealthPanel } from "@/features/channels/channel-admin-health-panel";
-import { ChannelAdminPageHeader } from "@/features/channels/channel-admin-page-header";
-import { ChannelAdminPanelShell } from "@/features/channels/channel-admin-panel-shell";
-import { ChannelAdminPlayerPanel } from "@/features/channels/channel-admin-player-panel";
-import { ChannelAdminShell } from "@/features/channels/channel-admin-shell";
-import { channelTabFromSearch, isAdminFlushTab, type ChannelTabId, type ListenerTabId } from "@/features/channels/channel-room-config";
-import { ChannelRoomInsights } from "@/features/channels/channel-room-insights";
-import { RoomOnboarding } from "@/components/room/room-onboarding";
-import { useRoomHotkeys } from "@/hooks/use-room-hotkeys";
+} from "@/shared/ui/dialog";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { useToast } from "@/shared/ui/toast-provider";
+import { ChannelAdminPanel } from "@/features/channels/components/channel-admin-panel";
+import { ChannelChatPanel } from "@/features/channels/components/channel-chat-panel";
+import { ChannelListenerMeta, ChannelRoomLoading } from "@/features/channels/components/channel-listener-view";
+import { ChannelListenerPanelShell } from "@/features/channels/components/channel-listener-panel-shell";
+import { ChannelListenerShell } from "@/features/channels/components/channel-listener-shell";
+import { RoomReactionProvider } from "@/features/channels/components/room-reaction-context";
+import { ChannelListenersPanel } from "@/features/channels/components/channel-listeners-panel";
+import { ChannelAdminQueuePanel } from "@/features/channels/components/channel-admin-queue-panel";
+import { ChannelAdminSuggestionsPanel } from "@/features/channels/components/channel-admin-suggestions-panel";
+import { ChannelQueuePanel } from "@/features/channels/components/channel-queue-panel";
+import { ChannelTrackSuggestions } from "@/features/channels/components/channel-track-suggestions";
+import { ChannelQueueProvider } from "@/features/channels/components/channel-queue-context";
+import { ChannelAdminHealthPanel } from "@/features/channels/components/channel-admin-health-panel";
+import { ChannelAdminPageHeader } from "@/features/channels/components/channel-admin-page-header";
+import { ChannelAdminPanelShell } from "@/features/channels/components/channel-admin-panel-shell";
+import { ChannelAdminPlayerPanel } from "@/features/channels/components/channel-admin-player-panel";
+import { ChannelAdminShell } from "@/features/channels/components/channel-admin-shell";
+import { channelTabFromSearch, isAdminFlushTab, type ChannelTabId, type ListenerTabId } from "@/features/channels/components/channel-room-config";
+import { ChannelRoomInsights } from "@/features/channels/components/channel-room-insights";
+import { RoomOnboarding } from "@/shared/room/room-onboarding";
+import { useRoomHotkeys } from "@/shared/hooks/use-room-hotkeys";
 import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
-import type { ChannelExperience } from "@/features/experience/room-experience-chrome";
-import { useChannelPresence } from "@/hooks/use-channel-presence";
-import { usePendingSuggestionsCount } from "@/hooks/use-pending-suggestions-count";
-import { useReconnectingChannelSocket } from "@/hooks/use-reconnecting-channel-socket";
+import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
+import { usePendingSuggestionsCount } from "@/shared/hooks/use-pending-suggestions-count";
+import { useReconnectingChannelSocket } from "@/shared/hooks/use-reconnecting-channel-socket";
 import {
   closeChannel,
   getChannelMembers,

@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Headphones, Radio, Zap } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { AuthStageVisual } from "@/features/auth/auth-stage-visual";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { AuthStageVisual } from "@/features/auth/components/auth-stage-visual";
 import { authStageContainer, authStageItem } from "@/lib/motion";
 
 const FEATURES = [

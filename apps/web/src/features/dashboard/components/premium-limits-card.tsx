@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Crown, Loader2 } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Badge } from "@/shared/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { useToast } from "@/shared/ui/toast-provider";
 import { getPremiumLimits, type PremiumLimits } from "@/lib/api";
 
 export function PremiumLimitsCard() {

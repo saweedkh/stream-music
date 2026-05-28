@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle, Send, Share2, Sparkles } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { Button } from "@/shared/ui/button";
+import { Progress } from "@/shared/ui/progress";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/components/ui/toast-provider";
-import { ROOM_REACTION_EMOJIS } from "@/features/channels/room-reaction-constants";
-import { useChannelPresence } from "@/hooks/use-channel-presence";
+import { useToast } from "@/shared/ui/toast-provider";
+import { ROOM_REACTION_EMOJIS } from "@/features/channels/components/room-reaction-constants";
+import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
 
 export type ChannelExperience = {
   accent?: string;

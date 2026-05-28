@@ -3,7 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Compass } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
 import {
   ADMIN_NAV,
   adminSectionMeta,
@@ -11,9 +11,9 @@ import {
   profileSectionMeta,
   type AdminSection,
   type ProfileSection,
-} from "@/features/dashboard/dashboard-nav-config";
-import { DASHBOARD_TAB_ICONS, DASHBOARD_TAB_META } from "@/features/dashboard/dashboard-nav-meta";
-import type { DashboardTab } from "@/features/dashboard/dashboard-types";
+} from "@/features/dashboard/model/dashboard-nav-config";
+import { DASHBOARD_TAB_ICONS, DASHBOARD_TAB_META } from "@/features/dashboard/model/dashboard-nav-meta";
+import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { hubPanelRoot, panelLgSurface, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";

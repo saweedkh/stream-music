@@ -1,8 +1,8 @@
 "use client";
 
-import { useTranslations } from "@/components/providers/locale-provider";
-import { ADMIN_TAB_META } from "@/features/channels/channel-admin-nav-meta";
-import type { ChannelTabId } from "@/features/channels/channel-room-config";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { ADMIN_TAB_META } from "@/features/channels/components/channel-admin-nav-meta";
+import type { ChannelTabId } from "@/features/channels/components/channel-room-config";
 
 type Props = {
   activeTab: ChannelTabId;

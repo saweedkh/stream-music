@@ -3,13 +3,13 @@
 import { Download, ExternalLink, History, Lightbulb, ListMusic, Loader2, PartyPopper, RefreshCw, Shield, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Button } from "@/components/ui/button";
-import { ChannelAdminInlineShell } from "@/features/channels/channel-admin-inline-shell";
-import { adminSegmentBtn, adminSectionLabel } from "@/features/channels/channel-admin-panel-styles";
-import { listenerFieldClass } from "@/features/channels/channel-listener-panel-styles";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast-provider";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Button } from "@/shared/ui/button";
+import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
+import { adminSegmentBtn, adminSectionLabel } from "@/features/channels/components/channel-admin-panel-styles";
+import { listenerFieldClass } from "@/features/channels/components/channel-listener-panel-styles";
+import { Input } from "@/shared/ui/input";
+import { useToast } from "@/shared/ui/toast-provider";
 import {
   addTrackReaction,
   getAuditLogExportUrl,

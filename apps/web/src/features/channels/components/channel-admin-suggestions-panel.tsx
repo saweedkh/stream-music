@@ -1,6 +1,6 @@
 "use client";
 
-import { ChannelTrackSuggestions } from "@/features/channels/channel-track-suggestions";
+import { ChannelTrackSuggestions } from "@/features/channels/components/channel-track-suggestions";
 
 type Props = {
   channelId: string;

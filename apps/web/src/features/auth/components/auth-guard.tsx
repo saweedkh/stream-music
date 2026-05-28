@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { Alert } from "@/shared/ui/alert";
+import { Button } from "@/shared/ui/button";
 import { getMe } from "@/lib/api";
 
 export function AuthGuard({ children }: { children: ReactNode }) {

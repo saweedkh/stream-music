@@ -1,10 +1,10 @@
 "use client";
 
 import { Users } from "lucide-react";
-import { useTranslations } from "@/components/providers/locale-provider";
-import { listenerItemClass } from "@/features/channels/channel-listener-panel-styles";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "@/shared/providers/locale-provider";
+import { listenerItemClass } from "@/features/channels/components/channel-listener-panel-styles";
+import { Badge } from "@/shared/ui/badge";
+import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function ChannelRoomLoading() {
@@ -36,7 +36,7 @@ type MetaProps = {
   description?: string;
   memberLimit?: number;
   joinRequiresApproval?: boolean;
-  experience?: import("@/features/experience/room-experience-chrome").ChannelExperience;
+  experience?: import("@/features/experience/components/room-experience-chrome").ChannelExperience;
   onlineCount?: number | null;
 };
 
