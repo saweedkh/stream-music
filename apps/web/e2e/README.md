@@ -35,7 +35,7 @@ This starts an **isolated** Compose project (`stream-e2e`) on port **8002** (bac
 COMPOSE_PROJECT_NAME=stream-e2e docker compose up -d postgres redis backend
 # wait for http://127.0.0.1:8002/api/health
 
-cd frontend-next
+cd apps/web
 export DEV_REMOTE_ORIGIN=http://127.0.0.1:8002
 export PLAYWRIGHT_API_URL=http://127.0.0.1:8002
 export NEXT_PUBLIC_WS_BASE_URL=ws://127.0.0.1:8002

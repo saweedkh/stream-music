@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-- Monorepo شامل Django (`backend-django`) و Next.js (`frontend-next`) است.
+- Monorepo شامل Django (`apps/api`) و Next.js (`apps/web`) است.
 - اپ `apps/common` مسئولیت‌های متعدد دارد: auth، discovery، social، admin، support، moderation، badges و غیره.
 - فرانت‌اند الگوی `features/` را دارد اما همه featureها زیرساخت یکسان (components/hooks/model) ندارند.
 - تیم و ابزارهای AI به سند مرجع واحد برای محل قرارگیری کد نیاز دارند.

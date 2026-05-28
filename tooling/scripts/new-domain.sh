@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scaffold a Django domain app under backend-django/apps/
+# Scaffold a Django domain app under apps/api/apps/
 set -euo pipefail
 
 NAME="${1:-}"
@@ -9,7 +9,7 @@ if [[ -z "$NAME" ]]; then
 fi
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-APP_DIR="$ROOT/backend-django/apps/$NAME"
+APP_DIR="$ROOT/apps/api/apps/$NAME"
 CLASS_NAME="$(echo "$NAME" | sed -r 's/(^|_)([a-z])/\U\2/g')"
 
 if [[ -d "$APP_DIR" ]]; then

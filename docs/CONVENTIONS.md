@@ -8,8 +8,8 @@
 
 | لایه | ابزار | دستور |
 |------|--------|--------|
-| Python | Ruff | `cd backend-django && ruff check .` |
-| TypeScript | ESLint + `tsc` | `cd frontend-next && npm run lint` |
+| Python | Ruff | `cd apps/api && ruff check .` |
+| TypeScript | ESLint + `tsc` | `cd apps/web && npm run lint` |
 | Format | Prettier (frontend) | طبق `package.json` |
 
 قبل از PR هر دو lint باید سبز باشند (مطابق CI).

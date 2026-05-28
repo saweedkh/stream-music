@@ -14,8 +14,8 @@
 2. [نمای کلی Monorepo](#نمای-کلی-monorepo)
 3. [وضعیت فعلی در برابر هدف](#وضعیت-فعلی-در-برابر-هدف)
 4. [لایه Platform](#لایه-platform)
-5. [لایه Backend (Django)](#لایه-backend-django)
-6. [لایه Frontend (Next.js)](#لایه-frontend-nextjs)
+5. [لایه Backend (Django)](#لایه-apps/api)
+6. [لایه Frontend (Next.js)](#لایه-apps/webjs)
 7. [نگاشت دامنه‌ها (فرانت ↔ بک)](#نگاشت-دامنه‌ها-فرانت--بک)
 8. [قراردادهای نام‌گذاری](#قراردادهای-نام‌گذاری)
 9. [قوانین وابستگی (Import Rules)](#قوانین-وابستگی-import-rules)
@@ -78,8 +78,8 @@ stream-music/
 │   └── scripts/
 │
 ├── apps/                         # ── محصول ──
-│   ├── api/                      # Django (فعلی: backend-django)
-│   └── web/                      # Next.js (فعلی: frontend-next)
+│   ├── api/                      # Django (فعلی: apps/api)
+│   └── web/                      # Next.js (فعلی: apps/web)
 │
 └── platform/                     # ── زیرساخت ──
     ├── deploy/
@@ -87,7 +87,7 @@ stream-music/
     └── scripts/                  # backup، vapid، ...
 ```
 
-> **توجه:** در فاز اول مهاجرت، نام‌های فعلی `backend-django` و `frontend-next` حفظ می‌شوند. rename به `apps/api` و `apps/web` اختیاری و در فاز ۳ انجام می‌شود.
+> **توجه:** در فاز اول مهاجرت، نام‌های فعلی `apps/api` و `apps/web` حفظ می‌شوند. rename به `apps/api` و `apps/web` اختیاری و در فاز ۳ انجام می‌شود.
 
 ### دیاگرام لایه‌های runtime
 
@@ -206,7 +206,7 @@ apps/api/
     └── admin_panel/
 ```
 
-> در repository فعلی مسیر `backend-django/apps/` است. تا زمان rename، `domains/<name>` معادل `apps/<name>` خوانده شود.
+> در repository فعلی مسیر `apps/api/apps/` است. تا زمان rename، `domains/<name>` معادل `apps/<name>` خوانده شود.
 
 ### الگوی ثابت هر Domain App
 
@@ -683,8 +683,8 @@ Split into discovery, social, accounts, ...
 
 ### فاز ۳ — Rename و Platform (اختیاری)
 
-- [ ] `backend-django` → `apps/api` (نام فعلی حفظ شده؛ rename شکستن CI/docker)  
-- [ ] `frontend-next` → `apps/web`  
+- [ ] `apps/api` → `apps/api` (نام فعلی حفظ شده؛ rename شکستن CI/docker)  
+- [ ] `apps/web` → `apps/web`  
 - [x] `deploy/` + `infra/` + `scripts/` → `platform/` (symlink ریشه برای سازگاری)  
 - [ ] به‌روزرسانی CI paths پس از rename  
 
@@ -720,22 +720,22 @@ Split into discovery, social, accounts, ...
 
 | فعلی | هدف |
 |------|-----|
-| `frontend-next/src/app/` | `apps/web/src/app/` (بدون تغییر نقش) |
-| `frontend-next/src/features/` | همان + زیرساختار `components/hooks/model` |
-| `frontend-next/src/components/ui/` | `shared/ui/` |
-| `frontend-next/src/components/layout/` | `shared/layout/` |
-| `frontend-next/src/lib/api/` | همان + `types/` + `modules/` |
-| `frontend-next/src/hooks/` | `shared/hooks/` یا داخل feature |
+| `apps/web/src/app/` | `apps/web/src/app/` (بدون تغییر نقش) |
+| `apps/web/src/features/` | همان + زیرساختار `components/hooks/model` |
+| `apps/web/src/components/ui/` | `shared/ui/` |
+| `apps/web/src/components/layout/` | `shared/layout/` |
+| `apps/web/src/lib/api/` | همان + `types/` + `modules/` |
+| `apps/web/src/hooks/` | `shared/hooks/` یا داخل feature |
 
 ### Backend — مسیر فعلی → هدف
 
 | فعلی | هدف |
 |------|-----|
-| `backend-django/apps/channels/` | `domains/channels/` |
-| `backend-django/apps/common/discovery_views.py` | `domains/discovery/api/views.py` |
-| `backend-django/apps/common/social_expansion_views.py` | `domains/discovery/` + `domains/social/` |
-| `backend-django/apps/common/views.py` (auth) | `core/auth/` |
-| `backend-django/config/settings.py` | `config/settings/base.py` + env splits |
+| `apps/api/apps/channels/` | `domains/channels/` |
+| `apps/api/apps/common/discovery_views.py` | `domains/discovery/api/views.py` |
+| `apps/api/apps/common/social_expansion_views.py` | `domains/discovery/` + `domains/social/` |
+| `apps/api/apps/common/views.py` (auth) | `core/auth/` |
+| `apps/api/config/settings.py` | `config/settings/base.py` + env splits |
 
 ---
 
@@ -744,7 +744,7 @@ Split into discovery, social, accounts, ...
 - [README.md](../README.md) — Quick start و overview
 - [realtime-contracts.md](./realtime-contracts.md) — WebSocket
 - [production-deployment.md](./production-deployment.md) — Deploy
-- [e2e/README.md](../frontend-next/e2e/README.md) — تست E2E
+- [e2e/README.md](../apps/web/e2e/README.md) — تست E2E
 
 ---
 

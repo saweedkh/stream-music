@@ -221,7 +221,7 @@ git pull
 ## ۱۳. مرجع فایل‌ها
 
 - `docker-compose.prod.yml` — تعریف سرویس‌های پروداکشن.
-- `backend-django/Dockerfile.prod` — backend بدون mirror اجباری PyPI در Dockerfile توسعه.
-- `frontend-next/Dockerfile.prod` — بیلد npm از registry عمومی؛ خروجی standalone.
+- `apps/api/Dockerfile.prod` — backend بدون mirror اجباری PyPI در Dockerfile توسعه.
+- `apps/web/Dockerfile.prod` — بیلد npm از registry عمومی؛ خروجی standalone.
 - `deploy/up.sh`, `deploy/down.sh` — ورود و خروج یکپارچه.
 - `deploy/render-env-generated.sh`, `deploy/render-nginx-prod.sh` — تولید کانفیگ از IP، دامنه، و مسیر Certbot.

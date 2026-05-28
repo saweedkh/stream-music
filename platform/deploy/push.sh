@@ -154,8 +154,8 @@ REMOTE="${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/"
 RSYNC_EXCLUDES=(
   --exclude '.git/'
   --exclude 'node_modules/'
-  --exclude 'frontend-next/node_modules/'
-  --exclude 'frontend-next/.next/'
+  --exclude 'apps/web/node_modules/'
+  --exclude 'apps/web/.next/'
   --exclude '__pycache__/'
   --exclude '*.pyc'
   --exclude '.venv/'

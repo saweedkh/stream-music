@@ -16,8 +16,8 @@ User may write in Persian; respond in the same language they use.
 
 | Layer | Path |
 |-------|------|
-| Frontend | `frontend-next/` — Next.js 15, React 18, TS, Tailwind, Radix |
-| Backend | `backend-django/` — Django 4.2, DRF, Channels (Daphne) |
+| Frontend | `apps/web/` — Next.js 15, React 18, TS, Tailwind, Radix |
+| Backend | `apps/api/` — Django 4.2, DRF, Channels (Daphne) |
 | Deploy | `deploy/`, `infra/` |
 | Docs / ADR | `docs/`, `docs/adr/` |
 
@@ -25,10 +25,10 @@ Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
 
 ## Non‑negotiable principles
 
-1. **Thin routes** — `frontend-next/src/app/**/page.tsx` = wiring only (guards, layout, import feature page).
-2. **Fat features** — UI logic in `frontend-next/src/features/<domain>/`.
+1. **Thin routes** — `apps/web/src/app/**/page.tsx` = wiring only (guards, layout, import feature page).
+2. **Fat features** — UI logic in `apps/web/src/features/<domain>/`.
 3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (target layout in `docs/project-structure.md`).
-4. **No scattered `fetch`** — HTTP only via `frontend-next/src/lib/api/` modules.
+4. **No scattered `fetch`** — HTTP only via `apps/web/src/lib/api/` modules.
 5. **No feature → feature imports** — share via `components/`, `lib/`, or extract to a shared module.
 6. **Minimize scope** — smallest correct diff; match existing naming and patterns.
 7. **Do not expand `apps/common`** with new domains — prefer new app or `services/` split per migration doc.
@@ -77,7 +77,7 @@ apps/<domain>/   # today: apps/channels, playback, tracks, playlists; splitting 
 
 ## Code quality
 
-- Run relevant checks before finishing: `cd frontend-next && npm run lint` / `npm run build`; `cd backend-django && ruff check .` / tests for touched apps.
+- Run relevant checks before finishing: `cd apps/web && npm run lint` / `npm run build`; `cd apps/api && ruff check .` / tests for touched apps.
 - Prefer useful tests for real behavior; skip trivial tests.
 - WS/API contract changes → update docs or add `docs/adr/NNN-*.md`.
 

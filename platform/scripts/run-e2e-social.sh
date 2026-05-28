@@ -22,7 +22,7 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-cd frontend-next
+cd apps/web
 export DEV_REMOTE_ORIGIN=http://127.0.0.1:8002
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000
 # API calls hit Django directly (trailing slashes); UI uses Next on :3000

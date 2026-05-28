@@ -18,32 +18,32 @@ dev:
 	docker compose up --build
 
 dev-web:
-	cd frontend-next && npm run dev
+	cd apps/web && npm run dev
 
 dev-api:
-	cd backend-django && .venv/bin/daphne -b 0.0.0.0 -p 8000 config.asgi:application
+	cd apps/api && .venv/bin/daphne -b 0.0.0.0 -p 8000 config.asgi:application
 
 lint: lint-web lint-api
 
 lint-web:
-	cd frontend-next && npm run lint
+	cd apps/web && npm run lint
 
 lint-api:
-	cd backend-django && ruff check .
+	cd apps/api && ruff check .
 
 test: test-web test-api
 
 test-web:
-	cd frontend-next && npm test
+	cd apps/web && npm test
 
 test-api:
-	cd backend-django && python manage.py test apps --verbosity=1
+	cd apps/api && python manage.py test apps --verbosity=1
 
 test-e2e:
-	cd frontend-next && npm run test:e2e:social
+	cd apps/web && npm run test:e2e:social
 
 build-web:
-	cd frontend-next && npm run build
+	cd apps/web && npm run build
 
 new-feature:
 	@test -n "$(NAME)" || (echo "Usage: make new-feature NAME=my-domain" && exit 1)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate VAPID keys and write them into backend-django/.env.example + frontend-next/.env.example
+# Generate VAPID keys and write them into apps/api/.env.example + apps/web/.env.example
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,8 +15,8 @@ ecdh.generateKeys();
 process.stdout.write(urlBase64(ecdh.getPublicKey()) + ' ' + urlBase64(ecdh.getPrivateKey()));
 ")
 
-BACKEND_ENV="${ROOT}/backend-django/.env.example"
-FRONTEND_ENV="${ROOT}/frontend-next/.env.example"
+BACKEND_ENV="${ROOT}/apps/api/.env.example"
+FRONTEND_ENV="${ROOT}/apps/web/.env.example"
 
 patch_env() {
   local file="$1"

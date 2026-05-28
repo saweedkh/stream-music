@@ -22,7 +22,7 @@ Use `--private` if tracks should belong only to the owner user until you share t
 ## Usage (local)
 
 ```bash
-cd backend-django
+cd apps/api
 python manage.py import_audio "/absolute/path/to/your/music/folder"
 ```
 
@@ -82,7 +82,7 @@ Files are copied into `/media` inside the container (persisted in the `media_dat
    docker compose exec backend python manage.py import_audio /media/inbox --owner youruser
    ```
 
-2. Ensure `MEDIA_ROOT` in the container matches where you’re writing (see `backend-django/.env.example`).
+2. Ensure `MEDIA_ROOT` in the container matches where you’re writing (see `apps/api/.env.example`).
 
 ## Idempotency
 
@@ -90,8 +90,8 @@ Imports are keyed by the **stored relative path** (`Track.file`). If a path alre
 
 ## Related code
 
-- Command: `backend-django/apps/tracks/management/commands/import_audio.py`
-- Logic: `backend-django/apps/tracks/filesystem_import.py`
+- Command: `apps/api/apps/tracks/management/commands/import_audio.py`
+- Logic: `apps/api/apps/tracks/filesystem_import.py`
   - `import_audio_from_system_directory` — arbitrary host path → `MEDIA_ROOT` + `Track`
   - `import_audio_files_under_media` — scan only under `MEDIA_ROOT/audio/` (legacy / internal use)
 

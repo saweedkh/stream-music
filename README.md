@@ -61,8 +61,8 @@ make new-feature NAME=my-domain   # scaffold features/<name>/
 
 ```bash
 git clone <repo-url> && cd stream-music
-cp backend-django/.env.example backend-django/.env
-cp frontend-next/.env.example frontend-next/.env.local  # optional for local npm run dev
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local  # optional for local npm run dev
 ```
 
 ### 2. Start the stack
@@ -83,14 +83,14 @@ Migrations run automatically on container startup.
 
 ```bash
 # Backend
-cd backend-django
+cd apps/api
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 daphne -b 0.0.0.0 -p 8000 config.asgi:application
 
 # Frontend
-cd frontend-next
+cd apps/web
 npm ci
 npm run dev
 ```
@@ -124,7 +124,7 @@ The deploy stack includes:
 
 ```
 stream-music/
-├── backend-django/           # Django project
+├── apps/api/           # Django project
 │   ├── apps/
 │   │   ├── channels/         # Channel, Membership, Chat, Invite, Moderation
 │   │   ├── common/           # Auth, Admin, Social, Support, Discovery
@@ -132,7 +132,7 @@ stream-music/
 │   │   ├── playlists/        # Playlist, Queue models
 │   │   └── tracks/           # Track, chunked upload, share permissions
 │   └── config/               # Settings, URLs, ASGI, Celery, middleware
-├── frontend-next/            # Next.js app
+├── apps/web/            # Next.js app
 │   ├── src/
 │   │   ├── app/              # App Router pages
 │   │   ├── components/       # UI primitives (shadcn/Radix)
@@ -203,13 +203,13 @@ See **[docs/import-audio-cli.md](docs/import-audio-cli.md)** for details.
 
 ```bash
 # Backend unit tests
-cd backend-django && python manage.py test --verbosity=2
+cd apps/api && python manage.py test --verbosity=2
 
 # Frontend unit tests
-cd frontend-next && npm test
+cd apps/web && npm test
 
 # E2E tests (Playwright)
-cd frontend-next && npm run test:e2e
+cd apps/web && npm run test:e2e
 ```
 
 ## Configuration

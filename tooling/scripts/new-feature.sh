@@ -4,7 +4,7 @@ set -euo pipefail
 
 NAME="${1:?Usage: new-feature.sh <slug>}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-FEATURE_DIR="$ROOT/frontend-next/src/features/$NAME"
+FEATURE_DIR="$ROOT/apps/web/src/features/$NAME"
 
 if [[ -d "$FEATURE_DIR" ]]; then
   echo "Feature already exists: $FEATURE_DIR" >&2
@@ -39,7 +39,7 @@ EOF
 touch "$FEATURE_DIR/model/.gitkeep"
 touch "$FEATURE_DIR/__tests__/.gitkeep"
 
-echo "Created feature: frontend-next/src/features/${NAME}/"
+echo "Created feature: apps/web/src/features/${NAME}/"
 echo "  - ${NAME}-page.tsx"
 echo "  - components/ hooks/ model/ __tests__/"
 echo "  - index.ts"

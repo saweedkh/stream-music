@@ -28,7 +28,7 @@ jobs:
           - 6379:6379
     defaults:
       run:
-        working-directory: backend-django
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -73,14 +73,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend-next
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: frontend-next/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
@@ -112,12 +112,12 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: frontend-next/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Start backend
-        working-directory: backend-django
+        working-directory: apps/api
         env:
           DJANGO_SETTINGS_MODULE: config.settings
           POSTGRES_HOST: localhost
@@ -138,12 +138,12 @@ jobs:
             sleep 2
           done
       - name: Install frontend & Playwright
-        working-directory: frontend-next
+        working-directory: apps/web
         run: |
           npm ci
           npx playwright install --with-deps chromium
       - name: Build & start frontend
-        working-directory: frontend-next
+        working-directory: apps/web
         env:
           INTERNAL_API_BASE_URL: http://127.0.0.1:8000
           INTERNAL_WS_BASE_URL: ws://127.0.0.1:8000
@@ -155,7 +155,7 @@ jobs:
             sleep 2
           done
       - name: Run Playwright smoke tests
-        working-directory: frontend-next
+        working-directory: apps/web
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           PLAYWRIGHT_API_URL: http://127.0.0.1:8000

@@ -5,7 +5,7 @@ Stream Music ships as a PWA; Capacitor wraps the **hosted Next.js app** in a nat
 ## Setup
 
 ```bash
-cd frontend-next
+cd apps/web
 npm install
 # Point the WebView at your dev server (use LAN IP for physical devices)
 export CAPACITOR_SERVER_URL=http://192.168.1.10:3000
@@ -23,10 +23,10 @@ Production: set `CAPACITOR_SERVER_URL` to your public HTTPS origin (e.g. `https:
 
 | Path | Purpose |
 |------|---------|
-| `frontend-next/capacitor.config.ts` | App id, `server.url`, splash/status bar |
-| `frontend-next/capacitor-www/` | Placeholder `webDir` (real UI loads from `server.url`) |
-| `frontend-next/src/lib/capacitor-runtime.ts` | `isCapacitorNative()`, status bar + splash hide |
-| `frontend-next/src/components/capacitor/capacitor-bootstrap.tsx` | Mounted in root layout |
+| `apps/web/capacitor.config.ts` | App id, `server.url`, splash/status bar |
+| `apps/web/capacitor-www/` | Placeholder `webDir` (real UI loads from `server.url`) |
+| `apps/web/src/lib/capacitor-runtime.ts` | `isCapacitorNative()`, status bar + splash hide |
+| `apps/web/src/components/capacitor/capacitor-bootstrap.tsx` | Mounted in root layout |
 
 ## Behaviour
 

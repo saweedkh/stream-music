@@ -24,7 +24,7 @@ done
 
 docker compose -f docker-compose.yml -f docker-compose.e2e.yml exec -T backend python manage.py migrate --noinput
 
-cd frontend-next
+cd apps/web
 export DEV_REMOTE_ORIGIN=http://127.0.0.1:8002
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000
 export PLAYWRIGHT_API_URL=http://127.0.0.1:8002
