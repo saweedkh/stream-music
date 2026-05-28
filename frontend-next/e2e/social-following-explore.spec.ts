@@ -63,6 +63,37 @@ test.describe("social: following, explore, user follow", () => {
     await followerCtx.dispose();
   });
 
+  test("UI: explore follow public channel", async ({ browser, playwright, request }) => {
+    const owner = uniqueUsername("expown");
+    const follower = uniqueUsername("expfol");
+    const password = "pw12345678";
+    const channelName = `ExploreFollow ${Date.now()}`;
+
+    await registerAndLogin(request, owner, password);
+    await createChannel(request, { name: channelName, privacy: "public" });
+
+    const followerCtx = await playwright.request.newContext({ baseURL: apiURL });
+    await registerAndLogin(followerCtx, follower, password);
+    const storage = await followerCtx.storageState();
+
+    const page = await browser.newContext({ storageState: storage }).then((c) => c.newPage());
+    await page.goto("/explore");
+    await expect(page.getByRole("heading", { name: /^explore$/i })).toBeVisible({ timeout: 15_000 });
+
+    const followBtn = page.getByRole("button", { name: /follow channel|دنبال کردن کانال/i }).first();
+    await expect(followBtn).toBeVisible({ timeout: 15_000 });
+    await followBtn.click();
+    await expect(page.getByRole("button", { name: /following|دنبال می‌کنید/i }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const feed = await listFollowingChannelsApi(followerCtx);
+    expect(feed.results.some((r) => r.channel.name === channelName)).toBeTruthy();
+
+    await page.context().close();
+    await followerCtx.dispose();
+  });
+
   test("API + UI: explore feed loads", async ({ browser, request }) => {
     const user = uniqueUsername("exp");
     await registerAndLogin(request, user);

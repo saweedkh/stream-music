@@ -109,6 +109,9 @@ The deploy stack includes:
 
 ## Project Structure
 
+**Full architecture guide (target layout, conventions, migration):** **[docs/project-structure.md](docs/project-structure.md)**  
+**Day-to-day conventions:** [docs/CONVENTIONS.md](docs/CONVENTIONS.md) · **ADRs:** [docs/adr/](docs/adr/)
+
 ```
 stream-music/
 ├── backend-django/           # Django project
@@ -130,9 +133,11 @@ stream-music/
 │   └── public/               # PWA manifest, service worker
 ├── deploy/                   # Production deployment scripts
 ├── scripts/                  # Backup, VAPID key generation
-├── docs/                     # Documentation
+├── docs/                     # Architecture, conventions, ADRs, runbooks
 └── .github/workflows/        # CI/CD pipelines
 ```
+
+See [docs/project-structure.md](docs/project-structure.md) for the target `apps/` + `domains/` layout and feature module template.
 
 ## API Overview
 

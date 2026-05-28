@@ -8,7 +8,7 @@ export default function ExploreRoute() {
       <WorkspacePanel
         tab="channels"
         headerTitleKey="explore.title"
-        headerDescriptionKey="explore.peopleOnlySubtitle"
+        headerDescriptionKey="explore.subtitle"
         headerIconKey="compass"
         className="lg:min-h-0 lg:flex-1"
       >

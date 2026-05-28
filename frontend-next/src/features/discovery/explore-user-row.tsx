@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Check, UserPlus } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PublicUserProfile } from "@/lib/api";
@@ -58,11 +57,6 @@ export function ExploreUserRow({ username, displayName, profile, following, busy
             </span>
             <span className="opacity-60">•</span>
             <span className="truncate">{metaParts.join(" · ")}</span>
-            {profile?.public_channels?.length ? (
-              <Badge variant="secondary" className="h-5 px-2 text-[11px] font-semibold">
-                {t("explore.userPublicRooms", { count: profile.public_channels.length })}
-              </Badge>
-            ) : null}
           </span>
           {bio ? (
             <span className="mt-1 line-clamp-1 block text-xs text-muted-foreground/90 group-hover:text-muted-foreground">
