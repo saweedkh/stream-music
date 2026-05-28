@@ -18,7 +18,7 @@ User may write in Persian; respond in the same language they use.
 |-------|------|
 | Frontend | `apps/web/` — Next.js 15, React 18, TS, Tailwind, Radix |
 | Backend | `apps/api/` — Django 4.2, DRF, Channels (Daphne) |
-| Deploy | `deploy/`, `infra/` |
+| Deploy | `platform/deploy/` (symlink: `deploy/`) |
 | Docs / ADR | `docs/`, `docs/adr/` |
 
 Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
@@ -29,7 +29,7 @@ Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
 2. **Fat features** — UI logic in `apps/web/src/features/<domain>/`.
 3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (target layout in `docs/project-structure.md`).
 4. **No scattered `fetch`** — HTTP only via `apps/web/src/lib/api/` modules.
-5. **No feature → feature imports** — share via `components/`, `lib/`, or extract to a shared module.
+5. **No feature → feature imports** — share via `shared/`, `lib/`, or extract to a shared module.
 6. **Minimize scope** — smallest correct diff; match existing naming and patterns.
 7. **Do not expand `apps/common`** with new domains — prefer new app or `services/` split per migration doc.
 
@@ -48,8 +48,10 @@ features/<domain>/
 
 Reference implementation: `features/discovery/` (Explore).
 
-- UI primitives: `src/components/ui/`
-- Layout/shell: `src/components/layout/` (e.g. `workspace/`)
+- UI primitives: `src/shared/ui/`
+- Layout/shell: `src/shared/layout/`
+- Shared hooks: `src/shared/hooks/`
+- Providers, room chrome, PWA, notifications: `src/shared/providers|room|pwa|notifications/`
 - API transport: `src/lib/api/` (+ `types/` when split)
 - i18n keys: `src/lib/i18n/messages.ts` — **always add `en` and `fa`**: `domain.context.name`
 

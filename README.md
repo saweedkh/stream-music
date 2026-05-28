@@ -134,10 +134,9 @@ stream-music/
 │   └── config/               # Settings, URLs, ASGI, Celery, middleware
 ├── apps/web/            # Next.js app
 │   ├── src/
-│   │   ├── app/              # App Router pages
-│   │   ├── components/       # UI primitives (shadcn/Radix)
-│   │   ├── features/         # Feature modules (auth, channels, player, etc.)
-│   │   ├── hooks/            # WebSocket, presence, hotkeys
+│   │   ├── app/              # App Router (thin routes)
+│   │   ├── shared/           # ui, layout, hooks, providers, room, …
+│   │   ├── features/         # Domain UI (components/, hooks/, model/, index.ts)
 │   │   └── lib/              # API client, i18n, utilities
 │   ├── e2e/                  # Playwright E2E tests
 │   └── public/               # PWA manifest, service worker

@@ -122,8 +122,10 @@ stream-music/
 | وضعیت | مسیر | اقدام هدف |
 |--------|------|-----------|
 | ✅ خوب | `apps/channels`, `playback`, `tracks`, `playlists` | حفظ + اعمال الگوی لایه‌ای یکسان |
-| ⚠️ نیاز به refactor | `apps/common` | تقسیم به `discovery`, `social`, `accounts`, `moderation`, `support`, `admin_panel`, `core` |
-| ✅ قابل قبول | `config/` | تفکیک `settings/` به base/local/production |
+| ✅ انجام شد | `apps/common` | فقط badges + shimها؛ مدل‌های منتقل‌شده در اپ دامنه با `db_table` قدیمی |
+| ✅ انجام شد | serializers | `*/api/serializers.py` per domain + `common/serializers.py` re-export |
+| ✅ انجام شد | `discovery`, `social`, `accounts`, `core`, … | اپ‌های دامنه + `urls` per domain |
+| ✅ انجام شد | `config/settings/` | base + local/production |
 
 ### Frontend
 
@@ -131,8 +133,9 @@ stream-music/
 |--------|------|-----------|
 | ✅ خوب | `src/features/*` | الگوی مرجع؛ هر feature زیرپوشه `components/`, `hooks/`, `model/` |
 | ✅ خوب | `src/lib/api/*` | split تدریجی `types.ts` به `types/` |
-| ⚠️ مرزبندی | `src/components/` | فقط `ui/`, `layout/`, `providers/` — نه business logic |
-| ⚠️ پراکنده | `src/hooks/` ریشه | انتقال به `shared/hooks/` یا داخل feature مربوطه |
+| ✅ انجام شد | `src/shared/ui`, `shared/layout`, `shared/hooks` | جایگزین `components/ui` و `hooks/` ریشه |
+| ✅ انجام شد | `src/shared/` | `ui/`, `layout/`, `hooks/`, `providers/`, `room/`, `pwa/`, `notifications/` |
+| ✅ انجام شد | `features/*` | `components/`, `hooks/`, `model/`, `index.ts` (auth, channels, dashboard, player, discovery, …) |
 
 ### نمونه موفق (الگوی مرجع)
 
@@ -656,7 +659,7 @@ Split into discovery, social, accounts, ...
 
 - [x] سند `docs/project-structure.md`
 - [x] `docs/CONVENTIONS.md`
-- [ ] لینک از `README.md` به این سند
+- [x] لینک از `README.md` به این سند
 - [x] `.cursor/rules/project-agent.mdc` (`alwaysApply`) + `AGENTS.md`
 
 ### فاز ۱ — Frontend یکدست (۲ هفته)
@@ -678,15 +681,21 @@ Split into discovery, social, accounts, ...
 7. [x] `core` ← health, metrics, schema, auth routes (`apps/core/api/`)  
 8. [x] `config/settings/` ← base + local/production (`DJANGO_ENV`)  
 9. [x] shimهای `apps/common/*_views.py` برای سازگاری  
+10. [x] `common/views.py` → `core/auth_views`, `channels/api/*`, `tracks/playlists` viewsets  
+11. [x] `common/urls.py` فقط `include()` دامنه‌ها  
+12. [x] `common/serializers.py` → `*/api/serializers.py` per domain  
+13. [x] `party_recap` → `channels/services/`  
+14. [x] `social/models.py`, `support/models.py`, `accounts/models.py` + migration state-only (`0006`)  
+15. [x] `channels/services/playback_control.py` — منطق control از view جدا شد  
 
 هر PR: move + urls + tests سبز.
 
-### فاز ۳ — Rename و Platform (اختیاری)
+### فاز ۳ — Rename و Platform
 
-- [ ] `apps/api` → `apps/api` (نام فعلی حفظ شده؛ rename شکستن CI/docker)  
-- [ ] `apps/web` → `apps/web`  
+- [x] `backend-django` → `apps/api`  
+- [x] `frontend-next` → `apps/web`  
 - [x] `deploy/` + `infra/` + `scripts/` → `platform/` (symlink ریشه برای سازگاری)  
-- [ ] به‌روزرسانی CI paths پس از rename  
+- [x] به‌روزرسانی CI paths (`apps/api`, `apps/web`)  
 
 ### فاز ۴ — کیفیت
 
@@ -694,7 +703,9 @@ Split into discovery, social, accounts, ...
 - [x] تست نمونه service (`discovery/tests/test_explore_feed.py`)  
 - [x] `lib/api/modules/` + alias `@/shared/ui` در tsconfig  
 - [x] ESLint هشدار feature↔feature (`.eslintrc.json`)  
-- [ ] OpenAPI → types codegen (ADR جداگانه)  
+- [x] `shared/ui`, `shared/layout`, `shared/hooks` (انتقال فیزیکی + alias)  
+- [x] `features/*/index.ts` برای دامنه‌های اصلی  
+- [x] OpenAPI codegen — **به‌تعویق** ([ADR-003](./adr/003-openapi-types-deferred.md))  
 
 ---
 
