@@ -31,3 +31,7 @@ deploy/sync.env
 deploy/.env.generated
 deploy/.env.runtime.merged
 deploy/nginx.generated.conf
+platform/deploy/sync.env
+platform/deploy/.env.generated
+platform/deploy/.env.runtime.merged
+platform/deploy/nginx.generated.conf
