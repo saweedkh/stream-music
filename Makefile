@@ -1,7 +1,7 @@
 # Stream Music — common dev commands
 # See docs/project-structure.md
 
-.PHONY: help dev dev-web dev-api lint lint-web lint-api test test-web test-api test-e2e build build-web new-feature
+.PHONY: help dev dev-web dev-api lint lint-web lint-api test test-web test-api test-e2e build build-web new-feature new-domain
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  make test-e2e     - Playwright social suite"
 	@echo "  make build-web    - production Next.js build"
 	@echo "  make new-feature NAME=<slug>  - scaffold frontend feature"
+	@echo "  make new-domain NAME=<slug>   - scaffold Django domain app"
 
 dev:
 	docker compose up --build
@@ -47,3 +48,7 @@ build-web:
 new-feature:
 	@test -n "$(NAME)" || (echo "Usage: make new-feature NAME=my-domain" && exit 1)
 	@bash tooling/scripts/new-feature.sh "$(NAME)"
+
+new-domain:
+	@test -n "$(NAME)" || (echo "Usage: make new-domain NAME=my_domain" && exit 1)
+	@bash tooling/scripts/new-domain.sh "$(NAME)"

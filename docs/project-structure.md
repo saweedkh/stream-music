@@ -655,7 +655,7 @@ Split into discovery, social, accounts, ...
 ### فاز ۰ — ثبت قرارداد (انجام / در حال انجام)
 
 - [x] سند `docs/project-structure.md`
-- [ ] `docs/CONVENTIONS.md`
+- [x] `docs/CONVENTIONS.md`
 - [ ] لینک از `README.md` به این سند
 - [x] `.cursor/rules/project-agent.mdc` (`alwaysApply`) + `AGENTS.md`
 
@@ -665,29 +665,35 @@ Split into discovery, social, accounts, ...
 - [x] انتقال Explore به `components/` + `model/` + `index.ts`
 - [x] split `lib/api/types.ts` → `lib/api/types/*`
 - [x] `Makefile` + `tooling/scripts/new-feature.sh`
-- [ ] ممنوعیت import مستقیم feature↔feature در ESLint (اختیاری)
+- [x] ممنوعیت import مستقیم feature↔feature در ESLint (هشدار در `.eslintrc.json`)
 
 ### فاز ۲ — Backend split `common` (۳–۵ هفته)
 
 1. [x] `discovery` ← explore + global search + track facets (`apps/discovery/`, services + api)  
 2. [x] `social` ← follow user/channel + following feed (`apps/social/`)  
-3. [ ] `accounts` ← profile, badges, premium limits (هنوز در `common/discovery_views.py`)  
-4. [ ] `support`, `moderation`, `admin_panel`  
-5. [ ] `core` ← auth, health, metrics  
+3. [x] `accounts` ← profile, premium (`apps/accounts/api/`)  
+4. [x] `playlists/api` ← playlist share links  
+5. [x] `channels/api` ← queue import-share, session export  
+6. [x] `support`, `moderation`, `admin_panel`, `dashboard`  
+7. [x] `core` ← health, metrics, schema, auth routes (`apps/core/api/`)  
+8. [x] `config/settings/` ← base + local/production (`DJANGO_ENV`)  
+9. [x] shimهای `apps/common/*_views.py` برای سازگاری  
 
 هر PR: move + urls + tests سبز.
 
 ### فاز ۳ — Rename و Platform (اختیاری)
 
-- [ ] `backend-django` → `apps/api`  
+- [ ] `backend-django` → `apps/api` (نام فعلی حفظ شده؛ rename شکستن CI/docker)  
 - [ ] `frontend-next` → `apps/web`  
-- [ ] `deploy/` + `infra/` → `platform/`  
-- [ ] به‌روزرسانی CI paths  
+- [x] `deploy/` + `infra/` + `scripts/` → `platform/` (symlink ریشه برای سازگاری)  
+- [ ] به‌روزرسانی CI paths پس از rename  
 
 ### فاز ۴ — کیفیت
 
-- [ ] `tooling/templates/` + `make new-*`  
-- [ ] پوشش تست service/hook برای flowهای اصلی  
+- [x] `tooling/templates/django-domain` + `make new-domain` / `new-feature`  
+- [x] تست نمونه service (`discovery/tests/test_explore_feed.py`)  
+- [x] `lib/api/modules/` + alias `@/shared/ui` در tsconfig  
+- [x] ESLint هشدار feature↔feature (`.eslintrc.json`)  
 - [ ] OpenAPI → types codegen (ADR جداگانه)  
 
 ---

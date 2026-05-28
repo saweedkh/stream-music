@@ -1,0 +1,34 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": ["@/features/*/**"],
+            "message": "Import from feature public API (@/features/<name>) instead of deep paths."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/features/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*"],
+                "message": "Features must not import other features; use @/shared or @/lib."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

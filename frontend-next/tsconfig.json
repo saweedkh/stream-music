@@ -15,7 +15,9 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@/shared/ui/*": ["src/components/ui/*"],
+      "@/shared/layout/*": ["src/components/layout/*"]
     },
     "plugins": [{ "name": "next" }]
   },
