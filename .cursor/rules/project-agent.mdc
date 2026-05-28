@@ -1,0 +1,95 @@
+---
+description: Stream Music — mandatory agent rules (structure, stack, git, quality)
+alwaysApply: true
+---
+
+# Stream Music — Agent Rules
+
+Read these docs when making non-trivial changes:
+- `docs/project-structure.md` — architecture, folders, migration map
+- `docs/CONVENTIONS.md` — lint, commits, PR, security
+- `docs/realtime-contracts.md` — WebSocket events (if touching playback/chat WS)
+
+User may write in Persian; respond in the same language they use.
+
+## Stack & paths (current repo)
+
+| Layer | Path |
+|-------|------|
+| Frontend | `frontend-next/` — Next.js 15, React 18, TS, Tailwind, Radix |
+| Backend | `backend-django/` — Django 4.2, DRF, Channels (Daphne) |
+| Deploy | `deploy/`, `infra/` |
+| Docs / ADR | `docs/`, `docs/adr/` |
+
+Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
+
+## Non‑negotiable principles
+
+1. **Thin routes** — `frontend-next/src/app/**/page.tsx` = wiring only (guards, layout, import feature page).
+2. **Fat features** — UI logic in `frontend-next/src/features/<domain>/`.
+3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (target layout in `docs/project-structure.md`).
+4. **No scattered `fetch`** — HTTP only via `frontend-next/src/lib/api/` modules.
+5. **No feature → feature imports** — share via `components/`, `lib/`, or extract to a shared module.
+6. **Minimize scope** — smallest correct diff; match existing naming and patterns.
+7. **Do not expand `apps/common`** with new domains — prefer new app or `services/` split per migration doc.
+
+## Where to put new code
+
+### Frontend feature template
+
+```text
+features/<domain>/
+  <domain>-page.tsx      # page orchestrator
+  components/            # UI for this domain only
+  hooks/                 # use-* data & actions
+  model/                 # pure utils, mappers
+  index.ts               # public exports
+```
+
+Reference implementation: `features/discovery/` (Explore).
+
+- UI primitives: `src/components/ui/`
+- Layout/shell: `src/components/layout/` (e.g. `workspace/`)
+- API transport: `src/lib/api/` (+ `types/` when split)
+- i18n keys: `src/lib/i18n/messages.ts` — **always add `en` and `fa`**: `domain.context.name`
+
+### Backend (target per domain)
+
+```text
+apps/<domain>/   # today: apps/channels, playback, tracks, playlists; splitting common → discovery, social, …
+  models.py
+  selectors.py
+  services/
+  api/views.py, serializers.py, urls.py
+  tests/
+```
+
+## Domain map (frontend ↔ backend)
+
+| Product | Frontend | Backend (current/target) | API module |
+|---------|----------|--------------------------|------------|
+| Auth | `features/auth` | `common` → `core/auth` | `lib/api/auth` |
+| Channels / room | `features/channels`, `dashboard` | `apps/channels` | `channels` |
+| Playback | `features/player`, `room` | `apps/playback` | channels/playback |
+| Tracks / playlists | `features/playlists` | `tracks`, `playlists` | `tracks`, `playlists` |
+| Discovery | `features/discovery` | `common` → `discovery` | `discovery` |
+| Admin / support | dashboard sections | `common` admin/support | `admin`, `support` |
+
+## Code quality
+
+- Run relevant checks before finishing: `cd frontend-next && npm run lint` / `npm run build`; `cd backend-django && ruff check .` / tests for touched apps.
+- Prefer useful tests for real behavior; skip trivial tests.
+- WS/API contract changes → update docs or add `docs/adr/NNN-*.md`.
+
+## Git (agent)
+
+- **Commit or push only when the user explicitly asks.**
+- Use Conventional Commits: `feat(scope):`, `fix(scope):`, `docs:`, `chore:`.
+- Never `--no-verify`, `git config`, or force-push `main` unless explicitly requested.
+
+## PR checklist (before suggesting “done”)
+
+- [ ] Logic in feature/service/hook, not in route or fat view
+- [ ] API via `lib/api`; i18n `en` + `fa` if user-facing strings added
+- [ ] No cross-feature imports; no secrets/backups committed
+- [ ] Tests or E2E noted if behavior changed

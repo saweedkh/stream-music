@@ -657,7 +657,7 @@ Split into discovery, social, accounts, ...
 - [x] سند `docs/project-structure.md`
 - [ ] `docs/CONVENTIONS.md`
 - [ ] لینک از `README.md` به این سند
-- [ ] `.cursor/rules` خلاصه برای AI
+- [x] `.cursor/rules/project-agent.mdc` (`alwaysApply`) + `AGENTS.md`
 
 ### فاز ۱ — Frontend یکدست (۲ هفته)
 

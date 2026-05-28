@@ -17,7 +17,9 @@ media/
 # Local database/media backups (do not commit)
 backups/
 
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 *.tsbuildinfo
 
 # Dev-only TLS assets (generate with infra/nginx/generate-dev-certs.sh)
