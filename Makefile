@@ -1,7 +1,7 @@
 # Stream Music — common dev commands
 # See docs/project-structure.md
 
-.PHONY: help dev dev-web dev-api lint lint-web lint-api test test-web test-api test-e2e build build-web new-feature new-domain
+.PHONY: help dev dev-web dev-api lint lint-web lint-api test test-web test-api test-e2e build build-web new-feature new-domain openapi-export
 
 help:
 	@echo "Targets:"
@@ -52,3 +52,6 @@ new-feature:
 new-domain:
 	@test -n "$(NAME)" || (echo "Usage: make new-domain NAME=my_domain" && exit 1)
 	@bash tooling/scripts/new-domain.sh "$(NAME)"
+
+openapi-export:
+	@bash tooling/scripts/export-openapi-schema.sh

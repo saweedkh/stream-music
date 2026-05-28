@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from apps.channels.api.channel_views import (
+from apps.channels.api.views import (
     ChannelAuditExportView,
     ChannelAuditLogView,
     ChannelChatPinView,

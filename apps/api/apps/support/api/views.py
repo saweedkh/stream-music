@@ -8,8 +8,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.support_models import SupportTicket
-from apps.common.support_service import (
+from apps.support.models import SupportTicket
+from apps.support.services.ticket_service import (
     apply_send_message,
     broadcast_staff_inbox,
     can_access_ticket,

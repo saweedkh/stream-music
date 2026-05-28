@@ -687,6 +687,9 @@ Split into discovery, social, accounts, ...
 13. [x] `party_recap` → `channels/services/`  
 14. [x] `social/models.py`, `support/models.py`, `accounts/models.py` + migration state-only (`0006`)  
 15. [x] `channels/services/playback_control.py` — منطق control از view جدا شد  
+16. [x] `channels/api/views/` — split از `channel_views.py` (viewset, playback, queue, join, room)  
+17. [x] `channels/services/channel_queue.py` — صف، upvote، jump  
+18. [x] `support/services/ticket_service.py` — منطق تیکت از `common`  
 
 هر PR: move + urls + tests سبز.
 
