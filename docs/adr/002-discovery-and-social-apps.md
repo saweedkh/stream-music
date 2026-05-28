@@ -18,13 +18,14 @@ Accepted
 - Add `apps.social` with follow user/channel and following channels feed.
 - Register apps in `INSTALLED_APPS`; mount URLs via `include()` in `apps/common/urls.py`.
 - Keep ORM models in `common.social_models` until a dedicated migration pass.
-- Leave profile, playlist share, premium in `common` for a future `accounts` split.
+- Move public profile + premium to `apps.accounts`; playlist share to `apps.playlists.api`; room tools to `apps.channels.api`.
+- Extract `core`, `support`, `moderation`, `admin_panel`, `dashboard` with domain `api/urls.py` and `common/urls.py` includes.
 
 ## Consequences
 
 - Clearer boundaries aligned with frontend `features/discovery`.
-- `common/discovery_views.py` re-exports moved views for compatibility.
-- Next step: move public profile + premium to `accounts` app.
+- `common/*_views.py` modules re-export moved views for backward compatibility.
+- Channel CRUD/queue/auth remain in `common/views.py` until a dedicated channels API split.
 
 ## References
 
