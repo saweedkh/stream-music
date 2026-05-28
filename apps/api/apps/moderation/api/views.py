@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelChatMessage, ChannelChatReport
 from apps.channels.moderation import ban_user, is_channel_staff, is_user_chat_banned, unban_user
-from apps.common.views import _can_manage_channel
+from apps.channels.api.helpers import _can_manage_channel
 
 
 class ChannelChatReportView(APIView):

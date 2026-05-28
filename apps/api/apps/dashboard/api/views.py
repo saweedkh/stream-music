@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership, ChannelPlaylistSuggestion
 from apps.common.serializers import ChannelSerializer
-from apps.common.views import _can_manage_channel
+from apps.channels.api.helpers import _can_manage_channel
 from apps.playback.consumers import _presence_snapshot
 
 

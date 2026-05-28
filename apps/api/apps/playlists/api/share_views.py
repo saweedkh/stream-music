@@ -14,7 +14,7 @@ from apps.channels.models import Channel, ChannelMembership
 from apps.common.serializers import PlaylistItemSerializer, PlaylistSerializer
 from apps.common.social_models import PlaylistShareLink
 from apps.common.user_badges import is_platform_superuser
-from apps.common.views import _can_manage_channel
+from apps.channels.api.helpers import _can_manage_channel
 from apps.playlists.models import Playlist, PlaylistItem
 
 

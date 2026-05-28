@@ -1,8 +1,28 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
 from apps.channels.models import Channel
 from apps.tracks.models import Track
+
+
+class PlaylistShareLink(models.Model):
+    class Privacy(models.TextChoices):
+        PUBLIC = "public", "Public"
+        UNLISTED = "unlisted", "Unlisted"
+
+    playlist = models.ForeignKey("Playlist", on_delete=models.CASCADE, related_name="share_links")
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    privacy = models.CharField(max_length=16, choices=Privacy.choices, default=Privacy.UNLISTED)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "common_playlistsharelink"
+        indexes = [models.Index(fields=["token", "is_active"], name="common_play_token_91ab0d_idx")]
 
 
 class Playlist(models.Model):
