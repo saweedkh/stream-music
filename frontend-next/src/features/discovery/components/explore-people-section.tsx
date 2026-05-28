@@ -5,8 +5,8 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { WorkspaceEmpty, WorkspaceList, WorkspaceSection } from "@/components/layout/workspace";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExploreUserRow } from "@/features/discovery/explore-user-row";
-import { displayNameFromProfile } from "@/features/discovery/explore-utils";
+import { ExploreUserRow } from "@/features/discovery/components/explore-user-row";
+import { displayNameFromProfile } from "@/features/discovery/model/explore-utils";
 import type { DiscoverableUser } from "@/features/discovery/hooks/use-discoverable-users";
 import type { PublicUserProfile } from "@/lib/api";
 

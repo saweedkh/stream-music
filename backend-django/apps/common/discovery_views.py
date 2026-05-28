@@ -1,11 +1,10 @@
-"""Global search, public profiles, playlist sharing, channel follows."""
+"""Public profiles, playlist sharing, premium limits (migrating to accounts/playlists domains)."""
 
 from __future__ import annotations
 
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -13,106 +12,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.premium_limits import can_create_channel, clamp_member_limit, user_has_premium
-from apps.common.user_badges import is_platform_superuser
-from apps.common.serializers import ChannelSerializer, PlaylistItemSerializer, PlaylistSerializer, TrackSerializer
 from apps.common.favorites import UserPlaylistFavorite
+from apps.common.serializers import ChannelSerializer, PlaylistItemSerializer, PlaylistSerializer
 from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserFollow, UserPublicProfile
-from apps.playback.models import PlaybackEvent
-from apps.common.user_badges import badges_for_user
+from apps.common.user_badges import badges_for_user, is_platform_superuser
 from apps.common.views import _can_manage_channel
-from apps.playback.services.channel_queue import tracks_accessible_to_user
+from apps.discovery.selectors import public_channel_queryset
+from apps.playback.models import PlaybackEvent
 from apps.playlists.models import Playlist, PlaylistItem
-from apps.tracks.models import Track
 
-
-def _public_channel_qs():
-    return (
-        Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC)
-        .exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
-        .select_related("owner")
-    )
-
-
-class GlobalSearchView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        q = (request.query_params.get("q") or "").strip()
-        if len(q) < 2:
-            return Response({"tracks": [], "playlists": [], "channels": [], "users": [], "shared_playlists": []})
-        user = request.user
-        track_qs = tracks_accessible_to_user(user).filter(
-            Q(title__icontains=q) | Q(artist__icontains=q) | Q(album__icontains=q) | Q(genre__icontains=q)
-        )[:20]
-        playlist_qs = Playlist.objects.filter(owner=user, channel__isnull=True, name__icontains=q)[:15]
-        member_ids = list(
-            Channel.objects.filter(memberships__user=user, memberships__is_active=True)
-            .filter(Q(name__icontains=q) | Q(description__icontains=q))
-            .distinct()
-            .values_list("id", flat=True)[:15]
-        )
-        pub_ids = list(
-            _public_channel_qs()
-            .filter(Q(name__icontains=q) | Q(description__icontains=q))
-            .exclude(id__in=member_ids)
-            .values_list("id", flat=True)[:10]
-        )
-        channel_ids = list(member_ids) + list(pub_ids)
-        channel_rows = Channel.objects.filter(id__in=channel_ids).select_related("owner") if channel_ids else []
-        user_rows = (
-            User.objects.filter(is_active=True, public_profile__is_public=True)
-            .filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
-            .select_related("public_profile")[:12]
-        )
-        users = [
-            {
-                "id": u.id,
-                "username": u.username,
-                "display_name": (u.get_full_name() or u.username).strip(),
-            }
-            for u in user_rows
-        ]
-        shared_links = (
-            PlaylistShareLink.objects.filter(is_active=True, playlist__name__icontains=q)
-            .select_related("playlist", "playlist__owner")
-            .order_by("-created_at")[:12]
-        )
-        shared_playlists = [
-            {
-                "token": str(link.token),
-                "playlist_name": link.playlist.name if link.playlist else "",
-                "owner_username": link.playlist.owner.username if link.playlist and link.playlist.owner_id else "",
-            }
-            for link in shared_links
-        ]
-        return Response(
-            {
-                "tracks": TrackSerializer(track_qs, many=True, context={"request": request}).data,
-                "playlists": PlaylistSerializer(playlist_qs, many=True, context={"request": request}).data,
-                "channels": ChannelSerializer(channel_rows, many=True, context={"request": request}).data,
-                "users": users,
-                "shared_playlists": shared_playlists,
-            }
-        )
-
-
-class TrackFacetsView(APIView):
-    """Distinct genre/album values for library filters."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        qs = tracks_accessible_to_user(request.user)
-        genres = sorted({g for g in qs.exclude(genre="").values_list("genre", flat=True) if g})
-        albums = sorted({a for a in qs.exclude(album="").values_list("album", flat=True)[:500] if a})
-        tags: set[str] = set()
-        for raw in qs.values_list("tags", flat=True)[:300]:
-            if isinstance(raw, list):
-                for t in raw:
-                    if isinstance(t, str) and t.strip():
-                        tags.add(t.strip())
-        return Response({"genres": genres, "albums": albums[:200], "tags": sorted(tags)[:100]})
+# Re-export for backward compatibility
+from apps.discovery.api.views import ExploreFeedView, GlobalSearchView, TrackFacetsView  # noqa: F401
+from apps.social.api.views import ChannelFollowView  # noqa: F401
 
 
 class PublicUserProfileView(APIView):
@@ -128,7 +39,7 @@ class PublicUserProfileView(APIView):
             return Response({"detail": "profile_private"}, status=status.HTTP_403_FORBIDDEN)
         channels = []
         if profile.is_public or is_self:
-            owned_public = _public_channel_qs().filter(owner_id=user.id).select_related("owner")[:30]
+            owned_public = public_channel_queryset().filter(owner_id=user.id).select_related("owner")[:30]
             channels = ChannelSerializer(owned_public, many=True, context={"request": request}).data
         following_count = 0
         user_following = False
@@ -274,8 +185,6 @@ class PlaylistSharePreviewView(APIView):
 
 
 class PlaylistShareImportView(APIView):
-    """Copy shared playlist tracks into a channel playlist or personal library playlist."""
-
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, channel_id: int):
@@ -300,50 +209,11 @@ class PlaylistShareImportView(APIView):
         return Response({"playlist": PlaylistSerializer(dest, context={"request": request}).data})
 
 
-class ChannelFollowView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, channel_id: int):
-        channel = get_object_or_404(Channel, id=channel_id)
-        if not is_platform_superuser(request.user) and channel.privacy != Channel.Privacy.PUBLIC and not ChannelMembership.objects.filter(
-            channel=channel, user=request.user, is_active=True
-        ).exists():
-            return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
-        row = ChannelFollow.objects.filter(channel_id=channel_id, user_id=request.user.id).first()
-        follower_count = ChannelFollow.objects.filter(channel_id=channel_id).count()
-        return Response(
-            {
-                "following": row is not None,
-                "notify_live": row.notify_live if row else True,
-                "follower_count": follower_count,
-            }
-        )
-
-    def post(self, request, channel_id: int):
-        channel = get_object_or_404(Channel, id=channel_id)
-        if channel.privacy != Channel.Privacy.PUBLIC:
-            return Response({"detail": "only_public_channels"}, status=status.HTTP_400_BAD_REQUEST)
-        notify = request.data.get("notify_live", True)
-        row, created = ChannelFollow.objects.get_or_create(
-            channel_id=channel_id,
-            user_id=request.user.id,
-            defaults={"notify_live": bool(notify)},
-        )
-        if not created and "notify_live" in request.data:
-            row.notify_live = bool(request.data.get("notify_live"))
-            row.save(update_fields=["notify_live"])
-        return Response({"following": True, "notify_live": row.notify_live}, status=status.HTTP_201_CREATED)
-
-    def delete(self, request, channel_id: int):
-        ChannelFollow.objects.filter(channel_id=channel_id, user_id=request.user.id).delete()
-        return Response({"following": False})
-
-
 class PremiumLimitsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from apps.channels.models import Channel
+        from apps.common.premium_limits import user_has_premium
 
         owned = Channel.objects.filter(owner_id=request.user.id).count()
         premium = user_has_premium(request.user)

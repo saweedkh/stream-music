@@ -4,8 +4,8 @@ import { Radio } from "lucide-react";
 import { useTranslations } from "@/components/providers/locale-provider";
 import { WorkspaceEmpty, WorkspaceSection } from "@/components/layout/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExploreHorizontalRail } from "@/features/discovery/explore-horizontal-rail";
-import { ExploreRoomCard } from "@/features/discovery/explore-room-card";
+import { ExploreHorizontalRail } from "@/features/discovery/components/explore-horizontal-rail";
+import { ExploreRoomCard } from "@/features/discovery/components/explore-room-card";
 import type { useExploreChannelFollow } from "@/features/discovery/hooks/use-explore-channel-follow";
 import type { ChannelSummary } from "@/lib/api";
 

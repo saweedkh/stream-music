@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ChannelCommandMenu } from "@/components/room/channel-command-menu";
-import { GlobalSearchDialog } from "@/features/discovery/global-search-dialog";
+import { GlobalSearchDialog } from "@/features/discovery";
 import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
 import { getMe, type AuthUser } from "@/lib/api";
 import { ConnectivityBanner } from "@/components/connectivity-banner";

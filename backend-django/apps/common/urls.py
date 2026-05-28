@@ -30,15 +30,12 @@ from apps.common.metrics import MetricsView
 from apps.common.openapi_schema import OpenApiSchemaView
 from apps.common.dashboard_views import MeChannelsOnlineView, MeChannelsPendingSuggestionsView
 from apps.common.discovery_views import (
-    ChannelFollowView,
-    GlobalSearchView,
     MePublicProfileView,
     PlaylistShareImportView,
     PlaylistShareLinkView,
     PlaylistSharePreviewView,
     PremiumLimitsView,
     PublicUserProfileView,
-    TrackFacetsView,
 )
 from apps.common.moderation_views import (
     ChannelChatBanStatusView,
@@ -49,9 +46,6 @@ from apps.common.moderation_views import (
 from apps.common.social_expansion_views import (
     ChannelQueueImportShareView,
     ChannelSessionExportPlaylistView,
-    ExploreFeedView,
-    FollowingChannelsFeedView,
-    UserFollowView,
 )
 from apps.common.views import (
     LoginView,
@@ -123,18 +117,14 @@ urlpatterns = [
     path("auth/me", MeView.as_view()),
     path("auth/me/public-profile", MePublicProfileView.as_view()),
     path("auth/me/premium-limits", PremiumLimitsView.as_view()),
-    path("search/global", GlobalSearchView.as_view()),
-    path("tracks/facets", TrackFacetsView.as_view()),
+    path("", include("apps.discovery.api.urls")),
+    path("", include("apps.social.api.urls")),
     path("users/<str:username>/profile", PublicUserProfileView.as_view()),
     path("playlists/<int:playlist_id>/share", PlaylistShareLinkView.as_view()),
     path("playlists/share/<uuid:token>", PlaylistSharePreviewView.as_view()),
     path("channels/<int:channel_id>/playlists/import-share", PlaylistShareImportView.as_view()),
-    path("channels/<int:channel_id>/follow", ChannelFollowView.as_view()),
-    path("me/following-channels", FollowingChannelsFeedView.as_view()),
     path("me/channels-online", MeChannelsOnlineView.as_view()),
     path("me/channels-pending-suggestions", MeChannelsPendingSuggestionsView.as_view()),
-    path("explore", ExploreFeedView.as_view()),
-    path("users/<str:username>/follow", UserFollowView.as_view()),
     path("channels/<int:channel_id>/queue/import-share", ChannelQueueImportShareView.as_view()),
     path("channels/<int:channel_id>/session/export-playlist", ChannelSessionExportPlaylistView.as_view()),
     path("auth/me/password", UserPasswordChangeView.as_view()),

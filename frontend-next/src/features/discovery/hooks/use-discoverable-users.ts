@@ -9,7 +9,7 @@ import {
   unfollowUser,
   type PublicUserProfile,
 } from "@/lib/api";
-import { displayNameFromProfile } from "@/features/discovery/explore-utils";
+import { displayNameFromProfile } from "@/features/discovery/model/explore-utils";
 
 export type DiscoverableUser = {
   id: number;

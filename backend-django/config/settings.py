@@ -29,6 +29,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.channels.apps.ChannelsConfig",
     "apps.common.apps.CommonConfig",
+    "apps.discovery.apps.DiscoveryConfig",
+    "apps.social.apps.SocialConfig",
     "apps.tracks",
     "apps.playlists",
     "apps.playback",

@@ -47,6 +47,16 @@ Browser/App  ──►  Nginx (TLS + static audio)  ──►  Next.js (SSR + UI
 - Node.js 20+ (for local frontend dev)
 - Python 3.12+ (for local backend dev)
 
+### Makefile shortcuts
+
+```bash
+make help          # list targets
+make dev-web       # Next.js dev
+make lint          # web + api
+make build-web     # production build
+make new-feature NAME=my-domain   # scaffold features/<name>/
+```
+
 ### 1. Clone & configure
 
 ```bash

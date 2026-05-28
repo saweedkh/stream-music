@@ -661,18 +661,19 @@ Split into discovery, social, accounts, ...
 
 ### فاز ۱ — Frontend یکدست (۲ هفته)
 
-- [ ] استاندارد `features/<x>/{components,hooks,model,index.ts}`
-- [ ] انتقال Explore به `components/` + `model/`
-- [ ] split `lib/api/types.ts` → `types/*`
+- [x] استاندارد `features/<x>/{components,hooks,model,index.ts}` — الگوی مرجع: `discovery`
+- [x] انتقال Explore به `components/` + `model/` + `index.ts`
+- [x] split `lib/api/types.ts` → `lib/api/types/*`
+- [x] `Makefile` + `tooling/scripts/new-feature.sh`
 - [ ] ممنوعیت import مستقیم feature↔feature در ESLint (اختیاری)
 
 ### فاز ۲ — Backend split `common` (۳–۵ هفته)
 
-1. `discovery` ← explore + global search views  
-2. `social` ← follow user/channel  
-3. `accounts` ← profile, badges, premium limits  
-4. `support`, `moderation`, `admin_panel`  
-5. `core` ← auth, health, metrics  
+1. [x] `discovery` ← explore + global search + track facets (`apps/discovery/`, services + api)  
+2. [x] `social` ← follow user/channel + following feed (`apps/social/`)  
+3. [ ] `accounts` ← profile, badges, premium limits (هنوز در `common/discovery_views.py`)  
+4. [ ] `support`, `moderation`, `admin_panel`  
+5. [ ] `core` ← auth, health, metrics  
 
 هر PR: move + urls + tests سبز.
 

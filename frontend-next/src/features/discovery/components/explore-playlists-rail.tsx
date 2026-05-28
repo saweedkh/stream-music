@@ -6,7 +6,7 @@ import { useTranslations } from "@/components/providers/locale-provider";
 import { WorkspaceEmpty, WorkspaceSection } from "@/components/layout/workspace";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExploreHorizontalRail } from "@/features/discovery/explore-horizontal-rail";
+import { ExploreHorizontalRail } from "@/features/discovery/components/explore-horizontal-rail";
 import type { ExploreFeed } from "@/lib/api";
 
 function PlaylistRailSkeleton() {

@@ -1,48 +1,30 @@
-"""Following feed, explore, user follow, queue import, session export."""
+"""Channel queue/session helpers (migrating to channels/playback domains)."""
 
 from __future__ import annotations
 
 import re
-from collections import Counter
-from datetime import timedelta
 
-from django.contrib.auth.models import User
-from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.channels.models import Channel, ChannelMembership, ChannelPlaylistSuggestion
-from apps.common.favorites import UserPlaylistFavorite
+from apps.channels.models import Channel
 from apps.common.party_recap import build_party_recap
-from apps.common.serializers import ChannelSerializer, PlaylistItemSerializer, PlaylistSerializer, QueueItemSerializer, TrackSerializer
-from apps.common.social_models import ChannelFollow, PlaylistShareLink, UserFollow, UserPublicProfile
-from apps.common.user_badges import badges_for_user
+from apps.common.serializers import PlaylistSerializer
+from apps.common.social_models import PlaylistShareLink
 from apps.common.views import _can_manage_channel, _serialize_queue
-from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playback.services.channel_queue import replace_queue_with_tracks, tracks_accessible_to_user
+from apps.playback.models import PlaybackSession
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem
 from apps.tracks.models import Track
 
+# Re-export for backward compatibility
+from apps.discovery.api.views import ExploreFeedView  # noqa: F401
+from apps.social.api.views import FollowingChannelsFeedView, UserFollowView  # noqa: F401
+
 _SPOTIFY_RE = re.compile(r"(?:open\.)?spotify\.com/(?:track|album|playlist)/", re.I)
 _YOUTUBE_RE = re.compile(r"(?:youtube\.com/watch|youtu\.be/)", re.I)
-
-
-def _public_channel_qs():
-    return (
-        Channel.objects.filter(is_active=True, privacy=Channel.Privacy.PUBLIC)
-        .exclude(Q(name__iexact="E2E") | Q(name__istartswith="E2E Room") | Q(name__istartswith="E2E "))
-        .select_related("owner")
-    )
-
-
-def _channel_live(channel: Channel) -> bool:
-    if channel.is_playing:
-        return True
-    session = PlaybackSession.objects.filter(channel_id=channel.id).only("is_playing").first()
-    return bool(session and session.is_playing)
 
 
 def _parse_external_source(url: str) -> tuple[str, str, str, str]:
@@ -60,158 +42,7 @@ def _parse_external_source(url: str) -> tuple[str, str, str, str]:
     return raw[:500], title, "", source
 
 
-class FollowingChannelsFeedView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        rows = (
-            ChannelFollow.objects.filter(user_id=request.user.id)
-            .select_related("channel", "channel__owner")
-            .order_by("-created_at")[:100]
-        )
-        member_channel_ids = set(
-            ChannelMembership.objects.filter(user_id=request.user.id, is_active=True).values_list("channel_id", flat=True)
-        )
-        results = []
-        for follow in rows:
-            ch = follow.channel
-            if not ch.is_active:
-                continue
-            results.append(
-                {
-                    "channel": ChannelSerializer(ch, context={"request": request}).data,
-                    "notify_live": follow.notify_live,
-                    "is_live": _channel_live(ch),
-                    "is_member": ch.id in member_channel_ids,
-                    "followed_at": follow.created_at.isoformat() if follow.created_at else None,
-                }
-            )
-        results.sort(key=lambda r: (not r["is_live"], r["channel"]["name"]))
-        return Response({"results": results})
-
-
-def _explore_channel_matches(ch: Channel, *, q: str, lang: str, genre: str) -> bool:
-    if q and q not in (ch.name or "").lower():
-        return False
-    ex = ch.experience if isinstance(ch.experience, dict) else {}
-    if lang:
-        ch_lang = str(ex.get("language") or ex.get("lang") or "").strip().lower()
-        if ch_lang != lang.lower():
-            return False
-    if genre:
-        ch_genre = str(ex.get("genre") or ex.get("music_genre") or "").strip().lower()
-        if ch_genre != genre.lower():
-            return False
-    return True
-
-
-class ExploreFeedView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        q = str(request.query_params.get("q") or "").strip().lower()
-        lang = str(request.query_params.get("lang") or "").strip()
-        genre = str(request.query_params.get("genre") or "").strip()
-        live_only = str(request.query_params.get("live_only") or "").lower() in {"1", "true", "yes"}
-
-        live = []
-        for ch in _public_channel_qs().order_by("-updated_at")[:80]:
-            if not _explore_channel_matches(ch, q=q, lang=lang, genre=genre):
-                continue
-            if _channel_live(ch):
-                live.append(ChannelSerializer(ch, context={"request": request}).data)
-        if live_only:
-            return Response({"live_channels": live, "popular_channels": [], "shared_playlists": []})
-        week_ago = timezone.now() - timedelta(days=7)
-        event_counts = (
-            PlaybackEvent.objects.filter(
-                channel__privacy=Channel.Privacy.PUBLIC,
-                channel__is_active=True,
-                emitted_at__gte=week_ago,
-                track_id__isnull=False,
-            )
-            .values("channel_id")
-            .annotate(n=Count("id"))
-            .order_by("-n")[:12]
-        )
-        popular_ids = [row["channel_id"] for row in event_counts]
-        popular_map = {c.id: c for c in _public_channel_qs().filter(id__in=popular_ids)}
-        popular = []
-        for cid in popular_ids:
-            ch = popular_map.get(cid)
-            if ch and _explore_channel_matches(ch, q=q, lang=lang, genre=genre):
-                popular.append(
-                    {
-                        "channel": ChannelSerializer(ch, context={"request": request}).data,
-                        "event_count": next(r["n"] for r in event_counts if r["channel_id"] == cid),
-                    }
-                )
-        share_links = (
-            PlaylistShareLink.objects.filter(is_active=True, privacy=PlaylistShareLink.Privacy.PUBLIC)
-            .select_related("playlist", "playlist__owner")
-            .order_by("-created_at")[:24]
-        )
-        shared_playlists = []
-        for link in share_links:
-            if link.expires_at and link.expires_at < timezone.now():
-                continue
-            pl = link.playlist
-            if pl.channel_id is not None:
-                continue
-            shared_playlists.append(
-                {
-                    "token": str(link.token),
-                    "share_url": f"/share/playlist/{link.token}",
-                    "playlist": PlaylistSerializer(pl, context={"request": request}).data,
-                    "owner_username": pl.owner.username,
-                    "item_count": PlaylistItem.objects.filter(playlist=pl).count(),
-                }
-            )
-        return Response(
-            {
-                "live_channels": live,
-                "popular_channels": popular,
-                "shared_playlists": shared_playlists,
-            }
-        )
-
-
-class UserFollowView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, username: str):
-        target = User.objects.filter(username__iexact=username).first()
-        if target is None:
-            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
-        row = UserFollow.objects.filter(follower_id=request.user.id, following_id=target.id).first()
-        follower_count = UserFollow.objects.filter(following_id=target.id).count()
-        return Response(
-            {
-                "following": row is not None,
-                "follower_count": follower_count,
-                "following_count": UserFollow.objects.filter(follower_id=target.id).count(),
-            }
-        )
-
-    def post(self, request, username: str):
-        target = get_object_or_404(User, username__iexact=username)
-        if target.id == request.user.id:
-            return Response({"detail": "cannot_follow_self"}, status=status.HTTP_400_BAD_REQUEST)
-        profile, _ = UserPublicProfile.objects.get_or_create(user_id=target.id)
-        if not profile.is_public:
-            return Response({"detail": "profile_private"}, status=status.HTTP_403_FORBIDDEN)
-        UserFollow.objects.get_or_create(follower_id=request.user.id, following_id=target.id)
-        return Response({"following": True}, status=status.HTTP_201_CREATED)
-
-    def delete(self, request, username: str):
-        target = get_object_or_404(User, username__iexact=username)
-        UserFollow.objects.filter(follower_id=request.user.id, following_id=target.id).delete()
-        return Response({"following": False})
-
-
 class ChannelQueueImportShareView(APIView):
-    """Append tracks from a shared playlist token to the channel queue."""
-
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, channel_id: int):
@@ -247,8 +78,6 @@ class ChannelQueueImportShareView(APIView):
 
 
 class ChannelSessionExportPlaylistView(APIView):
-    """Export recent playback history into a new personal or channel playlist."""
-
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, channel_id: int):

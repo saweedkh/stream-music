@@ -1,6 +1,6 @@
 import { WorkspacePanel } from "@/components/layout/workspace";
 import { AuthGuard } from "@/features/auth/auth-guard";
-import { ExplorePage } from "@/features/discovery/explore-page";
+import { ExplorePage } from "@/features/discovery";
 
 export default function ExploreRoute() {
   return (
