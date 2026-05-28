@@ -171,7 +171,7 @@ def insert_track_after_now_playing(
 
 def rebalance_queue_premium_boost(*, channel: Channel, current_track_id: int | None) -> list[ChannelQueueItem]:
     """Stable-sort upcoming queue so tracks owned by premium users play sooner."""
-    from apps.common.premium_limits import track_owner_is_premium
+    from apps.accounts.premium_limits import track_owner_is_premium
     from apps.playback.services.queue_advance import find_current_queue_index
 
     rows = list(

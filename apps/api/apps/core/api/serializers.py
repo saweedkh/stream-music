@@ -44,7 +44,7 @@ class AuthUserSerializer(serializers.ModelSerializer):
         ]
 
     def _public_profile(self, obj):
-        from apps.common.social_models import UserPublicProfile
+        from apps.social.models import UserPublicProfile
 
         return UserPublicProfile.objects.filter(user_id=obj.id).first()
 
@@ -57,13 +57,13 @@ class AuthUserSerializer(serializers.ModelSerializer):
         return bool(row.is_public) if row else False
 
     def get_badges(self, obj):
-        from apps.common.user_badges import badges_for_user
+        from apps.accounts.user_badges import badges_for_user
 
         return badges_for_user(obj)
 
     def get_is_premium(self, obj):
-        from apps.common.account_badges import SLUG_PREMIUM
-        from apps.common.user_badges import badges_for_user
+        from apps.accounts.badge_models import SLUG_PREMIUM
+        from apps.accounts.user_badges import badges_for_user
 
         slugs = {b["slug"] for b in badges_for_user(obj)}
         return SLUG_PREMIUM in slugs

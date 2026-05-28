@@ -31,13 +31,13 @@ from apps.tracks.models import Track
 
 
 def _notify_channel_staff_webpush(channel_id: int, action: str, payload: dict, actor_user_id: int) -> None:
-    from apps.common.webpush_service import notify_channel_staff_social_push
+    from apps.core.services.webpush import notify_channel_staff_social_push
 
     notify_channel_staff_social_push(channel_id, action, payload, actor_user_id)
 
 
 def _maybe_notify_track_changed_push(channel_id: int, payload: dict, actor_user_id: int | None) -> None:
-    from apps.common.webpush_service import notify_channel_track_changed_push
+    from apps.core.services.webpush import notify_channel_track_changed_push
 
     action = str(payload.get("action") or "").lower()
     track = payload.get("track") if isinstance(payload.get("track"), dict) else {}
@@ -405,7 +405,7 @@ class ChannelPlaybackConsumer(AsyncWebsocketConsumer):
                     threshold = 0
             votes = redis_votes if redis_votes > 0 else len(s)
             if threshold > 0 and votes >= max(1, threshold - 1):
-                from apps.common.webpush_service import notify_channel_skip_threshold_near_push
+                from apps.core.services.webpush import notify_channel_skip_threshold_near_push
 
                 notify_channel_skip_threshold_near_push(channel_id, votes=votes, threshold=threshold, actor_user_id=user.id)
             out: dict = {

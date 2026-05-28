@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.social_models import ChannelFollow, UserFollow, UserPublicProfile
-from apps.common.user_badges import is_platform_superuser
+from apps.social.models import ChannelFollow, UserFollow, UserPublicProfile
+from apps.accounts.user_badges import is_platform_superuser
 from apps.social.services.following_feed import build_following_channels_feed
 
 

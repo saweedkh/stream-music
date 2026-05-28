@@ -10,7 +10,7 @@ def send_webpush_notification(self, user_id: int, title: str, body: str, url: st
     """Send web push notification to all subscriptions for a user."""
     try:
         from apps.channels.models import WebPushSubscription
-        from apps.common.webpush_service import _send_push_to_subscription
+        from apps.core.services.webpush import _send_push_to_subscription
 
         subs = WebPushSubscription.objects.filter(user_id=user_id)
         for sub in subs:

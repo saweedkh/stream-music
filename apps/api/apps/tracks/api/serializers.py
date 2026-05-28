@@ -28,7 +28,7 @@ class TrackSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request or not getattr(request.user, "is_authenticated", False):
             return False
-        from apps.common.favorites import UserTrackFavorite
+        from apps.accounts.models import UserTrackFavorite
 
         return UserTrackFavorite.objects.filter(user_id=request.user.id, track_id=obj.id).exists()
 

@@ -16,7 +16,7 @@ from apps.channels.api.helpers import (
     _serialize_queue,
 )
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.user_badges import is_platform_superuser
+from apps.accounts.user_badges import is_platform_superuser
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.state_store import playback_state_store

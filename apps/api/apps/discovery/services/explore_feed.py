@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.channels.models import Channel
 from apps.common.serializers import ChannelSerializer, PlaylistSerializer
-from apps.common.social_models import PlaylistShareLink
+from apps.playlists.models import PlaylistShareLink
 from apps.discovery.selectors import channel_is_live, explore_channel_matches, public_channel_queryset
 from apps.playback.models import PlaybackEvent
 from apps.playlists.models import PlaylistItem

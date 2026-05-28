@@ -6,7 +6,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.favorites import UserPlaylistFavorite
+from apps.accounts.models import UserPlaylistFavorite
 from apps.channels.api.helpers import _playlist_inaccessible_track_ids
 from apps.playlists.models import Playlist, PlaylistItem
 from apps.tracks.models import Track

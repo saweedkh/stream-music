@@ -7,7 +7,7 @@ from django.db.models import Q
 
 from apps.channels.models import Channel
 from apps.common.serializers import ChannelSerializer, PlaylistSerializer, TrackSerializer
-from apps.common.social_models import PlaylistShareLink
+from apps.playlists.models import PlaylistShareLink
 from apps.discovery.selectors import public_channel_queryset
 from apps.playback.services.channel_queue import tracks_accessible_to_user
 from apps.playlists.models import Playlist

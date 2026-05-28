@@ -17,8 +17,8 @@ from apps.channels.chat_service import (
     can_access_chat,
     fetch_chat_history,
 )
-from apps.common.serializers import ChannelChatMessageSerializer
-from apps.common.webpush_service import notify_channel_chat_message_push
+from apps.channels.api.serializers import ChannelChatMessageSerializer
+from apps.core.services.webpush import notify_channel_chat_message_push
 
 
 class ChannelChatConsumer(AsyncWebsocketConsumer):

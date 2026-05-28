@@ -18,7 +18,7 @@ class PlaylistSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request or not getattr(request.user, "is_authenticated", False):
             return False
-        from apps.common.favorites import UserPlaylistFavorite
+        from apps.accounts.models import UserPlaylistFavorite
 
         return UserPlaylistFavorite.objects.filter(user_id=request.user.id, playlist_id=obj.id).exists()
 

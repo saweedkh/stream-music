@@ -59,7 +59,7 @@ from apps.common.serializers import (
     TrackSharePermissionSerializer,
     UserNotificationSettingsSerializer,
 )
-from apps.common.webpush_service import notify_channel_room_started_push
+from apps.core.services.webpush import notify_channel_room_started_push
 from apps.playback.models import PlaybackEvent, PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.channel_queue import (
@@ -88,8 +88,8 @@ from apps.common.admin_views import (
     AdminUserDetailView,
     AdminUsersView,
 )
-from apps.common.favorites import UserPlaylistFavorite, UserTrackFavorite
-from apps.common.user_badges import is_platform_superuser, user_badge_flags
+from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
+from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
 
 
 def _favorited_track_ids_for_user(user) -> set[int]:
@@ -109,7 +109,7 @@ def _playlist_visible_to_user(user, playlist: Playlist) -> bool:
         return True
     if playlist.channel_id:
         return ChannelMembership.objects.filter(channel_id=playlist.channel_id, user=user, is_active=True).exists()
-    from apps.common.social_models import PlaylistShareLink
+    from apps.playlists.models import PlaylistShareLink
 
     return PlaylistShareLink.objects.filter(playlist_id=playlist.id, is_active=True).exists()
 

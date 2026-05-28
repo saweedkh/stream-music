@@ -9,9 +9,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.account_badges import ICON_CHOICES, COLOR_CHOICES, UserBadgeDefinition
+from apps.accounts.badge_models import ICON_CHOICES, COLOR_CHOICES, UserBadgeDefinition
 from apps.core.api.health import HealthView
-from apps.common.user_badges import (
+from apps.accounts.user_badges import (
     badges_for_users,
     is_platform_superuser,
     serialize_badge,

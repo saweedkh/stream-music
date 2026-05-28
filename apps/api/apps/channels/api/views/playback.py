@@ -59,7 +59,7 @@ from apps.common.serializers import (
     TrackSharePermissionSerializer,
     UserNotificationSettingsSerializer,
 )
-from apps.common.webpush_service import notify_channel_room_started_push
+from apps.core.services.webpush import notify_channel_room_started_push
 from apps.playback.models import PlaybackEvent, PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.channel_queue import (
@@ -88,8 +88,8 @@ from apps.common.admin_views import (
     AdminUserDetailView,
     AdminUsersView,
 )
-from apps.common.favorites import UserPlaylistFavorite, UserTrackFavorite
-from apps.common.user_badges import is_platform_superuser, user_badge_flags
+from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
+from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
 from apps.channels.api.helpers import (
     _broadcast_queue_updated,
     _broadcast_suggestions_updated,

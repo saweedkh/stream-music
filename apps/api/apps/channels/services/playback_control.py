@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from apps.channels.api.helpers import _channel_closed_response, _log_channel_audit, _record_playback_event
 from apps.channels.models import Channel
-from apps.common.webpush_service import notify_channel_room_started_push
+from apps.core.services.webpush import notify_channel_room_started_push
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.queue_advance import apply_queue_advance, scheduled_start_blocks_playback

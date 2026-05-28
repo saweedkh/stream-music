@@ -10,7 +10,7 @@ from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from apps.support.models import SupportMessage, SupportTicket, SupportTicketRead
-from apps.common.user_badges import user_badge_flags
+from apps.accounts.user_badges import user_badge_flags
 
 _SUPPORT_SEND_TS: dict[tuple[int, int], list[float]] = {}
 _SUPPORT_SEND_WINDOW = 30
@@ -326,7 +326,7 @@ def broadcast_staff_inbox(ticket_dict: dict) -> None:
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
 
-        from apps.common.support_consumer import STAFF_INBOX_GROUP
+        from apps.support.consumers import STAFF_INBOX_GROUP
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(

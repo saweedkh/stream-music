@@ -11,9 +11,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel
-from apps.common.party_recap import build_party_recap
-from apps.common.serializers import PlaylistSerializer
-from apps.common.social_models import PlaylistShareLink
+from apps.channels.services.party_recap import build_party_recap
+from apps.playlists.api.serializers import PlaylistSerializer
+from apps.playlists.models import PlaylistShareLink
 from apps.channels.api.helpers import _can_manage_channel, _serialize_queue
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import ChannelQueueItem, Playlist, PlaylistItem

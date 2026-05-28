@@ -690,6 +690,8 @@ Split into discovery, social, accounts, ...
 16. [x] `channels/api/views/` — split از `channel_views.py` (viewset, playback, queue, join, room)  
 17. [x] `channels/services/channel_queue.py` — صف، upvote، jump  
 18. [x] `support/services/ticket_service.py` — منطق تیکت از `common`  
+19. [x] `core/services/webpush`, `accounts/{badge_models,user_badges,premium_limits}`, `support/consumers`  
+20. [x] ممیزی ساختار: [structure-audit.md](./structure-audit.md)  
 
 هر PR: move + urls + tests سبز.
 

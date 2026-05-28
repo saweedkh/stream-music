@@ -9,10 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
-from apps.common.favorites import UserPlaylistFavorite
+from apps.accounts.models import UserPlaylistFavorite
 from apps.common.serializers import ChannelSerializer, PlaylistSerializer
-from apps.common.social_models import ChannelFollow, UserFollow, UserPublicProfile
-from apps.common.user_badges import badges_for_user
+from apps.social.models import ChannelFollow, UserFollow, UserPublicProfile
+from apps.accounts.user_badges import badges_for_user
 from apps.discovery.selectors import public_channel_queryset
 from apps.playback.models import PlaybackEvent
 from apps.playlists.models import Playlist
@@ -110,7 +110,7 @@ class PremiumLimitsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from apps.common.premium_limits import user_has_premium
+        from apps.accounts.premium_limits import user_has_premium
 
         owned = Channel.objects.filter(owner_id=request.user.id).count()
         premium = user_has_premium(request.user)

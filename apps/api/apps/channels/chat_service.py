@@ -13,7 +13,7 @@ from apps.channels.moderation import (
     chat_word_filters,
     is_user_chat_banned,
 )
-from apps.common.user_badges import user_badge_flags
+from apps.accounts.user_badges import user_badge_flags
 
 _CHAT_SEND_TS: dict[tuple[int, int], list[float]] = {}
 _CHAT_SEND_WINDOW = 12

@@ -1,113 +1,60 @@
+"""Channel room views: invites, chat, members, settings, audit."""
+
+import csv
 import json
-import re
-import time
 import uuid
 from datetime import timedelta
-from urllib.parse import urlparse
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.conf import settings as django_settings
-from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Max, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
+from rest_framework import permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.premium_limits import clamp_member_limit
+from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
+from apps.channels.api.helpers import (
+    _ALLOWED_EXPERIENCE_KEYS,
+    _broadcast_queue_updated,
+    _broadcast_suggestions_updated,
+    _can_manage_channel,
+    _channel_closed_response,
+    _log_channel_audit,
+    _normalize_public_join_slug_for_save,
+    _serialize_queue,
+)
+from apps.channels.api.room_tools import parse_external_source
+from apps.channels.api.serializers import (
+    ChannelAuditLogSerializer,
+    ChannelChatMessageSerializer,
+    ChannelNotificationPreferenceSerializer,
+    ChannelPlaylistSuggestionSerializer,
+    ChannelSerializer,
+    ChannelTrackReactionSerializer,
+    InviteTokenSerializer,
+    MembershipSerializer,
+)
 from apps.channels.models import (
     Channel,
     ChannelAuditLog,
     ChannelChatMessage,
+    ChannelMembership,
     ChannelNotificationPreference,
     ChannelPlaylistSuggestion,
     ChannelTrackReaction,
-    ChannelJoinRequest,
-    ChannelMembership,
     InviteToken,
-    UserNotificationSettings,
-    WebPushSubscription,
 )
 
-
-from apps.common.serializers import (
-    ChannelAuditLogSerializer,
-    ChannelSerializer,
-    ChannelChatMessageSerializer,
-    ChannelNotificationPreferenceSerializer,
-    ChannelPlaylistSuggestionSerializer,
-    ChannelTrackReactionSerializer,
-    ChannelJoinRequestSerializer,
-    MembershipSerializer,
-    PlaybackEventSerializer,
-    PlaybackSessionSerializer,
-    PlaylistSerializer,
-    PlaylistItemSerializer,
-    QueueItemSerializer,
-    TrackSerializer,
-    AuthUserProfileUpdateSerializer,
-    AuthUserSerializer,
-    PasswordChangeSerializer,
-    InviteTokenSerializer,
-    TrackSharePermissionSerializer,
-    UserNotificationSettingsSerializer,
-)
-from apps.common.webpush_service import notify_channel_room_started_push
+from apps.core.services.webpush import notify_channel_new_suggestion_push
+from apps.playback.api.serializers import PlaybackEventSerializer, PlaybackSessionSerializer
 from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import (
-    MAX_SHUFFLE_TRACKS,
-    apply_track_to_session,
-    pick_shuffled_tracks,
-    replace_queue_with_tracks,
-    tracks_accessible_to_user,
-)
-from apps.playback.services.queue_advance import (
-    apply_queue_advance,
-    clear_active_playlist,
-    playback_queue_meta,
-    scheduled_start_blocks_playback,
-    set_active_playlist,
-    set_playback_source,
-)
+from apps.playback.services.channel_queue import insert_track_after_now_playing, tracks_accessible_to_user
 from apps.playback.services.state_store import playback_state_store
-from apps.tracks.filesystem_import import import_audio_files_under_media
-from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
-from apps.tracks.models import Track, TrackSharePermission
-from apps.common.admin_views import (
-    AdminChannelsView,
-    AdminHealthView,
-    AdminOverviewView,
-    AdminUserDetailView,
-    AdminUsersView,
-)
-from apps.common.favorites import UserPlaylistFavorite, UserTrackFavorite
-from apps.common.user_badges import is_platform_superuser, user_badge_flags
-from apps.channels.api.helpers import (
-    _broadcast_queue_updated,
-    _broadcast_suggestions_updated,
-    _can_copy_playlist_to_channel,
-    _can_edit_channel_playlist,
-    _can_manage_channel,
-    _channel_closed_response,
-    _consume_invite,
-    _log_channel_audit,
-    _normalize_public_join_slug_for_save,
-    _playlist_inaccessible_track_ids,
-    _record_playback_event,
-    _resolve_public_join_segment,
-    _queue_serialize_context,
-    _serialize_queue,
-    _validate_private_invite,
-    perform_channel_join,
-)
+from apps.playlists.api.serializers import TrackSerializer
+from apps.tracks.models import Track
 
 
 class ChannelInviteView(APIView):
@@ -385,9 +332,9 @@ class ChannelPlaylistSuggestionView(APIView):
             )
             _log_channel_audit(channel_id, "suggestion.created", request.user.id, target_type="track", target_id=track_id)
         else:
-            from apps.common.social_expansion_views import _parse_external_source
+            # parse_external_source from room_tools
 
-            url, title, artist, source = _parse_external_source(external_url)
+            url, title, artist, source = parse_external_source(external_url)
             if not url:
                 return Response({"detail": "invalid_external_url"}, status=status.HTTP_400_BAD_REQUEST)
             row = ChannelPlaylistSuggestion.objects.create(
@@ -405,7 +352,7 @@ class ChannelPlaylistSuggestionView(APIView):
             event="created",
             actor_username=getattr(request.user, "username", None),
         )
-        from apps.common.webpush_service import notify_channel_new_suggestion_push
+        from apps.core.services.webpush import notify_channel_new_suggestion_push
 
         notify_channel_new_suggestion_push(channel_id, getattr(request.user, "username", "?"), request.user.id)
         return Response(ChannelPlaylistSuggestionSerializer(row).data, status=status.HTTP_201_CREATED)
@@ -486,7 +433,7 @@ class ChannelSettingsView(APIView):
                 setattr(channel, field, request.data[field])
                 update_fields.append(field)
         if "member_limit" in request.data:
-            from apps.common.premium_limits import clamp_member_limit
+            from apps.accounts.premium_limits import clamp_member_limit
 
             channel.member_limit = clamp_member_limit(channel.owner, request.data.get("member_limit", channel.member_limit))
             update_fields.append("member_limit")
@@ -707,7 +654,7 @@ class ChannelPartyRecapView(APIView):
         channel = get_object_or_404(Channel, id=channel_id)
         if channel.privacy == Channel.Privacy.PRIVATE:
             return Response({"detail": "private"}, status=status.HTTP_403_FORBIDDEN)
-        from apps.common.party_recap import build_party_recap
+        
 
         return Response(build_party_recap(channel))
 
