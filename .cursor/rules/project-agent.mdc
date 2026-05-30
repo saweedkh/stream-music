@@ -6,7 +6,8 @@ alwaysApply: true
 # Stream Music — Agent Rules
 
 Read these docs when making non-trivial changes:
-- `docs/project-structure.md` — architecture, folders, migration map
+- `docs/README.md` — documentation index
+- `docs/project-structure.md` — architecture, folders, conventions
 - `docs/CONVENTIONS.md` — lint, commits, PR, security
 - `docs/realtime-contracts.md` — WebSocket events (if touching playback/chat WS)
 
@@ -29,7 +30,7 @@ Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
 2. **Fat features** — UI logic in `apps/web/src/features/<domain>/`.
 3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (target layout in `docs/project-structure.md`).
 4. **No scattered `fetch`** — HTTP only via `apps/web/src/lib/api/` modules.
-5. **No feature → feature imports** — share via `shared/`, `lib/`, or extract to a shared module.
+5. **No cross-feature deep imports** — use `@/features/<name>` barrels; share cross-cutting code via `shared/` or `lib/`.
 6. **Minimize scope** — smallest correct diff; match existing naming and patterns.
 7. **Do not expand `apps/common`** with new domains — prefer new app or `services/` split per migration doc.
 

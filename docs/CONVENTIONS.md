@@ -155,10 +155,16 @@ make test              # در صورت دسترسی به Postgres/Redis
 
 ## 9. مستندات
 
-- تغییر ساختار → به‌روز `docs/project-structure.md`.
-- تصمیم معماری → `docs/adr/NNN-*.md`.
-- endpoint/WS جدید → README API table یا `realtime-contracts.md`.
+فهرست: [docs/README.md](./README.md)
+
+| تغییر | سند |
+|--------|-----|
+| ساختار / پوشه جدید | `project-structure.md` |
+| تصمیم معماری | `docs/adr/NNN-*.md` |
+| REST endpoint | `api-endpoints.md` + `make openapi-export` |
+| WebSocket | `realtime-contracts.md` |
+| Deploy | `production-deployment.md` |
 
 ---
 
-*نسخه 1.1 — 2026-05-28*
+*نسخه 1.2 — 2026-05-28*

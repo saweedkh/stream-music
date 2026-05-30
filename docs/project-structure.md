@@ -1,8 +1,10 @@
 # ساختار پروژه Stream Music
 
-**نسخه:** 1.0  
-**وضعیت:** سند مرجع (Target Architecture)  
+**نسخه:** 2.0  
+**وضعیت:** سند مرجع — معماری **فعلی** (مهاجرت ساختاری تکمیل شده)  
 **آخرین به‌روزرسانی:** 2026-05-28  
+
+> فهرست همه اسناد: [docs/README.md](./README.md)
 
 این سند «منبع حقیقت» برای چیدمان کد، مرز دامنه‌ها، قراردادهای نام‌گذاری و مسیر مهاجرت از ساختار فعلی به ساختار هدف است. هدف همانند الگوهای **Cookiecutter** است: هر فیچر جدید از یک قالب ثابت ساخته شود و کل تیم (و ابزارهای AI) بدون حدس زدن بدانند فایل کجا قرار می‌گیرد.
 
@@ -115,29 +117,16 @@ stream-music/
 
 ---
 
-## وضعیت فعلی در برابر هدف
+## وضعیت معماری (خلاصه)
 
-### Backend
+| لایه | وضعیت |
+|------|--------|
+| Backend HTTP | URL-mirror + `*_api.py`؛ تجمیع URL در `config/api_urls.py` |
+| `apps.common` | فقط migration + shim (`urls` re-export) — [ADR-003](./adr/003-common-migration-shim.md) |
+| Frontend | `features/<domain>/` + `shared/`؛ import بین feature از barrel `@/features/<name>` |
+| کیفیت | `make check-quality`، pre-commit، ۶۲+ تست API، Vitest، OpenAPI snapshot — [ADR-004](./adr/004-api-contract-snapshot.md) |
 
-| وضعیت | مسیر | اقدام هدف |
-|--------|------|-----------|
-| ✅ خوب | `apps/channels`, `playback`, `tracks`, `playlists` | حفظ + اعمال الگوی لایه‌ای یکسان |
-| ✅ انجام شد | `apps/common` | فقط badges + shimها؛ مدل‌های منتقل‌شده در اپ دامنه با `db_table` قدیمی |
-| ✅ انجام شد | HTTP handlers | پوشه‌ها منطبق بر مسیر URL + `*_api.py` / `*_serializers.py` |
-| ✅ انجام شد | `discovery`, `social`, `accounts`, `core`, … | اپ‌های دامنه + `urls/` (نه `api/urls.py`) |
-| ✅ انجام شد | `config/settings/` | base + local/production |
-
-### Frontend
-
-| وضعیت | مسیر | اقدام هدف |
-|--------|------|-----------|
-| ✅ خوب | `src/features/*` | الگوی مرجع؛ هر feature زیرپوشه `components/`, `hooks/`, `model/` |
-| ✅ خوب | `src/lib/api/*` | split تدریجی `types.ts` به `types/` |
-| ✅ انجام شد | `src/shared/ui`, `shared/layout`, `shared/hooks` | جایگزین `components/ui` و `hooks/` ریشه |
-| ✅ انجام شد | `src/shared/` | `ui/`, `layout/`, `hooks/`, `providers/`, `room/`, `pwa/`, `notifications/` |
-| ✅ انجام شد | `features/*` | `components/`, `hooks/`, `model/`, `index.ts` (auth, channels, dashboard, player, discovery, …) |
-
-### نمونه موفق (الگوی مرجع)
+### نمونه مرجع (Explore)
 
 ماژول `features/discovery/` پس از refactor Explore:
 
@@ -196,7 +185,7 @@ apps/api/
 │   ├── permissions.py
 │   └── exceptions.py
 │
-└── domains/                    # هر دامنه = یک Django app
+└── apps/                       # هر دامنه = یک Django app (مسیر واقعی: apps/api/apps/)
     ├── channels/
     ├── playback/
     ├── tracks/
@@ -209,14 +198,12 @@ apps/api/
     └── admin_panel/
 ```
 
-> در repository فعلی مسیر `apps/api/apps/` است. تا زمان rename، `domains/<name>` معادل `apps/<name>` خوانده شود.
-
 ### الگوی ثابت هر Domain App
 
 **هر** دامنه **باید** این ساختار را داشته باشد (فایل‌های غیرضروری برای دامنه‌های بدون WS حذف می‌شوند):
 
 ```text
-domains/<domain_name>/
+apps/<domain_name>/
 ├── __init__.py
 ├── apps.py
 ├── models.py                   # یا models/ اگر > ~300 خط
@@ -653,13 +640,16 @@ make new-feature NAME=discovery   # frontend scaffold
 
 ## مستندات و ADR
 
+فهرست کامل: **[docs/README.md](./README.md)**
+
 | سند | محتوا |
 |-----|--------|
-| `docs/project-structure.md` | این سند — ساختار و قراردادها |
-| `docs/realtime-contracts.md` | قرارداد WS (موجود) |
-| `docs/production-deployment.md` | deploy (موجود) |
-| `docs/CONVENTIONS.md` | commit، formatting، pre-commit |
-| `docs/adr/NNN-title.md` | تصمیم‌های معماری |
+| `docs/project-structure.md` | این سند |
+| `docs/CONVENTIONS.md` | commit، lint، pre-commit |
+| `docs/api-endpoints.md` | REST + OpenAPI |
+| `docs/realtime-contracts.md` | WebSocket |
+| `docs/production-deployment.md` | استقرار پروداکشن |
+| `docs/adr/NNN-*.md` | تصمیم‌های معماری |
 
 ### قالب ADR کوتاه
 
@@ -681,65 +671,11 @@ Split into discovery, social, accounts, ...
 
 ---
 
-## نقشه مهاجرت
+## تکامل معماری (تکمیل‌شده)
 
-### فاز ۰ — ثبت قرارداد (انجام / در حال انجام)
+مهاجرت از `apps/common` و پکیج‌های `api/` به اپ‌های دامنه + URL-mirror انجام شده است. تاریخچه: [ADR-001](./adr/001-project-structure-and-domain-split.md)، [ADR-002](./adr/002-discovery-and-social-apps.md).
 
-- [x] سند `docs/project-structure.md`
-- [x] `docs/CONVENTIONS.md`
-- [x] لینک از `README.md` به این سند
-- [x] `.cursor/rules/project-agent.mdc` (`alwaysApply`) + `AGENTS.md`
-
-### فاز ۱ — Frontend یکدست (۲ هفته)
-
-- [x] استاندارد `features/<x>/{components,hooks,model,index.ts}` — الگوی مرجع: `discovery`
-- [x] انتقال Explore به `components/` + `model/` + `index.ts`
-- [x] split `lib/api/types.ts` → `lib/api/types/*`
-- [x] `Makefile` + `tooling/scripts/new-feature.sh`
-- [x] ممنوعیت import مستقیم feature↔feature در ESLint (هشدار در `.eslintrc.json`)
-
-### فاز ۲ — Backend split `common` (۳–۵ هفته)
-
-1. [x] `discovery` ← explore + global search + track facets (`apps/discovery/`, services + api)  
-2. [x] `social` ← follow user/channel + following feed (`apps/social/`)  
-3. [x] `accounts` ← profile, premium (`apps/accounts/auth/...`, `users/profile/`)  
-4. [x] `playlists` ← playlist share (`playlists/share/`)  
-5. [x] `channels` ← queue import-share, session export (`queue/import_share/`, `session/export_playlist/`)  
-6. [x] `support`, `moderation`, `admin_panel`, `dashboard`  
-7. [x] `core` ← health, metrics, schema, auth (`apps/core/health/`, `auth/me/password/`, …)  
-8. [x] `config/settings/` ← base + local/production (`DJANGO_ENV`)  
-9. [x] shimهای `apps/common/*_views.py` برای سازگاری  
-10. [x] `common/views.py` → `core/auth/...`, `channels/*_api.py`, generics CRUD در `tracks` / `playlists`  
-11. [x] `common/urls.py` فقط `include("apps.<domain>.urls")`  
-12. [x] serializers per endpoint یا `serializers/` دامنه (حذف پکیج `api/`)  
-13. [x] `party_recap` → `channels/services/`  
-14. [x] `social/models.py`, `support/models.py`, `accounts/models.py` + migration state-only (`0006`)  
-15. [x] `channels/services/playback_control.py` — منطق control از view جدا شد  
-16. [x] `channels/` — URL-mirror: `channel/`, `join/`, `playback/`, `queue/`, `room/`, `urls/`  
-17. [x] `channels/services/channel_queue.py` — صف، upvote، jump  
-18. [x] `support/services/ticket_service.py` — منطق تیکت از `common`  
-19. [x] `core/services/webpush`, `accounts/{badge_models,user_badges,premium_limits}`, `support/consumers`  
-20. [x] ممیزی ساختار: [structure-audit.md](./structure-audit.md)  
-21. [x] حذف `apps/<domain>/api/` — همه اپ‌ها `*_api.py` + `urls/`  
-
-هر PR: move + urls + tests سبز.
-
-### فاز ۳ — Rename و Platform
-
-- [x] `backend-django` → `apps/api`  
-- [x] `frontend-next` → `apps/web`  
-- [x] `deploy/` + `infra/` + `scripts/` → `platform/` (symlink ریشه برای سازگاری)  
-- [x] به‌روزرسانی CI paths (`apps/api`, `apps/web`)  
-
-### فاز ۴ — کیفیت
-
-- [x] `tooling/templates/django-domain` + `make new-domain` / `new-feature`  
-- [x] تست نمونه service (`discovery/tests/test_explore_feed.py`)  
-- [x] `lib/api/modules/` + alias `@/shared/ui` در tsconfig  
-- [x] ESLint هشدار feature↔feature (`.eslintrc.json`)  
-- [x] `shared/ui`, `shared/layout`, `shared/hooks` (انتقال فیزیکی + alias)  
-- [x] `features/*/index.ts` برای دامنه‌های اصلی  
-- [x] OpenAPI codegen — **به‌تعویق** ([ADR-003](./adr/003-openapi-types-deferred.md))  
+اختیاری آینده: حذف `apps.common` از `INSTALLED_APPS` ([ADR-003](./adr/003-common-migration-shim.md))؛ گسترش قرارداد API ([ADR-004](./adr/004-api-contract-snapshot.md)).
 
 ---
 
@@ -754,34 +690,28 @@ Split into discovery, social, accounts, ...
 - [ ] **i18n** کلید `en` + `fa` اضافه شده
 - [ ] **تست** حداقل یک case برای logic جدید (service یا hook یا API)
 - [ ] **مستندات** اگر قرارداد WS/API عوض شد → به‌روز `docs/realtime-contracts.md` یا ADR
-- [ ] **وابستگی** feature→feature وجود ندارد
+- [ ] **وابستگی** بین feature فقط از `@/features/<name>` (barrel)، نه deep path
 - [ ] **Migration** Django اگر model عوض شد
 - [ ] **E2E** اگر user journey اصلی touch شد (یا ticket برای follow-up)
 
 ---
 
-## پیوست: نگاشت فایل‌های فعلی
+## پیوست: ماژول‌های کاننیکال (بک‌اند)
 
-### Frontend — مسیر فعلی → هدف
-
-| فعلی | هدف |
-|------|-----|
-| `apps/web/src/app/` | `apps/web/src/app/` (بدون تغییر نقش) |
-| `apps/web/src/features/` | همان + زیرساختار `components/hooks/model` |
-| `apps/web/src/components/ui/` | `shared/ui/` |
-| `apps/web/src/components/layout/` | `shared/layout/` |
-| `apps/web/src/lib/api/` | همان + `types/` + `modules/` |
-| `apps/web/src/hooks/` | `shared/hooks/` یا داخل feature |
-
-### Backend — مسیر فعلی → هدف
-
-| فعلی | هدف |
-|------|-----|
-| `apps/api/apps/channels/` | `domains/channels/` |
-| `apps/api/apps/common/discovery_views.py` | `apps/discovery/explore/explore_api.py` |
-| `apps/api/apps/common/social_expansion_views.py` | `domains/discovery/` + `domains/social/` |
-| `apps/api/apps/common/views.py` (auth) | `core/auth/` |
-| `apps/api/config/settings.py` | `config/settings/base.py` + env splits |
+| نگرانی | مسیر |
+|--------|------|
+| تجمیع URL | `config/api_urls.py` |
+| Auth / health / OpenAPI | `apps/core/` |
+| کانال / صف / چت | `apps/channels/` + `services/` |
+| پخش WS | `apps/playback/` |
+| ترک / آپلود | `apps/tracks/` |
+| پلی‌لیست | `apps/playlists/` |
+| اکتشاف / جستجو | `apps/discovery/` |
+| فالو / اجتماعی | `apps/social/` |
+| حساب / badge | `apps/accounts/` |
+| پشتیبانی | `apps/support/` |
+| ادمین | `apps/admin_panel/` |
+| `common` | فقط `migrations/` — بدون کد runtime |
 
 ---
 

@@ -4,6 +4,7 @@ Cursor loads **`.cursor/rules/project-agent.mdc`** on every Agent run (`alwaysAp
 
 Full references:
 
+- [docs/README.md](docs/README.md) — documentation index
 - [docs/project-structure.md](docs/project-structure.md) — architecture & folder layout
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — commits, lint, security
 - [docs/adr/](docs/adr/) — architecture decision records
