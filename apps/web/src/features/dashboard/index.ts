@@ -1,4 +1,6 @@
 export { DashboardWorkspace } from "./components/dashboard-workspace";
+export { DashboardAccountSection } from "./components/dashboard-account-section";
+export { ChannelAvatar, channelInitials, getChannelDisplayMeta, resolveLogoCandidates } from "./channels/channel-shared";
 export { DashboardMobileHeader } from "./components/dashboard-mobile-header";
 export { DashboardSidebar } from "./components/dashboard-sidebar";
 export { JoinChannelDialog } from "./components/join-channel-dialog";

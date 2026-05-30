@@ -9,12 +9,10 @@ from rest_framework.views import APIView
 
 
 def build_openapi_dict() -> dict:
-    base = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:8080").rstrip("/")
-    api = f"{base}/api"
     return {
         "openapi": "3.0.3",
         "info": {"title": "Stream Music API", "version": "1.0.0"},
-        "servers": [{"url": api}],
+        "servers": [{"url": "/api"}],
         "paths": {
             "/health": {"get": {"summary": "Health check", "tags": ["system"]}},
             "/metrics": {"get": {"summary": "Application metrics", "tags": ["system"]}},

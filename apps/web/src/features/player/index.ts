@@ -1,5 +1,11 @@
 export { ChannelPlayer } from "./components/channel-player";
 export { ChannelPlayerMini } from "./components/channel-player-mini";
 export { ChannelPlayerFull } from "./components/channel-player-full";
-export { GlobalChannelPlayerProvider } from "./global-channel-player-context";
+export { GlobalChannelPlayerProvider, useGlobalChannelPlayer } from "./global-channel-player-context";
 export { GlobalChannelPlayerDock } from "./global-channel-player-dock";
+export { useChannelPlaybackEngine } from "./hooks/use-channel-playback-engine";
+export type { ChannelPlaybackEventPayload } from "./model/playback-payload";
+export { mergePlaybackPayload, shouldApplyEventSeq } from "./model/playback-payload";
+export { applyDriftCorrection, expectedTimeSeconds } from "./model/sync-client";
+export type { SyncState } from "./model/sync-client";
+export { audienceVolume, shouldAudienceHear } from "./model/playback-audience";

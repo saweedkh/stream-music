@@ -36,8 +36,8 @@ import { channelTabFromSearch, isAdminFlushTab, type ChannelTabId, type Listener
 import { ChannelRoomInsights } from "@/features/channels/components/channel-room-insights";
 import { RoomOnboarding } from "@/shared/room/room-onboarding";
 import { useRoomHotkeys } from "@/shared/hooks/use-room-hotkeys";
-import { useGlobalChannelPlayer } from "@/features/player/global-channel-player-context";
-import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience";
+import { useGlobalChannelPlayer } from "@/features/player";
 import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
 import { usePendingSuggestionsCount } from "@/shared/hooks/use-pending-suggestions-count";
 import { useReconnectingChannelSocket } from "@/shared/hooks/use-reconnecting-channel-socket";

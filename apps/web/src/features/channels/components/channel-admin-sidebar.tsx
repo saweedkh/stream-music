@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronRight, DoorClosed, Eye, LogOut, Radio, Share2 } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
+import { DashboardAccountSection } from "@/features/dashboard";
 import {
   ADMIN_LINK_ITEMS,
   adminNavSectionsForContext,

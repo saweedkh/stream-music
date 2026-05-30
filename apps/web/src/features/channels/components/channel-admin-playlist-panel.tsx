@@ -29,7 +29,7 @@ import { Select } from "@/shared/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { listenerFieldClass } from "@/features/channels/components/channel-listener-panel-styles";
-import { ImportPlaylistToChannelDialog } from "@/features/playlists/components/import-playlist-to-channel-dialog";
+import { ImportPlaylistToChannelDialog } from "@/features/playlists";
 import { useToast } from "@/shared/ui/toast-provider";
 import {
   addPlaylistItem,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
-import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience";
 import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/model/playback-payload";
 import { resumeSharedAudioContext } from "@/features/player/components/audio-wave-visualizer";
 import {

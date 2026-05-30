@@ -22,8 +22,8 @@
           {
             "patterns": [
               {
-                "group": ["@/features/*"],
-                "message": "Features must not import other features; use @/shared or @/lib."
+                "group": ["@/features/*/**"],
+                "message": "Import from feature public API (@/features/<name>) instead of deep paths."
               }
             ]
           }

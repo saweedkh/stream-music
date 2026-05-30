@@ -1,7 +1,7 @@
 # Stream Music — common dev commands
 # See docs/project-structure.md
 
-.PHONY: help dev ensure-env dev-web dev-api lint lint-web lint-api lint-api-format lint-web-types check-quality pre-commit-install pre-commit test test-web test-api test-e2e build build-web new-feature new-domain openapi-export
+.PHONY: help dev ensure-env dev-web dev-api lint lint-web lint-api lint-api-format lint-web-types check-quality pre-commit-install pre-commit test test-web test-api test-e2e build build-web new-feature new-domain openapi-export check-openapi
 
 help:
 	@echo "Targets:"
@@ -94,3 +94,6 @@ new-domain:
 
 openapi-export:
 	@bash tooling/scripts/export-openapi-schema.sh
+
+check-openapi:
+	@bash tooling/scripts/check-openapi-snapshot.sh

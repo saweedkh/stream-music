@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Radio, Share2 } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
+import { DashboardAccountSection } from "@/features/dashboard";
 import { LISTENER_LINK_ITEMS, LISTENER_NAV_SECTIONS } from "@/features/channels/components/channel-room-config";
 import type { ListenerTabId } from "@/features/channels/components/channel-room-config";
 import { ListenerSidebarReactions } from "@/features/channels/components/listener-sidebar-reactions";

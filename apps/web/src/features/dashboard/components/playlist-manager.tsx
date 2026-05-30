@@ -36,7 +36,7 @@ import { Select } from "@/shared/ui/select";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { AddPlaylistToChannelDialog } from "@/features/playlists/components/add-playlist-to-channel-dialog";
+import { AddPlaylistToChannelDialog } from "@/features/playlists";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,

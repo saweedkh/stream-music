@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { JoinLandingClient } from "@/features/channels/components/join-landing-client";
+import { JoinLandingClient } from "@/features/channels";
 
 export default function JoinPage() {
   return (

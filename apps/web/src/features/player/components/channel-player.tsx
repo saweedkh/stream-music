@@ -5,7 +5,7 @@ import { useToast } from "@/shared/ui/toast-provider";
 import { ChannelPlayerFull } from "@/features/player/components/channel-player-full";
 import { ChannelPlayerMini } from "@/features/player/components/channel-player-mini";
 import { NowPlayingReactions } from "@/features/player/components/now-playing-reactions";
-import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience";
 import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
 import { useChannelPlaybackEngine } from "@/features/player/hooks/use-channel-playback-engine";
 
