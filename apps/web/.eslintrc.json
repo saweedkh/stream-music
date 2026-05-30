@@ -15,15 +15,191 @@
   },
   "overrides": [
     {
-      "files": ["src/features/**/*"],
+      "files": ["src/features/auth/**/*"],
       "rules": {
         "no-restricted-imports": [
           "warn",
           {
             "patterns": [
               {
-                "group": ["@/features/*/**"],
-                "message": "Import from feature public API (@/features/<name>) instead of deep paths."
+                "group": [
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/channels/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/dashboard/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/discovery/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/experience/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/party/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/party/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/player/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/player/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/playlists/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/playlists/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/auth/**",
+                  "@/features/channels/**",
+                  "@/features/dashboard/**",
+                  "@/features/discovery/**",
+                  "@/features/experience/**",
+                  "@/features/party/**",
+                  "@/features/player/**"
+                ],
+                "message": "Import from @/features/<name> public API, not deep paths."
               }
             ]
           }

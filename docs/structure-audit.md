@@ -109,10 +109,12 @@ common/
 
 ## Recommended follow-ups (optional)
 
-1. حذف `common` از `INSTALLED_APPS` و انتقال badges به `accounts` (تغییر بزرگ).
-2. `make openapi-export` در CI وقتی API بالا است؛ تایپ‌های `lib/api/types`.
-3. E2E کامل با `docker compose up` + `npm run test:e2e:all`.
-4. PR/commit — فقط با درخواست صریح.
+1. ~~Barrelهای feature + import از `@/features/<name>`~~ — انجام شد؛ ESLint فقط deep path را هشدار می‌دهد.
+2. ~~OpenAPI در CI~~ — `check-openapi-snapshot.sh` + `schema-paths.ts`.
+3. ~~Vitest player/room~~ — `sync-client`, `playback-audience`, `playback-payload`.
+4. ~~تست API بیشتر~~ — queue, upload, auth validation (۶۲ تست).
+5. `apps.common` — ADR 003؛ حذف از `INSTALLED_APPS` نیاز به squash migration دارد.
+6. E2E کامل با `docker-compose.e2e.yml` + `make test-e2e-all`.
 
 ## Verification commands
 
