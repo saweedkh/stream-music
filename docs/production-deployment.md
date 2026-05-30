@@ -168,7 +168,7 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 
 ### ورود موزیک از دیسک سرور
 
-مثل محیط توسعه، داخل کانتینر backend؛ مسیر مدیا روی ولوم **`media_data`** persist می‌شود. راهنمای CLI: [`docs/import-audio-cli.md`](import-audio-cli.md).
+مثل محیط توسعه، داخل کانتینر backend؛ مسیر مدیا روی ولوم **`media_data`** persist می‌شود. راهنمای CLI: [`docs/architecture.md`](architecture.md#import-ترک-از-دیسک).
 
 ---
 

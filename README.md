@@ -58,16 +58,15 @@ make new-domain NAME=foo
 
 | سند | موضوع |
 |-----|--------|
-| [docs/project-structure.md](docs/project-structure.md) | ساختار repo و قراردادها |
+| [docs/architecture.md](docs/architecture.md) | ساختار repo، دامنه‌ها، API snapshot |
 | [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | lint، commit، PR |
-| [docs/api-endpoints.md](docs/api-endpoints.md) | REST API |
 | [docs/realtime-contracts.md](docs/realtime-contracts.md) | WebSocket |
 | [docs/production-deployment.md](docs/production-deployment.md) | استقرار پروداکشن |
 
 ## API و WebSocket
 
-- REST تحت `/api/` — جزئیات: [docs/api-endpoints.md](docs/api-endpoints.md)
-- WS کانال: `ws/channels/{id}` — جزئیات: [docs/realtime-contracts.md](docs/realtime-contracts.md)
+- REST: `/api/` — `make openapi-export` برای snapshot
+- WS: [docs/realtime-contracts.md](docs/realtime-contracts.md)
 - کنترل پخش: `POST /api/channels/{id}/control` → broadcast به همه اعضا
 
 ## تست
@@ -86,8 +85,7 @@ E2E با rate limit خاموش: `docker compose -f docker-compose.yml -f docker-
 
 ## سایر
 
-- Import ترک از دیسک: [docs/import-audio-cli.md](docs/import-audio-cli.md)
-- اپ native (Capacitor): [docs/capacitor-native-app.md](docs/capacitor-native-app.md)
+- Import ترک / Capacitor: بخش «راهنماهای کوتاه» در [docs/architecture.md](docs/architecture.md)
 - Web Push: `bash scripts/generate-vapid-keys.sh`
 
 ## License

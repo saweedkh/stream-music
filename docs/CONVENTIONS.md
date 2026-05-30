@@ -1,6 +1,6 @@
 # قراردادهای توسعه — Stream Music
 
-این سند مکمل [project-structure.md](./project-structure.md) است و قوانین عملیاتی روزمره (کد، Git، lint، review) را خلاصه می‌کند.
+این سند مکمل [architecture.md](./architecture.md) است و قوانین عملیاتی روزمره (کد، Git، lint، review) را خلاصه می‌کند.
 
 ---
 
@@ -44,7 +44,7 @@ test(e2e): cover explore follow channel UI
 
 - یک PR = یک موضوع قابل review (ترجیحاً < 400 خط منطقی).
 - توضیح PR: **چرا** + **چطور تست شد**.
-- از [چک‌لیست project-structure](./project-structure.md#چک‌لیست-pull-request) استفاده کنید.
+- از [چک‌لیست PR](./architecture.md#چک‌لیست-pr-خلاصه) در architecture استفاده کنید.
 - بدون commit فایل‌های `.env`، کلید VAPID production، backup، `media/`.
 
 ---
@@ -72,7 +72,7 @@ docs/<name>       # فقط مستندات
 - پوشه‌ها منطبق بر segmentهای مسیر API (بدون `/api/`): `auth/me/password/` برای `auth/me/password`.
 - فایل view: `<endpoint>_api.py`؛ serializer همان endpoint: `<endpoint>_serializers.py`.
 - Routeها در `apps/<domain>/urls/` — نه در پکیج `api/`.
-- جزئیات: [project-structure.md](./project-structure.md#الگوی-ثابت-هر-domain-app).
+- جزئیات: [architecture.md](./architecture.md#backend-appsapi).
 - CRUD: `generics.ListCreateAPIView` / `RetrieveUpdateDestroyAPIView` — **نه** `ModelViewSet` و **نه** `DefaultRouter`.
 - اکشن‌های سفارشی: `generics.GenericAPIView` یا `APIView` در پوشه leaf همان URL.
 
@@ -159,9 +159,8 @@ make test              # در صورت دسترسی به Postgres/Redis
 
 | تغییر | سند |
 |--------|-----|
-| ساختار / پوشه جدید | `project-structure.md` |
-| تصمیم معماری | `docs/adr/NNN-*.md` |
-| REST endpoint | `api-endpoints.md` + `make openapi-export` |
+| ساختار / پوشه جدید | `architecture.md` |
+| REST / schema | `make openapi-export` + `architecture.md` |
 | WebSocket | `realtime-contracts.md` |
 | Deploy | `production-deployment.md` |
 

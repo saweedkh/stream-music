@@ -1,5 +1,5 @@
 # Stream Music — common dev commands
-# See docs/project-structure.md
+# See docs/architecture.md
 
 .PHONY: help dev ensure-env dev-web dev-api lint lint-web lint-api lint-api-format lint-web-types check-quality pre-commit-install pre-commit test test-web test-api test-e2e build build-web new-feature new-domain openapi-export check-openapi
 
