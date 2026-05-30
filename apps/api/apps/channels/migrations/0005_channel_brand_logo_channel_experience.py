@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('stream_channels', '0004_channel_public_join_slug_ensure_invites'),
+        ("stream_channels", "0004_channel_public_join_slug_ensure_invites"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='channel',
-            name='brand_logo',
-            field=models.ImageField(blank=True, null=True, upload_to='channel_brand/'),
+            model_name="channel",
+            name="brand_logo",
+            field=models.ImageField(blank=True, null=True, upload_to="channel_brand/"),
         ),
         migrations.AddField(
-            model_name='channel',
-            name='experience',
+            model_name="channel",
+            name="experience",
             field=models.JSONField(blank=True, default=dict),
         ),
     ]

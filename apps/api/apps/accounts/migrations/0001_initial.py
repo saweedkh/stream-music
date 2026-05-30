@@ -1,12 +1,11 @@
 # State-only: tables remain common_* in the database
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -23,7 +22,12 @@ class Migration(migrations.Migration):
                 migrations.CreateModel(
                     name="UserTrackFavorite",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("created_at", models.DateTimeField(auto_now_add=True)),
                         (
                             "track",
@@ -44,14 +48,21 @@ class Migration(migrations.Migration):
                     ],
                     options={
                         "db_table": "common_usertrackfavorite",
-                        "indexes": [models.Index(fields=["user", "-created_at"], name="common_user_user_id_6a8f0d_idx")],
+                        "indexes": [
+                            models.Index(fields=["user", "-created_at"], name="common_user_user_id_6a8f0d_idx")
+                        ],
                         "unique_together": {("user", "track")},
                     },
                 ),
                 migrations.CreateModel(
                     name="UserPlaylistFavorite",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("created_at", models.DateTimeField(auto_now_add=True)),
                         (
                             "playlist",
@@ -72,7 +83,9 @@ class Migration(migrations.Migration):
                     ],
                     options={
                         "db_table": "common_userplaylistfavorite",
-                        "indexes": [models.Index(fields=["user", "-created_at"], name="common_user_user_id_7b2c1e_idx")],
+                        "indexes": [
+                            models.Index(fields=["user", "-created_at"], name="common_user_user_id_7b2c1e_idx")
+                        ],
                         "unique_together": {("user", "playlist")},
                     },
                 ),

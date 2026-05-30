@@ -1,7 +1,7 @@
 from apps.channels.models import ChannelMembership
-from apps.common.serializers import ChannelSerializer
-from apps.social.models import ChannelFollow
+from apps.channels.serializers.channel_serializers import ChannelSerializer
 from apps.discovery.selectors import channel_is_live
+from apps.social.models import ChannelFollow
 
 
 def build_following_channels_feed(request) -> dict:

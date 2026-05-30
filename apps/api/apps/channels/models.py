@@ -56,7 +56,9 @@ class ChannelJoinRequest(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="join_requests")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_join_requests")
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
-    invite = models.ForeignKey("InviteToken", on_delete=models.SET_NULL, null=True, blank=True, related_name="join_requests")
+    invite = models.ForeignKey(
+        "InviteToken", on_delete=models.SET_NULL, null=True, blank=True, related_name="join_requests"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolved_by = models.ForeignKey(
@@ -98,7 +100,9 @@ class UserNotificationSettings(models.Model):
 class ChannelNotificationPreference(models.Model):
     """Per-user per-channel overrides for targeted push notifications."""
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_notification_preferences")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_notification_preferences"
+    )
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="notification_preferences")
     muted = models.BooleanField(default=False)
     notify_room_started = models.BooleanField(default=True)
@@ -197,7 +201,9 @@ class ChannelTrackReaction(models.Model):
 
 class ChannelAuditLog(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="audit_logs")
-    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="channel_audit_actions")
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="channel_audit_actions"
+    )
     action = models.CharField(max_length=64)
     target_type = models.CharField(max_length=64, blank=True, default="")
     target_id = models.CharField(max_length=64, blank=True, default="")

@@ -33,7 +33,7 @@ def _tracks_by_id_map(ids: list[int]) -> dict[int, Track]:
 
 
 def tracks_accessible_to_user(user: AbstractUser):
-    """Same visibility rules as TrackViewSet: own tracks (any visibility), public LAN, user/channel shares."""
+    """Same visibility rules as track list API: own tracks (any visibility), public LAN, user/channel shares."""
     return (
         Track.objects.filter(
             Q(owner=user)
@@ -111,7 +111,8 @@ def replace_queue_with_tracks(
     if not tracks:
         return []
     rows = [
-        ChannelQueueItem(channel=channel, track=t, position=index, added_by_id=user_id) for index, t in enumerate(tracks)
+        ChannelQueueItem(channel=channel, track=t, position=index, added_by_id=user_id)
+        for index, t in enumerate(tracks)
     ]
     for i in range(0, len(rows), _BULK_CHUNK):
         ChannelQueueItem.objects.bulk_create(rows[i : i + _BULK_CHUNK])
@@ -150,7 +151,7 @@ def insert_track_after_now_playing(
     tail = [row for row in rows[current_idx + 1 :] if row.track_id != track_id]
 
     new_row = ChannelQueueItem(channel=channel, track=track, position=0, added_by_id=added_by_id)
-    rebuilt = head + [new_row] + tail
+    rebuilt = [*head, new_row, *tail]
 
     ChannelQueueItem.objects.filter(channel=channel).delete()
     if not rebuilt:

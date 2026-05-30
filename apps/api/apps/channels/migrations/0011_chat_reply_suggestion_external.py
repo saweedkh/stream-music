@@ -1,10 +1,8 @@
-from django.conf import settings
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("stream_channels", "0010_usernotificationsettings_quiet_hours"),
         ("tracks", "0003_track_file_hash"),

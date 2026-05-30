@@ -58,11 +58,12 @@ Reference implementation: `features/discovery/` (Explore).
 ### Backend (target per domain)
 
 ```text
-apps/<domain>/   # today: apps/channels, playback, tracks, playlists; splitting common → discovery, social, …
-  models.py
+apps/<domain>/   # channels, tracks, playlists, discovery, …
+  models.py | models/
   selectors.py
   services/
-  api/views.py, serializers.py, urls.py
+  urls/              # urlpatterns (like models/)
+  <url_path>/        # mirror HTTP path: auth/me/password/password_api.py
   tests/
 ```
 

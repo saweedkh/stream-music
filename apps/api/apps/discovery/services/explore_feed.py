@@ -8,11 +8,11 @@ from django.db.models import Count
 from django.utils import timezone
 
 from apps.channels.models import Channel
-from apps.common.serializers import ChannelSerializer, PlaylistSerializer
-from apps.playlists.models import PlaylistShareLink
+from apps.channels.serializers.channel_serializers import ChannelSerializer
 from apps.discovery.selectors import channel_is_live, explore_channel_matches, public_channel_queryset
 from apps.playback.models import PlaybackEvent
-from apps.playlists.models import PlaylistItem
+from apps.playlists.models import PlaylistItem, PlaylistShareLink
+from apps.playlists.playlists.playlist_serializers import PlaylistSerializer
 
 
 def build_explore_feed(request, *, q: str, lang: str, genre: str, live_only: bool) -> dict:

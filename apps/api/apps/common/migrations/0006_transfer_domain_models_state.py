@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("common", "0005_user_follow"),
         ("playlists", "0004_playlistsharelink_state"),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from apps.channels.models import Channel
@@ -112,8 +112,8 @@ def scheduled_start_blocks_playback(channel: Channel) -> tuple[bool, str | None]
             text = text[:-1] + "+00:00"
         when = datetime.fromisoformat(text)
         if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+            when = when.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         if when > now:
             return True, when.isoformat()
     except (TypeError, ValueError):

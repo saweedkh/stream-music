@@ -280,10 +280,7 @@ def _user_wants_chat_push(prefs, body: str, recipient_username: str) -> bool:
     if "@everyone" in low or "@all" in low:
         return True
     ru = (recipient_username or "").lower()
-    for m in _MENTION_RE.finditer(body):
-        if m.group(1).lower() == ru:
-            return True
-    return False
+    return any(m.group(1).lower() == ru for m in _MENTION_RE.finditer(body))
 
 
 def notify_channel_track_changed_push(
@@ -341,7 +338,9 @@ def notify_channel_chat_message_push(
         return
 
     member_rows = list(
-        ChannelMembership.objects.filter(channel_id=channel_id, is_active=True).select_related("user").exclude(user_id=author_id)
+        ChannelMembership.objects.filter(channel_id=channel_id, is_active=True)
+        .select_related("user")
+        .exclude(user_id=author_id)
     )
     if not member_rows:
         return
@@ -369,8 +368,8 @@ def notify_channel_chat_message_push(
 
 def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None = None) -> None:
     from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference
-    from apps.social.models import ChannelFollow
     from apps.playback.services.state_store import playback_state_store
+    from apps.social.models import ChannelFollow
 
     channel = Channel.objects.filter(id=channel_id).first()
     if channel is None:
@@ -404,7 +403,9 @@ def notify_channel_room_started_push(channel_id: int, actor_user_id: int | None 
         )
 
 
-def notify_channel_skip_threshold_near_push(channel_id: int, votes: int, threshold: int, actor_user_id: int | None = None) -> None:
+def notify_channel_skip_threshold_near_push(
+    channel_id: int, votes: int, threshold: int, actor_user_id: int | None = None
+) -> None:
     from apps.channels.models import Channel, ChannelMembership, ChannelNotificationPreference
     from apps.playback.services.state_store import playback_state_store
 

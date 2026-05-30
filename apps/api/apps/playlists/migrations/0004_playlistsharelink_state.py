@@ -2,13 +2,12 @@
 
 import uuid
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("common", "0005_user_follow"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -22,7 +21,12 @@ class Migration(migrations.Migration):
                 migrations.CreateModel(
                     name="PlaylistShareLink",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("token", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                         (
                             "privacy",

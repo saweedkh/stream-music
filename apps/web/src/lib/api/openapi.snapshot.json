@@ -1,0 +1,137 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Stream Music API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Application metrics",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/time": {
+      "get": {
+        "summary": "Server time",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Current user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/channels/": {
+      "get": {
+        "summary": "List channels"
+      },
+      "post": {
+        "summary": "Create channel"
+      }
+    },
+    "/channels/{channel_id}/state": {
+      "get": {
+        "summary": "Channel playback state"
+      }
+    },
+    "/channels/{channel_id}/control": {
+      "post": {
+        "summary": "Playback control"
+      }
+    },
+    "/channels/{channel_id}/queue": {
+      "get": {
+        "summary": "Queue list"
+      }
+    },
+    "/channels/{channel_id}/queue/{item_id}/upvote": {
+      "post": {
+        "summary": "Upvote queue item"
+      },
+      "delete": {
+        "summary": "Remove upvote"
+      }
+    },
+    "/channels/{channel_id}/suggestions": {
+      "get": {},
+      "post": {},
+      "patch": {}
+    },
+    "/channels/{channel_id}/history": {
+      "get": {
+        "summary": "Playback history"
+      }
+    },
+    "/channels/{channel_id}/audit-log": {
+      "get": {
+        "summary": "Audit log"
+      }
+    },
+    "/tracks/upload/init": {
+      "post": {
+        "summary": "Start chunked upload"
+      }
+    },
+    "/tracks/upload/{upload_id}/status": {
+      "get": {
+        "summary": "Upload resume status"
+      }
+    },
+    "/tracks/upload/{upload_id}/chunk": {
+      "put": {
+        "summary": "Upload chunk"
+      }
+    },
+    "/tracks/upload/{upload_id}/finalize": {
+      "post": {
+        "summary": "Finalize upload"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid"
+      }
+    }
+  }
+}

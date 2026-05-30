@@ -7,13 +7,13 @@ import time
 
 from django.utils import timezone
 
+from apps.accounts.user_badges import user_badge_flags
 from apps.channels.models import Channel, ChannelChatMessage, ChannelChatMessageReaction, ChannelMembership
 from apps.channels.moderation import (
     body_violates_word_filter,
     chat_word_filters,
     is_user_chat_banned,
 )
-from apps.accounts.user_badges import user_badge_flags
 
 _CHAT_SEND_TS: dict[tuple[int, int], list[float]] = {}
 _CHAT_SEND_WINDOW = 12
@@ -71,7 +71,11 @@ def message_to_dict(msg: ChannelChatMessage) -> dict:
             }
         )
     deleted = msg.deleted_at is not None
-    author_flags = user_badge_flags(msg.user) if msg.user_id else {"is_staff": False, "is_superuser": False, "is_premium": False, "badges": []}
+    author_flags = (
+        user_badge_flags(msg.user)
+        if msg.user_id
+        else {"is_staff": False, "is_superuser": False, "is_premium": False, "badges": []}
+    )
     reply_preview = None
     if getattr(msg, "reply_to_id", None) and getattr(msg, "reply_to", None):
         parent = msg.reply_to
@@ -94,7 +98,9 @@ def message_to_dict(msg: ChannelChatMessage) -> dict:
         "track_previews": _track_previews_from_body(body) if body else [],
         "is_pinned": bool(getattr(msg, "is_pinned", False)),
         "pinned_at": msg.pinned_at.isoformat() if getattr(msg, "pinned_at", None) else None,
-        "pinned_by_username": msg.pinned_by.username if getattr(msg, "pinned_by_id", None) and getattr(msg, "pinned_by", None) else None,
+        "pinned_by_username": msg.pinned_by.username
+        if getattr(msg, "pinned_by_id", None) and getattr(msg, "pinned_by", None)
+        else None,
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
         "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
         "deleted_at": msg.deleted_at.isoformat() if msg.deleted_at else None,
@@ -128,9 +134,7 @@ def can_access_chat(channel_id: int, user_id: int) -> bool:
         return True
     if ChannelMembership.objects.filter(channel_id=channel_id, user_id=user_id, is_active=True).exists():
         return True
-    if not ch.is_active and ch.owner_id == user_id:
-        return True
-    return False
+    return not ch.is_active and ch.owner_id == user_id
 
 
 def is_channel_staff(channel_id: int, user_id: int) -> bool:
@@ -177,7 +181,9 @@ def apply_chat_send(
         return None, "channel_closed"
     parent_id = None
     if reply_to_id is not None:
-        parent = ChannelChatMessage.objects.filter(id=reply_to_id, channel_id=channel_id).only("id", "deleted_at").first()
+        parent = (
+            ChannelChatMessage.objects.filter(id=reply_to_id, channel_id=channel_id).only("id", "deleted_at").first()
+        )
         if parent is None or parent.deleted_at:
             return None, "invalid_reply"
         parent_id = parent.id

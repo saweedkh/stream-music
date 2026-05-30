@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { ToastProvider } from "@/shared/ui/toast-provider";
 import { ChannelCommandMenu } from "@/shared/room/channel-command-menu";
 import { GlobalSearchDialog } from "@/features/discovery";
-import { GlobalChannelPlayerProvider } from "@/features/player/global-channel-player-context";
+import { GlobalChannelPlayerProvider } from "@/features/player";
 import { getMe, type AuthUser } from "@/lib/api";
 import { ConnectivityBanner } from "@/shared/connectivity-banner";
 import { NotificationProvider } from "@/shared/notifications/notification-provider";

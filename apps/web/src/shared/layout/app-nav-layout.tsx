@@ -5,11 +5,14 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { DashboardMobileHeader } from "@/features/dashboard/components/dashboard-mobile-header";
-import { DashboardSidebar } from "@/features/dashboard/components/dashboard-sidebar";
-import type { AdminSection, ProfileSection } from "@/features/dashboard/model/dashboard-nav-config";
-import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
-import { JoinChannelDialog } from "@/features/dashboard/components/join-channel-dialog";
+import {
+  DashboardMobileHeader,
+  DashboardSidebar,
+  JoinChannelDialog,
+  type AdminSection,
+  type DashboardTab,
+  type ProfileSection,
+} from "@/features/dashboard";
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { listenUserSessionRefresh } from "@/lib/user-session-events";

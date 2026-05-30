@@ -1,4 +1,5 @@
 export { getApiBase, getWsBase, ensureCsrfCookie } from "./client";
+export type { OpenApiPaths, OpenApiSnapshot } from "./types/openapi";
 export * from "./types";
 export * from "./auth";
 export * from "./channels";

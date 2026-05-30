@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.core.apps.CoreConfig",
     "apps.channels.apps.ChannelsConfig",
+    # Migration graph only (0001-0007); no runtime models - see apps/common/migrations/
     "apps.common.apps.CommonConfig",
     "apps.discovery.apps.DiscoveryConfig",
     "apps.social.apps.SocialConfig",
@@ -173,8 +174,8 @@ WEBPUSH_VAPID_SUBJECT = os.getenv("WEBPUSH_VAPID_SUBJECT", "mailto:admin@localho
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
 if SENTRY_DSN:
     import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.redis import RedisIntegration
 
     sentry_sdk.init(

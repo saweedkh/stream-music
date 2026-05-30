@@ -1,0 +1,46 @@
+# Stream Music — local quality gates (see docs/CONVENTIONS.md §9)
+# Setup: pip install -r requirements-dev.txt && pre-commit install
+
+default_language_version:
+  python: python3.12
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^apps/api/apps/.*/migrations/
+      - id: end-of-file-fixer
+        exclude: ^apps/api/apps/.*/migrations/
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-yaml
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.9
+    hooks:
+      - id: ruff
+        name: ruff (apps/api)
+        args: [--config=apps/api/pyproject.toml]
+        files: ^apps/api/
+      - id: ruff-format
+        name: ruff format (apps/api)
+        args: [--config=apps/api/pyproject.toml]
+        files: ^apps/api/
+
+  - repo: local
+    hooks:
+      - id: eslint-web
+        name: ESLint (apps/web)
+        entry: bash tooling/scripts/pre-commit-eslint.sh
+        language: system
+        files: ^apps/web/.*\.(tsx?|jsx?|mjs|cjs)$
+        pass_filenames: false
+      - id: tsc-web
+        name: TypeScript (apps/web)
+        entry: bash tooling/scripts/pre-commit-tsc.sh
+        language: system
+        files: ^apps/web/.*\.tsx?$
+        pass_filenames: false

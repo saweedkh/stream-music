@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 
-from apps.channels.api.helpers import _channel_closed_response, _log_channel_audit, _record_playback_event
+from apps.channels.helpers import _channel_closed_response, _log_channel_audit, _record_playback_event
 from apps.channels.models import Channel
 from apps.core.services.webpush import notify_channel_room_started_push
 from apps.playback.models import PlaybackSession
@@ -45,7 +45,9 @@ def build_control_payload(
         "position": position,
         "is_playing": playback_session.is_playing,
         "queue_version": playback_session.queue_version,
-        "track_file": playback_session.track.file.url if playback_session.track and playback_session.track.file else None,
+        "track_file": playback_session.track.file.url
+        if playback_session.track and playback_session.track.file
+        else None,
     }
     if channel is not None:
         payload.update(playback_queue_meta(channel, playback_session))
@@ -54,7 +56,7 @@ def build_control_payload(
 
 def apply_channel_control(request, channel_id: int) -> Response:
     """Apply play/pause/seek/next/prev and broadcast WS payload."""
-    from apps.playback.api.serializers import PlaybackSessionSerializer  # noqa: PLC0415
+    from apps.playback.serializers.playback_serializers import PlaybackSessionSerializer
 
     if not can_control_channel(request.user, channel_id):
         return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
@@ -83,7 +85,9 @@ def apply_channel_control(request, channel_id: int) -> Response:
         playback_session.paused_at_position = max(0.0, resume_from)
     elif action == "pause":
         playback_session.is_playing = False
-        playback_session.paused_at_position = position if position is not None else float(request.data.get("position", 0))
+        playback_session.paused_at_position = (
+            position if position is not None else float(request.data.get("position", 0))
+        )
     elif action == "seek":
         seek_position = position if position is not None else float(request.data.get("position", 0))
         playback_session.paused_at_position = max(0.0, seek_position)
@@ -98,7 +102,14 @@ def apply_channel_control(request, channel_id: int) -> Response:
                 action = "pause"
         playback_session.queue_version += 1
     playback_session.save(
-        update_fields=["is_playing", "started_at_server_time", "paused_at_position", "queue_version", "track", "updated_at"]
+        update_fields=[
+            "is_playing",
+            "started_at_server_time",
+            "paused_at_position",
+            "queue_version",
+            "track",
+            "updated_at",
+        ]
     )
     _record_playback_event(
         channel.id,
@@ -128,5 +139,7 @@ def apply_channel_control(request, channel_id: int) -> Response:
     )
     channel_layer = get_channel_layer()
     if channel_layer is not None:
-        async_to_sync(channel_layer.group_send)(f"channel_{channel.id}", {"type": "broadcast_event", "payload": payload})
+        async_to_sync(channel_layer.group_send)(
+            f"channel_{channel.id}", {"type": "broadcast_event", "payload": payload}
+        )
     return Response(PlaybackSessionSerializer(playback_session).data)

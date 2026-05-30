@@ -52,8 +52,10 @@ Browser/App  ──►  Nginx (TLS + static audio)  ──►  Next.js (SSR + UI
 ```bash
 make help          # list targets
 make dev-web       # Next.js dev
-make lint          # web + api
-make build-web     # production build
+make lint              # web + api
+make check-quality     # lint + ruff format check + tsc (مثل CI)
+make pre-commit-install  # نصب git hooks (یک‌بار)
+make build-web         # production build
 make new-feature NAME=my-domain   # scaffold features/<name>/
 ```
 
@@ -63,6 +65,7 @@ make new-feature NAME=my-domain   # scaffold features/<name>/
 git clone <repo-url> && cd stream-music
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local  # optional for local npm run dev
+# Docker Compose loads .env.example then merges apps/api/.env (and web .env.local) when present.
 ```
 
 ### 2. Start the stack

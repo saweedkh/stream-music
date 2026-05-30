@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("stream_channels", "0012_chat_moderation"),
         ("playlists", "0003_channelqueueupvote"),

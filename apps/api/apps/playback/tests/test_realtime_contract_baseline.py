@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from apps.channels.api.views.playback import ChannelControlView
+from apps.channels.channel_id.control.control_api import ChannelControlView
 from apps.playback.consumers import ChannelPlaybackConsumer
 
 
@@ -43,7 +43,9 @@ class RealtimeContractBaselineTests(SimpleTestCase):
             queue_version=3,
             track=track,
         )
-        payload = ChannelPlaybackConsumer._build_payload(channel=channel, action="play", playback_session=session, position=0.0)
+        payload = ChannelPlaybackConsumer._build_payload(
+            channel=channel, action="play", playback_session=session, position=0.0
+        )
         for key in [
             "type",
             "action",

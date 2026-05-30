@@ -102,7 +102,7 @@ stream-music/
               │                               │
 ┌─────────────▼─────────────┐   ┌─────────────▼───────────────────┐
 │  Next.js (apps/web)        │   │  Django + Daphne (apps/api)    │
-│  app/ → features/ → api   │   │  api/ → services/ → models      │
+│  app/ → features/ → api   │   │  *_api.py → services/ → models │
 └─────────────┬─────────────┘   └─────────────┬───────────────────┘
               │                               │
               │         REST + WebSocket      │
@@ -123,8 +123,8 @@ stream-music/
 |--------|------|-----------|
 | ✅ خوب | `apps/channels`, `playback`, `tracks`, `playlists` | حفظ + اعمال الگوی لایه‌ای یکسان |
 | ✅ انجام شد | `apps/common` | فقط badges + shimها؛ مدل‌های منتقل‌شده در اپ دامنه با `db_table` قدیمی |
-| ✅ انجام شد | serializers | `*/api/serializers.py` per domain + `common/serializers.py` re-export |
-| ✅ انجام شد | `discovery`, `social`, `accounts`, `core`, … | اپ‌های دامنه + `urls` per domain |
+| ✅ انجام شد | HTTP handlers | پوشه‌ها منطبق بر مسیر URL + `*_api.py` / `*_serializers.py` |
+| ✅ انجام شد | `discovery`, `social`, `accounts`, `core`, … | اپ‌های دامنه + `urls/` (نه `api/urls.py`) |
 | ✅ انجام شد | `config/settings/` | base + local/production |
 
 ### Frontend
@@ -220,25 +220,48 @@ domains/<domain_name>/
 ├── __init__.py
 ├── apps.py
 ├── models.py                   # یا models/ اگر > ~300 خط
-├── selectors.py                # QuerySetهای read-only، فیلتر، prefetch
+├── selectors.py
 ├── services/
-│   ├── __init__.py
-│   └── <use_case>.py           # منطق write و orchestration
-├── api/
-│   ├── __init__.py
-│   ├── serializers.py
-│   ├── views.py                # یا views/ اگر بزرگ شد
-│   └── urls.py
-├── consumers.py                # فقط اگر WebSocket دارد
-├── routing.py                  # WS routing
-├── tasks.py                    # Celery tasks
-├── admin.py
+│   └── <use_case>.py
+├── urls/                       # مانند models/ — تجمیع routeها
+│   ├── __init__.py             # urlpatterns اصلی دامنه
+│   └── <group>_urls.py         # اختیاری اگر urlpatterns بزرگ شد
+├── <url_segment>/              # آینه مسیر HTTP (بدون پیشوند /api/)
+│   ├── <endpoint>_api.py       # generics.* یا APIView — نازک
+│   └── <endpoint>_serializers.py  # در همان پوشه، اگر لازم است
+├── serializers/                # اختیاری — serializerهای مشترک چند endpoint
+├── consumers.py
+├── routing.py
+├── tasks.py
 ├── migrations/
 └── tests/
-    ├── test_selectors.py
-    ├── test_services.py
-    └── test_api.py
 ```
+
+#### نگاشت URL → پوشه و فایل
+
+| قانون | مثال |
+|--------|------|
+| هر segment مسیر = یک پوشه | `auth/me/password` → `auth/me/password/` |
+| `-` در URL → `_` در نام پوشه/فایل | `join-from-link` → `join_from_link/` |
+| View در `*_api.py` | `password_api.py` → `UserPasswordChangeView` |
+| Serializer در `*_serializers.py` کنار همان endpoint | `password_serializers.py` |
+| `global` و کلمات رزرو پایتون | مسیر `search/global` → پوشه `search/global_search/` |
+| CRUD collection | `ListCreateAPIView` + `RetrieveUpdateDestroyAPIView` در `urls/` (بدون Router/ViewSet) |
+| پارامتر مسیر Django | `<channel_id>` → پوشه `channel_id/` (ثابت، نه مقدار runtime) |
+| چند view در یک فایل | فقط وقتی فایل کوچک است؛ `channels` اکنون leaf per endpoint زیر `channel_id/` |
+
+**مثال (`core`):**
+
+```text
+core/
+├── urls/__init__.py
+├── health/health_api.py
+├── auth/me/password/password_api.py
+├── auth/me/password/password_serializers.py
+└── services/webpush.py
+```
+
+**ممنوع:** پکیج `api/` با `views.py` / `serializers.py` / `urls.py` متمرکز — جایگزین: ساختار بالا.
 
 ### مسئولیت لایه‌ها
 
@@ -247,25 +270,26 @@ domains/<domain_name>/
 | **models** | schema، constraints، `__str__`، متدهای ساده مدل | `Channel`, `ChannelMembership` |
 | **selectors** | خواندن DB، بهینه‌سازی query، بدون side effect | `get_live_public_channels()` |
 | **services** | قوانین کسب‌وکار، transaction، emit event | `follow_channel(user, channel)` |
-| **api/views** | permission، validate input، فراخوانی service، response | `ExploreFeedView` |
-| **serializers** | شکل JSON ورودی/خروجی | `ChannelSummarySerializer` |
+| **\*_api.py** | permission، validate input، فراخوانی service، response | `ExploreFeedView` در `explore/explore_api.py` |
+| **\*_serializers.py** | شکل JSON ورودی/خروجی | `password_serializers.py` کنار `password_api.py` |
 | **consumers** | پیام WS، delegate به service | `ChannelChatConsumer` |
 | **tasks** | کار async / scheduled | `send_webpush_batch` |
 
 ### قوانین وابستگی Backend
 
 ```text
-api          →  services, selectors, serializers, core.permissions
+*_api.py     →  services, selectors, *_serializers, core.permissions
 services     →  selectors, models, core (exceptions)
 selectors    →  models
 models       →  (فقط Django / stdlib)
+urls/        →  *_api (import view classes)
 tasks        →  services
 consumers    →  services
 ```
 
 **ممنوع:**
 
-- QuerySet پیچیده داخل `views.py`
+- QuerySet پیچیده داخل `*_api.py`
 - import دامنه A از models دامنه B بدون interface/service مشخص
 - قرار دادن business logic در `serializers` (فقط validation/format)
 
@@ -279,16 +303,18 @@ consumers    →  services
 /api/search/global/
 ```
 
-هر domain فایل `api/urls.py` خود را دارد؛ `config/urls.py` فقط `include` می‌کند:
+هر domain پکیج `urls/` دارد؛ تجمیع REST در `apps/common/urls.py`:
 
 ```python
-# config/urls.py (هدف)
+# apps/common/urls.py
 urlpatterns = [
-    path("api/", include("domains.discovery.api.urls")),
-    path("api/", include("domains.channels.api.urls")),
+    path("", include("apps.core.urls")),
+    path("", include("apps.channels.urls")),
     # ...
 ]
 ```
+
+`include("apps.core.urls")` همان `apps/core/urls/__init__.py` است (نه `api/urls.py`).
 
 ### تقسیم پیشنهادی `apps/common` (فعلی)
 
@@ -442,6 +468,8 @@ Endpoint جدید باید در هر سه ستون نام هم‌خوان داش
 | کامپوننت React | `PascalCase` | `ExploreRoomCard` |
 | Hook | `use` + `camelCase` | `useExploreFeed` |
 | فایل Python | `snake_case.py` | `explore_feed.py` |
+| endpoint HTTP | `<name>_api.py` در پوشه آینه URL | `auth/me/password/password_api.py` |
+| serializer endpoint | `<name>_serializers.py` کنار `*_api` | `password_serializers.py` |
 | کلاس Django | `PascalCase` | `ExploreFeedView` |
 | تست Python | `test_<unit>.py` | `test_explore_feed.py` |
 | تست E2E | `<domain>.spec.ts` | `discovery-explore.spec.ts` |
@@ -475,9 +503,9 @@ chore/<topic>
 ### Backend — مثال مجاز
 
 ```python
-# domains/discovery/api/views.py
-from domains.discovery.services.explore_feed import build_explore_feed
-from domains.discovery.selectors import live_public_channels
+# apps/discovery/explore/explore_api.py
+from apps.discovery.services.explore_feed import build_explore_feed
+from apps.discovery.selectors import live_public_channels
 ```
 
 ### Backend — مثال ممنوع
@@ -674,24 +702,25 @@ Split into discovery, social, accounts, ...
 
 1. [x] `discovery` ← explore + global search + track facets (`apps/discovery/`, services + api)  
 2. [x] `social` ← follow user/channel + following feed (`apps/social/`)  
-3. [x] `accounts` ← profile, premium (`apps/accounts/api/`)  
-4. [x] `playlists/api` ← playlist share links  
-5. [x] `channels/api` ← queue import-share, session export  
+3. [x] `accounts` ← profile, premium (`apps/accounts/auth/...`, `users/profile/`)  
+4. [x] `playlists` ← playlist share (`playlists/share/`)  
+5. [x] `channels` ← queue import-share, session export (`queue/import_share/`, `session/export_playlist/`)  
 6. [x] `support`, `moderation`, `admin_panel`, `dashboard`  
-7. [x] `core` ← health, metrics, schema, auth routes (`apps/core/api/`)  
+7. [x] `core` ← health, metrics, schema, auth (`apps/core/health/`, `auth/me/password/`, …)  
 8. [x] `config/settings/` ← base + local/production (`DJANGO_ENV`)  
 9. [x] shimهای `apps/common/*_views.py` برای سازگاری  
-10. [x] `common/views.py` → `core/auth_views`, `channels/api/*`, `tracks/playlists` viewsets  
-11. [x] `common/urls.py` فقط `include()` دامنه‌ها  
-12. [x] `common/serializers.py` → `*/api/serializers.py` per domain  
+10. [x] `common/views.py` → `core/auth/...`, `channels/*_api.py`, generics CRUD در `tracks` / `playlists`  
+11. [x] `common/urls.py` فقط `include("apps.<domain>.urls")`  
+12. [x] serializers per endpoint یا `serializers/` دامنه (حذف پکیج `api/`)  
 13. [x] `party_recap` → `channels/services/`  
 14. [x] `social/models.py`, `support/models.py`, `accounts/models.py` + migration state-only (`0006`)  
 15. [x] `channels/services/playback_control.py` — منطق control از view جدا شد  
-16. [x] `channels/api/views/` — split از `channel_views.py` (viewset, playback, queue, join, room)  
+16. [x] `channels/` — URL-mirror: `channel/`, `join/`, `playback/`, `queue/`, `room/`, `urls/`  
 17. [x] `channels/services/channel_queue.py` — صف، upvote، jump  
 18. [x] `support/services/ticket_service.py` — منطق تیکت از `common`  
 19. [x] `core/services/webpush`, `accounts/{badge_models,user_badges,premium_limits}`, `support/consumers`  
 20. [x] ممیزی ساختار: [structure-audit.md](./structure-audit.md)  
+21. [x] حذف `apps/<domain>/api/` — همه اپ‌ها `*_api.py` + `urls/`  
 
 هر PR: move + urls + tests سبز.
 
@@ -718,7 +747,8 @@ Split into discovery, social, accounts, ...
 
 قبل از merge:
 
-- [ ] **مرز دامنه** رعایت شده؛ منطق در service/hook نه view/page
+- [ ] **مرز دامنه** رعایت شده؛ منطق در service/hook نه `*_api.py` / page
+- [ ] **Backend HTTP** endpoint جدید در پوشه آینه URL + `*_api.py` (نه `api/views.py`)
 - [ ] **Route/Page** فقط wiring است
 - [ ] **API** فقط از `lib/api` (بدون `fetch` پراکنده)
 - [ ] **i18n** کلید `en` + `fa` اضافه شده
@@ -748,7 +778,7 @@ Split into discovery, social, accounts, ...
 | فعلی | هدف |
 |------|-----|
 | `apps/api/apps/channels/` | `domains/channels/` |
-| `apps/api/apps/common/discovery_views.py` | `domains/discovery/api/views.py` |
+| `apps/api/apps/common/discovery_views.py` | `apps/discovery/explore/explore_api.py` |
 | `apps/api/apps/common/social_expansion_views.py` | `domains/discovery/` + `domains/social/` |
 | `apps/api/apps/common/views.py` (auth) | `core/auth/` |
 | `apps/api/config/settings.py` | `config/settings/base.py` + env splits |

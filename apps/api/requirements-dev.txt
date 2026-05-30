@@ -1,0 +1,6 @@
+# Dev / IDE type-checking: pip install -r requirements-dev.txt
+-r requirements.txt
+django-stubs==4.2.7
+djangorestframework-stubs==3.14.5
+pre-commit>=4.0.0
+ruff>=0.9.0

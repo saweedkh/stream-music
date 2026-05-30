@@ -107,9 +107,8 @@ class SimpleRateLimitMiddleware:
         if _rate_limit_disabled():
             return self.get_response(request)
         path = request.path
-        if path in _LIMITS and request.method == "POST":
-            if not _allow(_client_key(request), path):
-                from django.http import JsonResponse
+        if path in _LIMITS and request.method == "POST" and not _allow(_client_key(request), path):
+            from django.http import JsonResponse
 
-                return JsonResponse({"detail": "rate_limited"}, status=429)
+            return JsonResponse({"detail": "rate_limited"}, status=429)
         return self.get_response(request)

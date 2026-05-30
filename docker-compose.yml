@@ -20,8 +20,9 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+    # Local secrets: cp apps/api/.env.example apps/api/.env (see `make ensure-env`).
     env_file:
-      - ./apps/api/.env.example
+      - ./apps/api/.env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
       MEDIA_ROOT: /media
@@ -45,7 +46,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
     env_file:
-      - ./apps/web/.env.example
+      - ./apps/web/.env.local
     environment:
       # Client-side API/WS use the browser origin (phone on LAN). SSR calls Django directly:
       INTERNAL_API_BASE_URL: http://backend:8000

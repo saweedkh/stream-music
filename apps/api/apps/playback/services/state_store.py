@@ -1,3 +1,4 @@
+import contextlib
 import json
 import time
 from typing import Any
@@ -141,10 +142,8 @@ class PlaybackStateStore:
             self._event_seq_key(channel_id),
             self._auto_next_lock_key(channel_id),
         ):
-            try:
+            with contextlib.suppress(Exception):
                 self._client.delete(key)
-            except Exception:
-                pass
 
     def touch_presence(self, channel_id: int, user_id: int) -> None:
         if self._client is None:

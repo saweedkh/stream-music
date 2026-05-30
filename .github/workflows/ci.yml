@@ -67,7 +67,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci-secret-key
           DEBUG: "1"
-        run: python manage.py test --verbosity=2
+        run: python manage.py test apps --verbosity=2
 
   frontend:
     runs-on: ubuntu-latest
@@ -84,6 +84,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
+      - run: npm test
 
   e2e:
     runs-on: ubuntu-latest

@@ -53,9 +53,7 @@ class ChannelQueueItemTests(TestCase):
         self.track = Track.objects.create(owner=self.user, title="Song", file=audio)
 
     def test_create_queue_item(self):
-        qi = ChannelQueueItem.objects.create(
-            channel=self.channel, track=self.track, position=0, added_by=self.user
-        )
+        qi = ChannelQueueItem.objects.create(channel=self.channel, track=self.track, position=0, added_by=self.user)
         self.assertEqual(qi.channel_id, self.channel.id)
         self.assertEqual(qi.added_by_id, self.user.id)
 
