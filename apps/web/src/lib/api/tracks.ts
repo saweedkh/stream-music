@@ -252,3 +252,18 @@ export async function getTrackFacets(): Promise<TrackFacets> {
   if (!res.ok) throw new Error("Cannot load facets");
   return (await res.json()) as TrackFacets;
 }
+
+export async function importTrackFromExternalUrl(
+  url: string,
+  options?: { async?: boolean },
+): Promise<TrackSummary | { ok: boolean; status: string }> {
+  const res = await fetch(
+    `${getApiBase()}/api/tracks/import-external`,
+    await withAuthHeaders({
+      method: "POST",
+      body: JSON.stringify({ url, async: options?.async ?? false }),
+    }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Import failed"));
+  return (await res.json()) as TrackSummary | { ok: boolean; status: string };
+}

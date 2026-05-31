@@ -41,6 +41,21 @@ export type PublicUserProfile = {
   follower_count?: number;
   user_following?: boolean;
   is_self: boolean;
+  gamification?: { level: number; points: number; streak_days: number } | null;
+  live_channels?: ChannelSummary[];
+  party_highlights?: Array<{
+    channel_id: number;
+    channel_name: string;
+    top_tracks: Array<{ id: number; title: string; artist?: string; play_count?: number }>;
+    total_events: number;
+  }>;
+  recent_activity?: Array<{
+    kind: string;
+    channel_id: number | null;
+    channel_name: string | null;
+    created_at: string | null;
+    metadata?: Record<string, unknown>;
+  }>;
 };
 
 export type PremiumLimits = {

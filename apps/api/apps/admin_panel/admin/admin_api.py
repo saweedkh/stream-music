@@ -322,4 +322,6 @@ class AdminHealthView(APIView):
     permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
 
     def get(self, request):
-        return HealthView().get(request)
+        from apps.admin_panel.services.system_metrics import build_admin_system_payload
+
+        return Response(build_admin_system_payload())

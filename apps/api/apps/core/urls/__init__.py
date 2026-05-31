@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 
 from apps.core.auth.csrf.csrf_api import auth_csrf
@@ -32,3 +33,8 @@ urlpatterns = [
     path("auth/me/push-test", WebPushTestView.as_view()),
     path("auth/users", UsersListView.as_view()),
 ]
+
+if getattr(settings, "E2E_RATE_LIMIT_OFF", False):
+    from apps.core.e2e.e2e_helpers_api import E2EPremiumCodeView
+
+    urlpatterns.append(path("e2e/premium-code", E2EPremiumCodeView.as_view()))

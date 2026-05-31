@@ -96,6 +96,21 @@ def build_party_recap(channel: Channel, limit: int = 80) -> dict:
         for r in reversed(list(rows))
     ]
     heatmap = _build_excitement_heatmap(channel.id, rows)
+    reaction_rows = list(
+        ChannelTrackReaction.objects.filter(channel_id=channel.id)
+        .select_related("user")
+        .order_by("created_at")[:200]
+    )
+    reaction_timeline = [
+        {
+            "at": r.created_at.isoformat() if r.created_at else None,
+            "emoji": r.emoji,
+            "user_id": r.user_id,
+            "username": getattr(r.user, "username", "") if r.user_id else "",
+            "track_id": r.track_id,
+        }
+        for r in reaction_rows
+    ]
     listener_peaks = []
     if heatmap.get("buckets"):
         for b in heatmap["buckets"]:
@@ -108,6 +123,7 @@ def build_party_recap(channel: Channel, limit: int = 80) -> dict:
         "total_events": len(rows),
         "top_tracks": top_tracks,
         "timeline": timeline[-40:],
+        "reaction_timeline": reaction_timeline,
         "excitement_heatmap": heatmap,
         "listener_peaks": listener_peaks[:6],
         "generated_at": timezone.now().isoformat(),

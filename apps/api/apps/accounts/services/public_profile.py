@@ -49,6 +49,32 @@ def build_public_profile_payload(
         pub_pl = public_playlists_for_user(user.id)
         public_playlists = PlaylistSerializer(pub_pl, many=True, context={"request": request}).data
 
+    gamification = None
+    live_channels = []
+    party_highlights = []
+    recent_activity = []
+    if profile.is_public:
+        from apps.analytics.services.gamification import build_gamification_payload
+        from apps.accounts.services.public_profile_enrichment import (
+            live_public_channels_for_user,
+            party_recap_highlights_for_user,
+            recent_activity_for_user,
+        )
+
+        g = build_gamification_payload(user.id)
+        gamification = {
+            "level": g["level"],
+            "points": g["points"],
+            "streak_days": g["streak_days"],
+        }
+        live_channels = live_public_channels_for_user(user.id, request)
+        party_highlights = party_recap_highlights_for_user(user.id)
+        recent_activity = recent_activity_for_user(user.id)
+    elif is_self:
+        from apps.accounts.services.public_profile_enrichment import recent_activity_for_user
+
+        recent_activity = recent_activity_for_user(user.id)
+
     return (
         {
             "user": {
@@ -71,6 +97,10 @@ def build_public_profile_payload(
             "follower_count": social["follower_count"],
             "user_following": social["user_following"],
             "is_self": is_self,
+            "gamification": gamification,
+            "live_channels": live_channels,
+            "party_highlights": party_highlights,
+            "recent_activity": recent_activity,
         },
         None,
         None,

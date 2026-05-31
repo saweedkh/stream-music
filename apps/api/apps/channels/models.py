@@ -35,6 +35,7 @@ class ChannelMembership(models.Model):
     class Role(models.TextChoices):
         OWNER = "owner", "Owner"
         MODERATOR = "moderator", "Moderator"
+        DJ = "dj", "DJ"
         MEMBER = "member", "Member"
 
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="memberships")
@@ -288,6 +289,22 @@ class ChannelChatBan(models.Model):
     class Meta:
         unique_together = ("channel", "user")
         indexes = [models.Index(fields=["channel", "banned_until"])]
+
+
+class ChannelBlindGuess(models.Model):
+    """Guess track title during blind listening; scored after reveal."""
+
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="blind_guesses")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="blind_guesses")
+    track = models.ForeignKey("tracks.Track", on_delete=models.CASCADE, related_name="blind_guesses")
+    guess_text = models.CharField(max_length=255)
+    score = models.PositiveSmallIntegerField(default=0)
+    revealed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("channel", "user", "track")
+        indexes = [models.Index(fields=["channel", "-created_at"])]
 
 
 class InviteToken(models.Model):

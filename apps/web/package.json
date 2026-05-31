@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
-    "cap:ios": "cap open ios"
+    "cap:ios": "cap open ios",
+    "generate:api-types": "bash ../../tooling/scripts/generate-openapi-typescript.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.2.0",
@@ -78,6 +79,7 @@
     "autoprefixer": "10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.18",
+    "openapi-typescript": "^7.6.1",
     "jsdom": "^26.1.0",
     "postcss": "8.4.47",
     "tailwindcss": "3.4.14",

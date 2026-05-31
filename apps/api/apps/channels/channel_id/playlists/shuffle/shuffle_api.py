@@ -100,6 +100,23 @@ class ChannelShufflePlayView(APIView):
             metadata={"limit": limit},
         )
         notify_channel_room_started_push(channel.id, actor_user_id=request.user.id)
+        try:
+            from apps.integrations.services.webhooks import dispatch_webhook_event
+            from apps.social.services.activity_feed import record_activity
+
+            dispatch_webhook_event(
+                "channel.shuffle",
+                {"channel_id": channel.id, "channel_name": channel.name},
+                owner_id=channel.owner_id,
+            )
+            record_activity(
+                request.user.id,
+                "channel_shuffle",
+                channel_id=channel.id,
+                metadata={"limit": limit},
+            )
+        except Exception:
+            pass
 
         payload = ChannelControlView._build_control_payload(
             channel_id=channel.id,

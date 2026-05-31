@@ -41,6 +41,38 @@ services:
       - postgres
       - redis
 
+  celery-worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      MEDIA_ROOT: /media
+    volumes:
+      - ./apps/api:/app
+      - ./media:/media
+    command: celery -A config worker -l info --concurrency=2
+    depends_on:
+      - postgres
+      - redis
+
+  celery-beat:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+    volumes:
+      - ./apps/api:/app
+    command: celery -A config beat -l info
+    depends_on:
+      - postgres
+      - redis
+
   frontend:
     build:
       context: ./apps/web

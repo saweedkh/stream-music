@@ -9,4 +9,6 @@ export * from "./playlists";
 export * from "./admin";
 export * from "./support";
 export * from "./discovery";
+export * from "./analytics";
+export * from "./integrations";
     

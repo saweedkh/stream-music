@@ -5,6 +5,8 @@ import type snapshot from "../openapi.snapshot.json";
 
 export type { OpenApiPath } from "./schema-paths";
 export { OPENAPI_PATHS } from "./schema-paths";
+export type { OpenApiOperation as OpenApiOperationKey } from "./openapi-operations";
+export { OPENAPI_OPERATIONS } from "./openapi-operations";
 
 export type OpenApiSnapshot = typeof snapshot;
 

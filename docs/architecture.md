@@ -187,4 +187,6 @@ npm run dev
 npx cap sync && npm run cap:android   # یا cap:ios
 ```
 
-فایل‌ها: `capacitor.config.ts`, `src/lib/capacitor-runtime.ts`.
+فایل‌ها: `capacitor.config.ts`, `src/lib/capacitor-runtime.ts`, `src/lib/capacitor-background-audio.ts`.
+
+برای پخش در پس‌زمینه iOS/Android بعد از `cap add`، `UIBackgroundModes` = `audio` را در Info.plist بگذارید — راهنما: `apps/web/resources/native/BACKGROUND_AUDIO.md`.

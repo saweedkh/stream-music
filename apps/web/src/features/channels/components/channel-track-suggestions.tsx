@@ -10,6 +10,7 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Select } from "@/shared/ui/select";
 import { useToast } from "@/shared/ui/toast-provider";
 import { useTranslations } from "@/shared/providers/locale-provider";
+import { ChannelLiveCollabBanner } from "@/features/channels/components/channel-live-collab-banner";
 import { listenerFieldClass, listenerItemClass } from "@/features/channels/components/channel-listener-panel-styles";
 import { useChannelQueue } from "@/features/channels/components/channel-queue-context";
 import {
@@ -132,6 +133,7 @@ function ListenerTrackSuggestions({ channelId }: { channelId: string }) {
 
   return (
     <div className="space-y-5">
+      <ChannelLiveCollabBanner channelId={channelId} />
       <section className="overflow-hidden rounded-xl border border-border/50 bg-gradient-to-b from-card/40 to-card/15">
         <div className="border-b border-border/40 bg-[var(--surface-inset)]/80 px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">{t("room.listener.suggestions.composeTitle")}</h3>
@@ -636,6 +638,7 @@ export function ChannelTrackSuggestions({ channelId, canManage, variant = "admin
 
   const body = (
     <div className="space-y-4">
+      <ChannelLiveCollabBanner channelId={channelId} />
       <div className="flex flex-wrap gap-2">
         <Select
           value={suggestionFilter}

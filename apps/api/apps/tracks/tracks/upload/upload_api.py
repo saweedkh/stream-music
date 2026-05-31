@@ -142,4 +142,8 @@ class TrackUploadFinalizeView(APIView):
         finally:
             cleanup_files(upload_id)
 
+        from apps.tracks.tasks import enqueue_transcode_low
+
+        enqueue_transcode_low(track.id)
+
         return Response(TrackSerializer(track).data, status=status.HTTP_201_CREATED)

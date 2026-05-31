@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.channels.channel.channel_id.retrieve_update_destroy_api import ChannelRetrieveUpdateDestroyView
 from apps.channels.channel.list_create_api import ChannelListCreateView
+from apps.channels.channel_id.blind_guess.blind_guess_api import ChannelBlindGuessView
 from apps.channels.channel_id.audit_log.audit_log_api import ChannelAuditLogView
 from apps.channels.channel_id.audit_log.export.export_api import ChannelAuditExportView
 from apps.channels.channel_id.chat.chat_api import ChannelChatView
@@ -73,6 +74,7 @@ urlpatterns = [
     path("channels/<int:channel_id>/chat/pin", ChannelChatPinView.as_view()),
     path("channels/<int:channel_id>/track-reactions", ChannelTrackReactionView.as_view()),
     path("channels/<int:channel_id>/party-recap", ChannelPartyRecapView.as_view()),
+    path("channels/<int:channel_id>/blind-guess", ChannelBlindGuessView.as_view()),
     path("channels/<int:channel_id>/history", ChannelPlaybackHistoryView.as_view()),
     path("channels/<int:channel_id>/audit-log", ChannelAuditLogView.as_view()),
     path("channels/<int:channel_id>/audit-log/export", ChannelAuditExportView.as_view()),

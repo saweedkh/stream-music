@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     "apps.tracks",
     "apps.playlists",
     "apps.playback",
+    "apps.analytics.apps.AnalyticsConfig",
+    "apps.integrations.apps.IntegrationsConfig",
 ]
 
 MIDDLEWARE = [
@@ -116,6 +118,23 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-unused-tracks-weekly": {
+        "task": "apps.tracks.tasks.cleanup_unused_tracks_task",
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),
+    },
+}
+
+TRANSCODE_LOW_ENABLED = os.getenv("TRANSCODE_LOW_ENABLED", "1") == "1"
+TRANSCODE_LOW_BITRATE = os.getenv("TRANSCODE_LOW_BITRATE", "128k")
+TRANSCODE_FFMPEG_PATH = os.getenv("TRANSCODE_FFMPEG_PATH", "").strip()
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "").strip()
+
 STATIC_URL = "static/"
 MEDIA_URL = "/audio/"
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
@@ -126,6 +145,13 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(2
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(50 * 1024 * 1024)))
 
 CHUNK_UPLOAD_ROOT = os.getenv("CHUNK_UPLOAD_ROOT", os.path.join(MEDIA_ROOT, "chunk_uploads"))
+
+# External music URL import (YouTube via yt-dlp)
+EXTERNAL_IMPORT_ENABLED = os.getenv("EXTERNAL_IMPORT_ENABLED", "1") == "1"
+EXTERNAL_IMPORT_MAX_DURATION_SECONDS = int(os.getenv("EXTERNAL_IMPORT_MAX_DURATION_SECONDS", "600"))
+EXTERNAL_IMPORT_MAX_BYTES = int(os.getenv("EXTERNAL_IMPORT_MAX_BYTES", str(50 * 1024 * 1024)))
+EXTERNAL_IMPORT_RATE_PER_HOUR = int(os.getenv("EXTERNAL_IMPORT_RATE_PER_HOUR", "8"))
+TRACK_RETENTION_UNUSED_DAYS = int(os.getenv("TRACK_RETENTION_UNUSED_DAYS", "180"))
 CHUNK_UPLOAD_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_MAX_BYTES", str(500 * 1024 * 1024)))
 CHUNK_UPLOAD_CHUNK_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_CHUNK_MAX_BYTES", str(8 * 1024 * 1024)))
 

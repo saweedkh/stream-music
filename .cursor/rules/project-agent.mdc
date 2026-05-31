@@ -6,6 +6,7 @@ alwaysApply: true
 # Stream Music — Agent Rules
 
 Read these docs when making non-trivial changes:
+- `README.md`, `apps/web/README.md`, `apps/api/README.md` — product features (repo / front / back)
 - `docs/README.md` — documentation index
 - `docs/architecture.md` — structure, domains, conventions
 - `docs/CONVENTIONS.md` — lint, commits, PR, security

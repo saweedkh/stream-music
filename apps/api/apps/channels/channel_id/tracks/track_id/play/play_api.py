@@ -99,8 +99,20 @@ class ChannelPlayTrackView(APIView):
         channel_layer = get_channel_layer()
         if channel_layer is not None:
             async_to_sync(channel_layer.group_send)(
-                f"channel_{channel.id}", {"type": "broadcast_event", "payload": payload}
+                f"channel_{channel.id}",
+                {"type": "broadcast_event", "payload": payload},
             )
+
+        try:
+            from apps.integrations.services.webhooks import dispatch_webhook_event
+
+            dispatch_webhook_event(
+                "channel.live",
+                {"channel_id": channel.id, "channel_name": channel.name, "track_id": track.id},
+                owner_id=channel.owner_id,
+            )
+        except Exception:
+            pass
 
         return Response(
             {

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { saveLastChannelId } from "@/lib/last-channel-cache";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/shared/ui/dialog";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
+import { ChannelBlindGuessPanel } from "@/features/channels/components/channel-blind-guess-panel";
 import { ChannelAdminPanel } from "@/features/channels/components/channel-admin-panel";
 import { ChannelChatPanel } from "@/features/channels/components/channel-chat-panel";
 import { ChannelListenerMeta, ChannelRoomLoading } from "@/features/channels/components/channel-listener-view";
@@ -147,6 +149,10 @@ export function ChannelDashboardTabs(props: Props) {
   const [chatTabUnread, setChatTabUnread] = useState(0);
   const [viewAsListener, setViewAsListener] = useState(false);
   const [listenerTab, setListenerTab] = useState<ListenerTabId>("chat");
+  useEffect(() => {
+    saveLastChannelId(channelId);
+  }, [channelId]);
+
   const { onlineCount } = useChannelPresence(channelId);
   const pendingSuggestionsCount = usePendingSuggestionsCount(
     channelId,
@@ -245,8 +251,16 @@ export function ChannelDashboardTabs(props: Props) {
           pending_count?: number;
           event?: string;
           actor_username?: string;
+          collab_active_count?: number;
+          collab_usernames?: string[];
+          recent_pending?: Array<{ id: number; title: string; artist?: string; username: string }>;
         };
         const pending = typeof sug.pending_count === "number" ? sug.pending_count : null;
+        window.dispatchEvent(
+          new CustomEvent("channel-suggestions", {
+            detail: { channelId: String(channelId), payload: sug },
+          }),
+        );
         if (pending != null) {
           window.dispatchEvent(
             new CustomEvent("channel-suggestions-changed", {
@@ -744,6 +758,9 @@ export function ChannelDashboardTabs(props: Props) {
             experience={experience}
             onlineCount={onlineCount}
           />
+          {experience?.blind_playlist_id ? (
+            <ChannelBlindGuessPanel channelId={channelId} currentTrackId={currentTrackId} />
+          ) : null}
         </ChannelListenerPanelShell>
       ),
     };
@@ -836,7 +853,15 @@ export function ChannelDashboardTabs(props: Props) {
         return queuePanel;
       case "suggestions":
         return <ChannelAdminSuggestionsPanel channelId={channelId} canManage={canManageChannel} />;
-      case "insights": return <ChannelRoomInsights channelId={channelId} canManage={canManageChannel} currentTrackId={currentTrackId} />;
+      case "insights":
+        return (
+          <ChannelRoomInsights
+            channelId={channelId}
+            canManage={canManageChannel}
+            currentTrackId={currentTrackId}
+            experience={experience}
+          />
+        );
       case "listeners": return canManageChannel ? <ChannelListenersPanel channelId={channelId} canManage={canManageChannel} isOwner={isChannelOwner} channelIsActive={channelIsActive} onPreviewListenerView={() => setViewAsListener(true)} /> : null;
       case "admin":
         return canManageChannel ? (

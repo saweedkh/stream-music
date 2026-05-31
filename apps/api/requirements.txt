@@ -11,4 +11,7 @@ Pillow>=10.0
 pywebpush>=2.0.0
 http-ece>=1.2.0
 celery>=5.4
+# Optional: server-side YouTube import (apps/tracks/services/external_audio_import.py)
+yt-dlp>=2024.1.1
 sentry-sdk[django]>=2.0
+stripe>=11.0,<14

@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { WorkspacePage } from "@/shared/layout/workspace";
 import { useToast } from "@/shared/ui/toast-provider";
+import { ExploreActivityFeed } from "@/features/discovery/components/explore-activity-feed";
+import { ExploreFriendsLiveRail } from "@/features/discovery/components/explore-friends-live-rail";
 import { ExploreFiltersBar } from "@/features/discovery/components/explore-filters";
 import { ExploreLiveRail } from "@/features/discovery/components/explore-live-rail";
 import { ExplorePeopleSection } from "@/features/discovery/components/explore-people-section";
@@ -80,6 +82,9 @@ export function ExplorePage() {
   return (
     <WorkspacePage className="gap-5 sm:gap-6">
       <ExploreFiltersBar filters={filters} onChange={setFilters} refreshing={refreshing} />
+
+      <ExploreFriendsLiveRail />
+      <ExploreActivityFeed />
 
       <ExploreLiveRail channels={feed.live_channels} loading={sectionLoading} channelFollow={channelFollow} />
 

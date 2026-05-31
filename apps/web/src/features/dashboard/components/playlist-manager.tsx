@@ -37,6 +37,8 @@ import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { AddPlaylistToChannelDialog } from "@/features/playlists";
+import { PlaylistBackupExportButton } from "@/features/dashboard/components/playlist-backup-export-button";
+import { PlaylistBackupImportButton } from "@/features/dashboard/components/playlist-backup-import-button";
 import {
   addPlaylistItem,
   bulkAddTracksToPlaylist,
@@ -568,6 +570,8 @@ export function PlaylistManager() {
             <Star className={`h-3.5 w-3.5 ${playlistsFavoritesOnly ? "fill-current" : ""}`} aria-hidden />
             {playlistsFavoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
           </Button>
+          <PlaylistBackupExportButton />
+          <PlaylistBackupImportButton onImported={() => void refreshMeta(playlistsFavoritesOnly)} />
         </CardHeader>
         <CardContent className="min-h-0 flex-1 pt-0">
         <ScrollArea className="min-h-[12rem] flex-1">

@@ -4,6 +4,8 @@ from apps.playlists.playlist_items.item_id.retrieve_update_destroy_api import (
     PlaylistItemRetrieveUpdateDestroyView,
 )
 from apps.playlists.playlist_items.list_create_api import PlaylistItemListCreateView
+from apps.playlists.playlists.backup.backup_api import PlaylistBackupExportView
+from apps.playlists.playlists.backup.backup_import_api import PlaylistBackupImportView
 from apps.playlists.playlists.list_create_api import PlaylistListCreateView
 from apps.playlists.playlists.playlist_id.add_tracks.add_tracks_api import PlaylistAddTracksView
 from apps.playlists.playlists.playlist_id.assign_to_channel.assign_to_channel_api import (
@@ -23,6 +25,8 @@ from apps.playlists.share.share_api import (
 )
 
 urlpatterns = [
+    path("playlists/backup-export", PlaylistBackupExportView.as_view()),
+    path("playlists/backup-import", PlaylistBackupImportView.as_view()),
     path("playlists/", PlaylistListCreateView.as_view()),
     path("playlists/<int:playlist_id>/", PlaylistRetrieveUpdateDestroyView.as_view()),
     path("playlists/<int:playlist_id>/favorite/", PlaylistFavoriteView.as_view()),

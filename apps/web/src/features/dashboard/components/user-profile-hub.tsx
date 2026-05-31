@@ -28,7 +28,11 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-provider";
+import { GamificationCard } from "@/features/dashboard/components/gamification-card";
 import { NotificationPreferencesCard } from "@/features/dashboard/components/notification-preferences-card";
+import { IntegrationsHubCard } from "@/features/dashboard/components/integrations-hub-card";
+import { PremiumRedeemCard } from "@/features/dashboard/components/premium-redeem-card";
+import { PremiumStripeCard } from "@/features/dashboard/components/premium-stripe-card";
 import { getMe, patchMeProfile, patchMePublicProfile, postChangePassword, type AuthUser } from "@/lib/api";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { dispatchUserSessionRefresh } from "@/lib/user-session-events";
@@ -251,6 +255,17 @@ export function UserProfileHub({ activeSection, channelCount, trackCount, playli
   return (
     <div className="min-w-0 space-y-5">
         {activeSection === "overview" ? overviewHero : null}
+
+        {activeSection === "overview" ? (
+          <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <GamificationCard />
+              <PremiumRedeemCard />
+              <PremiumStripeCard />
+            </div>
+            <IntegrationsHubCard />
+          </>
+        ) : null}
 
         {activeSection === "profile" ? (
           <Card className="border-border/60 bg-card/50 shadow-sm">

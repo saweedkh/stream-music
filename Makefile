@@ -95,5 +95,11 @@ new-domain:
 openapi-export:
 	@bash tooling/scripts/export-openapi-schema.sh
 
+openapi-typescript:
+	@bash tooling/scripts/generate-openapi-typescript.sh
+
+capacitor-native:
+	@bash tooling/scripts/capacitor-init-native.sh
+
 check-openapi:
 	@bash tooling/scripts/check-openapi-snapshot.sh

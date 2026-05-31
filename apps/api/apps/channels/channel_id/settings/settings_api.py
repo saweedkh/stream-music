@@ -8,7 +8,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.channels.constants import ALLOWED_EXPERIENCE_KEYS
+from apps.channels.constants import ALLOWED_EXPERIENCE_KEYS, EXPERIENCE_PRESETS
 from apps.channels.helpers import (
     _log_channel_audit,
     _normalize_public_join_slug_for_save,
@@ -71,6 +71,10 @@ class ChannelSettingsView(APIView):
                     return Response({"detail": "invalid_experience"}, status=status.HTTP_400_BAD_REQUEST)
             if isinstance(raw, dict):
                 ex = dict(channel.experience or {})
+                preset_key = raw.get("experience_preset")
+                if isinstance(preset_key, str) and preset_key in EXPERIENCE_PRESETS:
+                    ex.update(EXPERIENCE_PRESETS[preset_key])
+                    ex["experience_preset"] = preset_key
                 for k, v in raw.items():
                     if k not in ALLOWED_EXPERIENCE_KEYS:
                         continue

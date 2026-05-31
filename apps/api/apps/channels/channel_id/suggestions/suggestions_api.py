@@ -148,12 +148,23 @@ class ChannelPlaylistSuggestionView(APIView):
                 session.save(update_fields=["queue_version", "updated_at"])
                 _broadcast_queue_updated(channel_id, request.user.id)
             elif row.external_url:
-                from apps.channels.chat_service import apply_chat_send
+                from apps.playback.services.channel_queue import insert_track_after_now_playing
+                from apps.tracks.services.external_audio_import import ExternalImportError, import_track_from_url
 
-                label = row.external_title or "Link"
-                artist = f" — {row.external_artist}" if row.external_artist else ""
-                body = f"🎧 {label}{artist}\n{row.external_url}"
-                apply_chat_send(channel_id, request.user, body)
+                try:
+                    track = import_track_from_url(row.user_id, row.external_url)
+                    insert_track_after_now_playing(channel, track, added_by_id=row.user_id)
+                    session, _ = PlaybackSession.objects.get_or_create(channel=channel)
+                    session.queue_version += 1
+                    session.save(update_fields=["queue_version", "updated_at"])
+                    _broadcast_queue_updated(channel_id, request.user.id)
+                except ExternalImportError:
+                    from apps.channels.chat_service import apply_chat_send
+
+                    label = row.external_title or "Link"
+                    artist = f" — {row.external_artist}" if row.external_artist else ""
+                    body = f"🎧 {label}{artist}\n{row.external_url}"
+                    apply_chat_send(channel_id, request.user, body)
         _log_channel_audit(
             channel_id, f"suggestion.{action}", request.user.id, target_type="suggestion", target_id=row.id
         )

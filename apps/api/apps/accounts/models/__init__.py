@@ -11,6 +11,7 @@ from apps.accounts.models.badge_constants import (
 from apps.accounts.models.user_badge_assignment import UserBadgeAssignment
 from apps.accounts.models.user_badge_definition import UserBadgeDefinition
 from apps.accounts.models.user_playlist_favorite import UserPlaylistFavorite
+from apps.accounts.models.premium_invite_code import PremiumCodeRedemption, PremiumInviteCode
 from apps.accounts.models.user_track_favorite import UserTrackFavorite
 
 __all__ = [
@@ -22,6 +23,8 @@ __all__ = [
     "SYSTEM_BADGE_SLUGS",
     "UserBadgeAssignment",
     "UserBadgeDefinition",
+    "PremiumCodeRedemption",
+    "PremiumInviteCode",
     "UserPlaylistFavorite",
     "UserTrackFavorite",
 ]

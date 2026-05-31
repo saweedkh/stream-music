@@ -25,7 +25,13 @@ class ChannelMemberManageView(APIView):
             return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
         membership = get_object_or_404(ChannelMembership, id=member_id, channel_id=channel_id)
         role = request.data.get("role")
-        if role not in [ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR, ChannelMembership.Role.MEMBER]:
+        allowed = {
+            ChannelMembership.Role.OWNER,
+            ChannelMembership.Role.MODERATOR,
+            ChannelMembership.Role.DJ,
+            ChannelMembership.Role.MEMBER,
+        }
+        if role not in allowed:
             return Response({"detail": "invalid_role"}, status=status.HTTP_400_BAD_REQUEST)
         if membership.role == ChannelMembership.Role.OWNER and role != ChannelMembership.Role.OWNER:
             current_owners = ChannelMembership.objects.filter(

@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.admin_panel.admin.premium_codes_api import AdminPremiumCodesView
 from apps.admin_panel.admin.admin_api import (
     AdminBadgeDetailView,
     AdminBadgesView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("admin/channels", AdminChannelsView.as_view()),
     path("admin/channels/<int:channel_id>", AdminChannelDetailView.as_view()),
     path("admin/health", AdminHealthView.as_view()),
+    path("admin/premium-codes", AdminPremiumCodesView.as_view()),
 ]

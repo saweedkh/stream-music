@@ -23,6 +23,7 @@ import { SupportHub } from "@/features/dashboard/components/support-hub";
 import { ProfileFavoritesPanel } from "@/features/dashboard/components/profile-favorites-panel";
 import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
 import { PlaylistManager } from "@/features/dashboard/components/playlist-manager";
+import { TrackImportExternalCard } from "@/features/dashboard/components/track-import-external-card";
 import { TrackLibrarySection } from "@/features/dashboard/components/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/components/track-sharing-section";
 import {
@@ -568,6 +569,7 @@ export function DashboardWorkspace() {
         {activeTab === "tracks" ? (
           <>
             {interruptedUploadAlert}
+            <TrackImportExternalCard />
             <TrackLibrarySection
               tracks={tracks}
               trackTitle={trackTitle}

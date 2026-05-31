@@ -1,93 +1,156 @@
-# Stream Music
+# استریم موزیک (Stream Music)
 
-پلتفرم self-hosted برای پخش هم‌زمان موسیقی در اتاق‌های گروهی (کانال)، با همگام‌سازی WebSocket، چت، صف، پلی‌لیست و کشف محتوا.
+پلتفرم **میزبانی‌شده روی سرور خودتان** برای گوش دادن هم‌زمان به موسیقی در اتاق‌های گروهی: پخش همگام با WebSocket، چت زنده، صف پخش، پلی‌لیست، کاوش محتوا، ناظرگری و پنل مدیریت.
+
+---
 
 ## معماری
 
 ```text
-Browser/PWA  →  Nginx (TLS, /audio)  →  Next.js  →  Django + Daphne (REST + WS)
-                                              ├── PostgreSQL 16
-                                              ├── Redis 7
-                                              └── Celery
+مرورگر / PWA / اپ بومی (Capacitor)
+        ↓
+   Nginx (TLS، مسیر /audio)
+        ↓
+   Next.js (apps/web)  ──REST/WS──►  Django + Daphne (apps/api)
+                                        ├── PostgreSQL 16
+                                        ├── Redis 7 (Channels + کش)
+                                        └── Celery
 ```
 
-| لایه | فناوری |
-|------|--------|
-| Frontend | Next.js 15, React 18, TypeScript, Tailwind, Radix, Zustand |
-| Backend | Django 4.2, DRF, Channels (Daphne) |
-| Deploy | Docker Compose, nginx, Certbot |
+| لایه | مسیر در مخزن | راهنما |
+|------|--------------|--------|
+| **کل پروژه** | `/` | همین فایل |
+| **فرانت‌اند** | `apps/web/` | [apps/web/README.md](apps/web/README.md) |
+| **بک‌اند** | `apps/api/` | [apps/api/README.md](apps/api/README.md) |
+| **مستندات فنی** | `docs/` | [docs/README.md](docs/README.md) |
 
-## شروع سریع (توسعه)
+---
+
+## فیچرهای محصول (نگاه کلی)
+
+### اتاق و کانال (`channels` + `playback`)
+
+| قابلیت | فرانت‌اند | بک‌اند |
+|--------|----------|--------|
+| ساخت، ویرایش، بستن و بازگشایی اتاق | `features/channels`، `dashboard` | `channels/`، `close`، `reopen` |
+| عمومی / خصوصی / فهرست‌نشده، پیوستن با slug | `/join`، `/join/public/[slug]` | `join`، `join-from-link`، `invite` |
+| عضویت، تأیید درخواست پیوستن، خروج | جریان‌های join | `join`، `join-requests`، `leave` |
+| پخش همگام (پخش / توقف / جابه‌جایی / بعدی) | `features/player` | `control`، `state`، WebSocket |
+| صف، رأی، پرش، shuffle | رابط صف اتاق | `queue/`، `playlists/shuffle` |
+| پیشنهاد پلی‌لیست برای اتاق | پنل پیشنهادها | `suggestions` |
+| چت (پاسخ، ویرایش، سنجاق، واکنش) | `channel-chat-panel` | `chat/`، `chat/pin` |
+| واکنش روی ترک / ایموجی شناور | `room-reaction-*` | `track-reactions` |
+| ناظرگری (گزارش، مسدودسازی) | بخش ادمین اتاق | اپ `moderation` |
+| گزارش ممیزی + خروجی | ادمین اتاق | `audit-log/` |
+| خلاصه مهمانی / نقشه حرارتی | `features/party` | `party-recap` |
+| حالت‌های تجربه (تمرین، دروازه مقدمه، …) | `features/experience` | فیلد JSON `experience` کانال |
+
+### کتابخانه و پلی‌لیست (`tracks` + `playlists`)
+
+| قابلیت | فرانت‌اند | بک‌اند |
+|--------|----------|--------|
+| آپلود ترک (چندبخشی و تکه‌تکه) | بخش ترک‌ها در داشبورد | `tracks/`، `upload/` |
+| سطح نمایش و مجوز اشتراک | اشتراک‌گذاری ترک | `share-permissions` |
+| علاقه‌مندی ترک / پلی‌لیست | علاقه‌مندی‌های پروفایل | `favorite/` |
+| ایجاد / ویرایش / حذف پلی‌لیست و آیتم‌ها | `features/playlists`، داشبورد | `playlists/`، `playlist-items/` |
+| افزودن ترک، کپی / اختصاص به کانال | دیالوگ‌ها | `add-tracks`، `copy-to-channel` |
+| لینک اشتراک پلی‌لیست | `/share/playlist/[token]` | `share/` |
+| وارد کردن اشتراک به صف کانال | دیالوگ import | `queue/import-share` |
+
+### کاوش و اجتماعی (`discovery` + `social`)
+
+| قابلیت | فرانت‌اند | بک‌اند |
+|--------|----------|--------|
+| کاوش (زنده، محبوب، پلی‌لیست‌ها) | `features/discovery`، `/explore` | `explore/` |
+| جستجوی سراسری | دیالوگ جستجوی سراسری | `search/global` |
+| دنبال کردن کاربر / کانال | کاوش + پروفایل | `users/.../follow`، `channels/.../follow` |
+| پروفایل عمومی | `/users/[username]` | `accounts`، `social` |
+
+### داشبورد و حساب (`dashboard` + `auth` + `accounts`)
+
+| قابلیت | فرانت‌اند | بک‌اند |
+|--------|----------|--------|
+| ورود، ثبت‌نام، پروفایل | `features/auth`، `/login` | `core/auth/` |
+| مدیریت کانال‌ها، QR پیوستن | `dashboard` | `channels/` |
+| کتابخانه ترک، ساز پلی‌لیست | بخش‌های داشبورد | `tracks`، `playlists` |
+| اعلان‌ها و Web Push | کارت‌های اعلان | `notification-settings`، push |
+| محدودیت‌های پریمیوم | کارت پریمیوم | `accounts` |
+| کانال‌های آنلاین / پیشنهادهای در انتظار | ویجت‌ها | `dashboard/me/` |
+
+### پشتیبانی و مدیریت (`support` + `admin_panel`)
+
+| قابلیت | فرانت‌اند | بک‌اند |
+|--------|----------|--------|
+| تیکت پشتیبانی + WebSocket | `support-hub` | `support/` |
+| پنل ادمین (کاربران، نشان‌ها، کانال‌ها) | `admin-panel-hub` | `admin/` |
+
+---
+
+## مسیرهای اصلی رابط کاربری
+
+| مسیر | توضیح |
+|------|--------|
+| `/` | صفحه ورود / هدایت |
+| `/login`، `/register` | احراز هویت |
+| `/dashboard` | فضای کار (کانال‌ها، کتابخانه، پروفایل، ادمین) |
+| `/explore` | کاوش |
+| `/channel/[id]` | اتاق (تب شنونده و ادمین) |
+| `/join`، `/join/public/[slug]`، `/join/private/[token]` | پیوستن به اتاق |
+| `/join/pending` | در انتظار تأیید پیوستن |
+| `/users/[username]` | پروفایل عمومی |
+| `/share/playlist/[token]` | پلی‌لیست اشتراکی |
+| `/party/[channelId]` | خلاصه جلسه |
+
+---
+
+## شروع سریع
 
 ```bash
-git clone <repo-url> && cd stream-music
-make ensure-env          # کپی .env از example در صورت نبود
+git clone <آدرس-مخزن> && cd stream-music
+make ensure-env
 docker compose up --build
 ```
 
-- اپ: **http://localhost:8080** (nginx)
+- اپلیکیشن: **http://localhost:8080**
 - HTTPS محلی: **https://localhost:8443**
 
-توسعه بدون Docker:
+بدون Docker: راهنمای [بک‌اند](apps/api/README.md) و [فرانت‌اند](apps/web/README.md).
+
+---
+
+## دستورات Makefile
 
 ```bash
-# Backend
-cd apps/api && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && python manage.py migrate
-daphne -b 0.0.0.0 -p 8000 config.asgi:application
-
-# Frontend
-cd apps/web && npm ci && npm run dev
+make help                 # فهرست دستورات
+make check-quality        # lint، قالب‌بندی، بررسی TypeScript
+make test-api             # تست‌های Django
+make test                 # Vitest + Django
+make openapi-export       # خروجی snapshot از API
+make new-feature NAME=discovery   # اسکلت فیچر فرانت
+make new-domain NAME=discovery    # اسکلت دامنه بک
 ```
 
-## Makefile
-
-```bash
-make help
-make check-quality       # lint + ruff format + tsc
-make test-api            # تست Django (Postgres روی localhost:5431)
-make test              # Vitest + Django
-make openapi-export    # openapi.snapshot.json
-make new-feature NAME=foo
-make new-domain NAME=foo
-```
-
-## مستندات
-
-**فهرست کامل:** [docs/README.md](docs/README.md)
-
-| سند | موضوع |
-|-----|--------|
-| [docs/architecture.md](docs/architecture.md) | ساختار repo، دامنه‌ها، API snapshot |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | lint، commit، PR |
-| [docs/realtime-contracts.md](docs/realtime-contracts.md) | WebSocket |
-| [docs/production-deployment.md](docs/production-deployment.md) | استقرار پروداکشن |
+---
 
 ## API و WebSocket
 
-- REST: `/api/` — `make openapi-export` برای snapshot
-- WS: [docs/realtime-contracts.md](docs/realtime-contracts.md)
-- کنترل پخش: `POST /api/channels/{id}/control` → broadcast به همه اعضا
+- **REST:** پیشوند `/api/` — به‌روزرسانی snapshot: `make openapi-export`
+- **WebSocket پخش:** `ws/channels/{id}` — جزئیات در [docs/realtime-contracts.md](docs/realtime-contracts.md)
+- **WebSocket چت:** همان کانال (consumer جدا در بک‌اند)
 
-## تست
+---
 
-```bash
-make test-api
-cd apps/web && npm test
-cd apps/web && npm run test:e2e    # Playwright — see apps/web/e2e/README.md
-```
+## مستندات تکمیلی
 
-E2E با rate limit خاموش: `docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d`
+| سند | موضوع |
+|-----|--------|
+| [docs/architecture.md](docs/architecture.md) | قرارداد پوشه‌ها و import |
+| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | lint، commit، PR |
+| [docs/production-deployment.md](docs/production-deployment.md) | استقرار پروداکشن |
+| [docs/realtime-contracts.md](docs/realtime-contracts.md) | قرارداد WebSocket |
 
-## استقرار پروداکشن
+---
 
-[docs/production-deployment.md](docs/production-deployment.md) — `./deploy/up.sh`، TLS، migrate خودکار.
+## مجوز
 
-## سایر
-
-- Import ترک / Capacitor: بخش «راهنماهای کوتاه» در [docs/architecture.md](docs/architecture.md)
-- Web Push: `bash scripts/generate-vapid-keys.sh`
-
-## License
-
-Private — all rights reserved.
+خصوصی — تمامی حقوق محفوظ است.

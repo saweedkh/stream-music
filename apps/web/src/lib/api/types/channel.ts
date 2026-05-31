@@ -25,6 +25,7 @@ export type ChannelExperienceSettings = {
   scheduled_start_at?: string | null;
   queue_end_mode?: "loop" | "stop" | "repeat_one";
   room_rules?: string;
+  experience_preset?: string | null;
 };
 
 export type ChannelStateResponse = {

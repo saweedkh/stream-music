@@ -17,6 +17,7 @@ class TrackSerializer(serializers.ModelSerializer):
             "tags",
             "duration_seconds",
             "file",
+            "file_low",
             "visibility",
             "created_at",
             "is_favorited",

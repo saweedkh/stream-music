@@ -2,7 +2,10 @@
 
 from django.urls import include, path
 
+from apps.accounts.webhooks.stripe_webhook_api import StripeWebhookView
+
 urlpatterns = [
+    path("webhooks/stripe", StripeWebhookView.as_view()),
     path("", include("apps.core.urls")),
     path("", include("apps.accounts.urls")),
     path("", include("apps.tracks.urls")),
@@ -14,4 +17,6 @@ urlpatterns = [
     path("", include("apps.moderation.urls")),
     path("", include("apps.support.urls")),
     path("", include("apps.admin_panel.urls")),
+    path("", include("apps.analytics.urls")),
+    path("", include("apps.integrations.urls")),
 ]

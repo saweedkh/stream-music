@@ -21,3 +21,15 @@ def record_playback_event(
         source=source,
         payload=payload or {},
     )
+    try:
+        from apps.analytics.services.listen_metrics import on_playback_event
+
+        on_playback_event(
+            channel_id,
+            event_type,
+            actor_id=actor_id,
+            track_id=track.id if track else None,
+            payload=payload,
+        )
+    except Exception:
+        pass

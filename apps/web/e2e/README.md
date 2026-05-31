@@ -12,6 +12,13 @@
 | `join-request.spec.ts` | Private channel join approve |
 | `resumable-upload.spec.ts` | Chunked upload init/status |
 | `playback-channel.spec.ts` | Admin/listener audio (project `chromium-playback`) |
+| `premium-redeem-ui.spec.ts` | Dashboard premium code redeem (needs `E2E_RATE_LIMIT_OFF`) |
+| `channel-statistics-ui.spec.ts` | Channel insights statistics panel |
+| `playlist-backup-ui.spec.ts` | Playlist JSON backup download |
+| `new-features-api.spec.ts` | Statistics / gamification / blind-guess API smoke |
+| `blind-guess-ui.spec.ts` | Blind guess panel in room info tab |
+| `integrations-webhook.spec.ts` | Outbound webhooks + public API token |
+| `playlist-backup-roundtrip.spec.ts` | Export/import backup API roundtrip |
 
 ## Run (recommended)
 
