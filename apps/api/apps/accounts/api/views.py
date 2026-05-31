@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership
 from apps.accounts.models import UserPlaylistFavorite
-from apps.common.serializers import ChannelSerializer, PlaylistSerializer
+from apps.channels.api.serializers import ChannelSerializer
+from apps.playlists.api.serializers import PlaylistSerializer
 from apps.social.models import ChannelFollow, UserFollow, UserPublicProfile
 from apps.accounts.user_badges import badges_for_user
 from apps.discovery.selectors import public_channel_queryset

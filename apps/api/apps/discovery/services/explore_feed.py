@@ -8,7 +8,8 @@ from django.db.models import Count
 from django.utils import timezone
 
 from apps.channels.models import Channel
-from apps.common.serializers import ChannelSerializer, PlaylistSerializer
+from apps.channels.api.serializers import ChannelSerializer
+from apps.playlists.api.serializers import PlaylistSerializer
 from apps.playlists.models import PlaylistShareLink
 from apps.discovery.selectors import channel_is_live, explore_channel_matches, public_channel_queryset
 from apps.playback.models import PlaybackEvent

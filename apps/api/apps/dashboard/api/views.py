@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelMembership, ChannelPlaylistSuggestion
-from apps.common.serializers import ChannelSerializer
+from apps.channels.api.serializers import ChannelSerializer
 from apps.channels.api.helpers import _can_manage_channel
 from apps.playback.consumers import _presence_snapshot
 

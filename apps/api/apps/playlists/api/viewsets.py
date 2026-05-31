@@ -1,117 +1,27 @@
-import json
-import re
-import time
-import uuid
-from datetime import timedelta
-from urllib.parse import urlparse
-
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.conf import settings as django_settings
-from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Max, Q
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from apps.channels.models import (
-    Channel,
-    ChannelAuditLog,
-    ChannelChatMessage,
-    ChannelNotificationPreference,
-    ChannelPlaylistSuggestion,
-    ChannelTrackReaction,
-    ChannelJoinRequest,
-    ChannelMembership,
-    InviteToken,
-    UserNotificationSettings,
-    WebPushSubscription,
+from apps.accounts.models import UserPlaylistFavorite
+from apps.accounts.user_badges import is_platform_superuser
+from apps.channels.api.helpers import (
+    PLAYLIST_BULK_ADD_MAX,
+    _can_copy_playlist_to_channel,
+    _can_edit_channel_playlist,
+    _can_manage_channel,
+    _favorited_playlist_ids_for_user,
+    _playlist_inaccessible_track_ids,
+    _playlist_visible_to_user,
 )
+from apps.channels.models import Channel, ChannelMembership
+from apps.playback.services.channel_queue import tracks_accessible_to_user
+from apps.playlists.api.serializers import PlaylistItemSerializer, PlaylistSerializer
+from apps.playlists.models import Playlist, PlaylistItem
+from apps.tracks.models import Track
 
-
-from apps.common.serializers import (
-    ChannelAuditLogSerializer,
-    ChannelSerializer,
-    ChannelChatMessageSerializer,
-    ChannelNotificationPreferenceSerializer,
-    ChannelPlaylistSuggestionSerializer,
-    ChannelTrackReactionSerializer,
-    ChannelJoinRequestSerializer,
-    MembershipSerializer,
-    PlaybackEventSerializer,
-    PlaybackSessionSerializer,
-    PlaylistSerializer,
-    PlaylistItemSerializer,
-    QueueItemSerializer,
-    TrackSerializer,
-    AuthUserProfileUpdateSerializer,
-    AuthUserSerializer,
-    PasswordChangeSerializer,
-    InviteTokenSerializer,
-    TrackSharePermissionSerializer,
-    UserNotificationSettingsSerializer,
-)
-from apps.core.services.webpush import notify_channel_room_started_push
-from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import (
-    MAX_SHUFFLE_TRACKS,
-    apply_track_to_session,
-    pick_shuffled_tracks,
-    replace_queue_with_tracks,
-    tracks_accessible_to_user,
-)
-from apps.playback.services.queue_advance import (
-    apply_queue_advance,
-    clear_active_playlist,
-    playback_queue_meta,
-    scheduled_start_blocks_playback,
-    set_active_playlist,
-    set_playback_source,
-)
-from apps.playback.services.state_store import playback_state_store
-from apps.tracks.filesystem_import import import_audio_files_under_media
-from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
-from apps.tracks.models import Track, TrackSharePermission
-from apps.common.admin_views import (
-    AdminChannelsView,
-    AdminHealthView,
-    AdminOverviewView,
-    AdminUserDetailView,
-    AdminUsersView,
-)
-from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
-from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
-
-
-def _favorited_track_ids_for_user(user) -> set[int]:
-    return set(UserTrackFavorite.objects.filter(user_id=user.id).values_list("track_id", flat=True))
-
-
-def _favorited_playlist_ids_for_user(user) -> set[int]:
-    return set(UserPlaylistFavorite.objects.filter(user_id=user.id).values_list("playlist_id", flat=True))
-
-
-def _playlist_visible_to_user(user, playlist: Playlist) -> bool:
-    if is_platform_superuser(user):
-        return True
-    if playlist.owner_id == user.id:
-        return True
-    if UserPlaylistFavorite.objects.filter(user_id=user.id, playlist_id=playlist.id).exists():
-        return True
-    if playlist.channel_id:
-        return ChannelMembership.objects.filter(channel_id=playlist.channel_id, user=user, is_active=True).exists()
-    from apps.playlists.models import PlaylistShareLink
-
-    return PlaylistShareLink.objects.filter(playlist_id=playlist.id, is_active=True).exists()
 
 class PlaylistViewSet(viewsets.ModelViewSet):
     serializer_class = PlaylistSerializer
@@ -371,5 +281,3 @@ class PlaylistItemViewSet(viewsets.ModelViewSet):
         if not _can_edit_channel_playlist(self.request.user, instance.playlist):
             raise PermissionDenied("permission_denied")
         instance.delete()
-
-

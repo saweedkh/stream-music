@@ -1,5 +1,5 @@
 from apps.channels.models import ChannelMembership
-from apps.common.serializers import ChannelSerializer
+from apps.channels.api.serializers import ChannelSerializer
 from apps.social.models import ChannelFollow
 from apps.discovery.selectors import channel_is_live
 

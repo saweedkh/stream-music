@@ -1,7 +1,6 @@
 """Channel queue HTTP views."""
 
 from rest_framework import permissions
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.services import channel_queue as queue_service

@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.channels.models import Channel, ChannelChatMessage, ChannelChatReport
-from apps.channels.moderation import ban_user, is_channel_staff, is_user_chat_banned, unban_user
+from apps.channels.moderation import ban_user, is_channel_staff, unban_user
 from apps.channels.api.helpers import _can_manage_channel
 
 

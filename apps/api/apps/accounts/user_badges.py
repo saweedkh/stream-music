@@ -172,20 +172,3 @@ def badges_for_users(users: list) -> dict[int, list[dict]]:
         return out
     except ProgrammingError:
         return {u.id: _legacy_badge_list(u) for u in users}
-
-
-def assign_badge_slug(user_id: int, slug: str, *, assigned_by_id: int | None = None) -> bool:
-    defn = UserBadgeDefinition.objects.filter(slug=slug, is_active=True).first()
-    if defn is None:
-        return False
-    UserBadgeAssignment.objects.get_or_create(
-        user_id=user_id,
-        badge_id=defn.id,
-        defaults={"assigned_by_id": assigned_by_id},
-    )
-    return True
-
-
-def unassign_badge_slug(user_id: int, slug: str) -> bool:
-    deleted, _ = UserBadgeAssignment.objects.filter(user_id=user_id, badge__slug=slug).delete()
-    return deleted > 0

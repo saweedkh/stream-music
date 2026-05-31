@@ -1,95 +1,17 @@
-import json
-import re
-import time
-import uuid
-from datetime import timedelta
-from urllib.parse import urlparse
-
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.conf import settings as django_settings
-from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
-from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.channels.models import (
-    Channel,
-    ChannelAuditLog,
-    ChannelChatMessage,
-    ChannelNotificationPreference,
-    ChannelPlaylistSuggestion,
-    ChannelTrackReaction,
-    ChannelJoinRequest,
-    ChannelMembership,
-    InviteToken,
-    UserNotificationSettings,
-    WebPushSubscription,
-)
-
-
-from apps.common.serializers import (
-    ChannelAuditLogSerializer,
-    ChannelSerializer,
-    ChannelChatMessageSerializer,
-    ChannelNotificationPreferenceSerializer,
-    ChannelPlaylistSuggestionSerializer,
-    ChannelTrackReactionSerializer,
-    ChannelJoinRequestSerializer,
-    MembershipSerializer,
-    PlaybackEventSerializer,
-    PlaybackSessionSerializer,
-    PlaylistSerializer,
-    PlaylistItemSerializer,
-    QueueItemSerializer,
-    TrackSerializer,
-    AuthUserProfileUpdateSerializer,
-    AuthUserSerializer,
-    PasswordChangeSerializer,
-    InviteTokenSerializer,
-    TrackSharePermissionSerializer,
-    UserNotificationSettingsSerializer,
-)
-from apps.core.services.webpush import notify_channel_room_started_push
-from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import (
-    MAX_SHUFFLE_TRACKS,
-    apply_track_to_session,
-    pick_shuffled_tracks,
-    replace_queue_with_tracks,
-    tracks_accessible_to_user,
-)
-from apps.playback.services.queue_advance import (
-    apply_queue_advance,
-    clear_active_playlist,
-    playback_queue_meta,
-    scheduled_start_blocks_playback,
-    set_active_playlist,
-    set_playback_source,
-)
-from apps.playback.services.state_store import playback_state_store
-from apps.tracks.filesystem_import import import_audio_files_under_media
-from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
+from apps.accounts.models import UserTrackFavorite
+from apps.accounts.user_badges import is_platform_superuser
+from apps.channels.models import Channel, ChannelMembership
+from apps.playback.services.channel_queue import tracks_accessible_to_user
+from apps.tracks.api.serializers import TrackSerializer, TrackSharePermissionSerializer
 from apps.tracks.models import Track, TrackSharePermission
-from apps.common.admin_views import (
-    AdminChannelsView,
-    AdminHealthView,
-    AdminOverviewView,
-    AdminUserDetailView,
-    AdminUsersView,
-)
-from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
-from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
 
 
 class TrackViewSet(viewsets.ModelViewSet):
@@ -101,7 +23,9 @@ class TrackViewSet(viewsets.ModelViewSet):
         ctx = super().get_serializer_context()
         user = self.request.user
         if getattr(user, "is_authenticated", False):
-            ctx["favorited_track_ids"] = _favorited_track_ids_for_user(user)
+            ctx["favorited_track_ids"] = set(
+                UserTrackFavorite.objects.filter(user_id=user.id).values_list("track_id", flat=True)
+            )
         return ctx
 
     def get_queryset(self):
@@ -198,7 +122,9 @@ class TrackSharePermissionsView(APIView):
             kwargs["user"] = get_object_or_404(User, id=int(user_id))
         if channel_id:
             channel = get_object_or_404(Channel, id=int(channel_id))
-            if not is_platform_superuser(request.user) and not ChannelMembership.objects.filter(channel=channel, user=request.user, is_active=True).exists():
+            if not is_platform_superuser(request.user) and not ChannelMembership.objects.filter(
+                channel=channel, user=request.user, is_active=True
+            ).exists():
                 return Response({"detail": "channel_not_accessible"}, status=status.HTTP_403_FORBIDDEN)
             kwargs["channel"] = channel
         share, _ = TrackSharePermission.objects.get_or_create(**kwargs)
@@ -213,5 +139,3 @@ class TrackSharePermissionsView(APIView):
         if not deleted:
             return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-

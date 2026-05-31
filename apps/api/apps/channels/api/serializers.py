@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.channels.models import (
     Channel, ChannelAuditLog, ChannelChatMessage, ChannelJoinRequest, ChannelMembership,
     ChannelNotificationPreference, ChannelPlaylistSuggestion, ChannelTrackReaction,
-    InviteToken, UserNotificationSettings,
+    InviteToken,
 )
 
 class ChannelSerializer(serializers.ModelSerializer):

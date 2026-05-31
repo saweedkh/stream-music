@@ -6,9 +6,44 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.serializers import TrackSerializer
+from apps.tracks.api.serializers import TrackSerializer
 from apps.tracks.chunk_upload import append_chunk, cleanup_files, finalize_path, get_session, init_session
 from apps.tracks.models import Track
+from apps.tracks.services.url_import import import_track_from_url
+
+
+class TrackUploadFromUrlView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        url = (request.data.get("url") or "").strip()
+        if not url:
+            return Response({"detail": "url_required"}, status=status.HTTP_400_BAD_REQUEST)
+        title = (request.data.get("title") or "").strip()
+        visibility = request.data.get("visibility") or Track.Visibility.PRIVATE
+        artist = (request.data.get("artist") or "").strip()
+        album = (request.data.get("album") or "").strip()
+        genre = (request.data.get("genre") or "").strip()[:120]
+        raw_tags = request.data.get("tags")
+        tags: list[str] = []
+        if isinstance(raw_tags, list):
+            tags = [str(t).strip() for t in raw_tags if str(t).strip()][:20]
+        try:
+            payload, code, duplicate = import_track_from_url(
+                user=request.user,
+                url=url,
+                title=title,
+                visibility=visibility,
+                artist=artist,
+                album=album,
+                genre=genre,
+                tags=tags,
+            )
+        except ValueError as exc:
+            detail = str(exc) or "import_failed"
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        body = {**payload, "duplicate": duplicate}
+        return Response(body, status=code)
 
 
 class TrackUploadInitView(APIView):

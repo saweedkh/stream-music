@@ -1,39 +1,29 @@
 """Channel API helpers (join, queue, audit, permissions)."""
 
-import json
 import re
-import time
-import uuid
-from datetime import timedelta
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from django.contrib.auth.models import User
-from django.db import transaction
-from django.db.models import Max, Q
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 
-from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
+from apps.accounts.models import UserPlaylistFavorite
 from apps.accounts.user_badges import is_platform_superuser
 from apps.channels.models import (
     Channel,
     ChannelAuditLog,
-    ChannelChatMessage,
     ChannelJoinRequest,
     ChannelMembership,
+    ChannelPlaylistSuggestion,
     InviteToken,
 )
-from apps.core.services.webpush import notify_channel_room_started_push
 from apps.playback.models import PlaybackEvent, PlaybackSession
 from apps.playback.services.channel_queue import tracks_accessible_to_user
 from apps.playback.services.state_store import playback_state_store
 from apps.channels.api.serializers import MembershipSerializer
 from apps.playlists.api.serializers import QueueItemSerializer
 from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
-from apps.playlists.models import PlaylistShareLink
 from apps.tracks.models import Track
 
 
@@ -117,10 +107,6 @@ def _resolve_public_join_segment(seg: str) -> Channel | None:
 
 # Per-request cap for playlist bulk-add (client may send smaller chunks).
 PLAYLIST_BULK_ADD_MAX = 150
-
-
-def _favorited_track_ids_for_user(user) -> set[int]:
-    return set(UserTrackFavorite.objects.filter(user_id=user.id).values_list("track_id", flat=True))
 
 
 def _favorited_playlist_ids_for_user(user) -> set[int]:

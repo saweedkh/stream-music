@@ -1,113 +1,23 @@
-import json
 import re
-import time
-import uuid
-from datetime import timedelta
 from urllib.parse import urlparse
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.conf import settings as django_settings
-from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.models import User
-from django.db import transaction
-from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.channels.models import (
-    Channel,
-    ChannelAuditLog,
-    ChannelChatMessage,
-    ChannelNotificationPreference,
-    ChannelPlaylistSuggestion,
-    ChannelTrackReaction,
-    ChannelJoinRequest,
-    ChannelMembership,
-    InviteToken,
-    UserNotificationSettings,
-    WebPushSubscription,
-)
-
-
-from apps.common.serializers import (
-    ChannelAuditLogSerializer,
-    ChannelSerializer,
-    ChannelChatMessageSerializer,
-    ChannelNotificationPreferenceSerializer,
-    ChannelPlaylistSuggestionSerializer,
-    ChannelTrackReactionSerializer,
-    ChannelJoinRequestSerializer,
-    MembershipSerializer,
-    PlaybackEventSerializer,
-    PlaybackSessionSerializer,
-    PlaylistSerializer,
-    PlaylistItemSerializer,
-    QueueItemSerializer,
-    TrackSerializer,
-    AuthUserProfileUpdateSerializer,
-    AuthUserSerializer,
-    PasswordChangeSerializer,
-    InviteTokenSerializer,
-    TrackSharePermissionSerializer,
-    UserNotificationSettingsSerializer,
-)
-from apps.core.services.webpush import notify_channel_room_started_push
-from apps.playback.models import PlaybackEvent, PlaybackSession
-from apps.playback.permissions import can_control_channel
-from apps.playback.services.channel_queue import (
-    MAX_SHUFFLE_TRACKS,
-    apply_track_to_session,
-    pick_shuffled_tracks,
-    replace_queue_with_tracks,
-    tracks_accessible_to_user,
-)
-from apps.playback.services.queue_advance import (
-    apply_queue_advance,
-    clear_active_playlist,
-    playback_queue_meta,
-    scheduled_start_blocks_playback,
-    set_active_playlist,
-    set_playback_source,
-)
-from apps.playback.services.state_store import playback_state_store
-from apps.tracks.filesystem_import import import_audio_files_under_media
-from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote, Playlist, PlaylistItem
-from apps.tracks.models import Track, TrackSharePermission
-from apps.common.admin_views import (
-    AdminChannelsView,
-    AdminHealthView,
-    AdminOverviewView,
-    AdminUserDetailView,
-    AdminUsersView,
-)
-from apps.accounts.models import UserPlaylistFavorite, UserTrackFavorite
-from apps.accounts.user_badges import is_platform_superuser, user_badge_flags
 from apps.channels.api.helpers import (
-    _broadcast_queue_updated,
-    _broadcast_suggestions_updated,
-    _can_copy_playlist_to_channel,
-    _can_edit_channel_playlist,
+    _PUBLIC_JOIN_CODE_RE,
+    _UUID_TOKEN_RE,
     _can_manage_channel,
     _channel_closed_response,
     _consume_invite,
-    _log_channel_audit,
-    _normalize_public_join_slug_for_save,
-    _playlist_inaccessible_track_ids,
-    _record_playback_event,
     _resolve_public_join_segment,
-    _queue_serialize_context,
-    _serialize_queue,
-    _validate_private_invite,
     perform_channel_join,
 )
+from apps.channels.api.serializers import ChannelJoinRequestSerializer, MembershipSerializer
+from apps.channels.models import Channel, ChannelJoinRequest, ChannelMembership, InviteToken
 
 
 class ChannelJoinRequestRejectView(APIView):
@@ -128,7 +38,6 @@ class ChannelJoinRequestRejectView(APIView):
         return Response({"detail": "rejected"}, status=status.HTTP_200_OK)
 
 
-
 class ChannelJoinRequestListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -141,7 +50,6 @@ class ChannelJoinRequestListView(APIView):
             .order_by("created_at")
         )
         return Response({"results": ChannelJoinRequestSerializer(pending, many=True).data})
-
 
 
 class ChannelJoinRequestApproveView(APIView):
@@ -187,14 +95,12 @@ class ChannelJoinRequestApproveView(APIView):
         return Response(MembershipSerializer(membership).data, status=status.HTTP_200_OK)
 
 
-
 class ChannelJoinView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, channel_id: int):
         channel = get_object_or_404(Channel, id=channel_id)
         return perform_channel_join(request.user, channel, request.data.get("token"))
-
 
 
 class ChannelJoinFromLinkView(APIView):
@@ -271,8 +177,3 @@ class ChannelJoinFromLinkView(APIView):
             return perform_channel_join(request.user, channel, None)
 
         return Response({"detail": "unrecognized_link"}, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-

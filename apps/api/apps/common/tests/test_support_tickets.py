@@ -58,7 +58,7 @@ class SupportTicketApiTests(TestCase):
         self.assertEqual(staff_list.json()["total"], 1)
         self.assertIn("stats", staff_list.json())
 
-        other = User.objects.create_user(username="other", password="pw123456")
+        User.objects.create_user(username="other", password="pw123456")
         self._login("other")
         other_list = self.client.get("/api/support/tickets")
         self.assertEqual(other_list.json()["total"], 0)
