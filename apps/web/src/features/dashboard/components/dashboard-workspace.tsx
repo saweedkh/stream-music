@@ -194,39 +194,6 @@ export function DashboardWorkspace() {
     }
   }
 
-  async function handleAddPlaylistItem() {
-    if (!itemPlaylistId || !itemTrackId) {
-      showToast(t("dashboard.selectPlaylistAndTrack"), "error");
-      return;
-    }
-    try {
-      const playlistId = Number(itemPlaylistId);
-      const trackId = Number(itemTrackId);
-      const position = playlistItems.filter((item) => item.playlist === playlistId).length;
-      await addPlaylistItem({ playlist: playlistId, track: trackId, position });
-      setStatus(t("dashboard.trackAddedToPlaylist"));
-      showToast(t("dashboard.trackAddedToPlaylist"), "success");
-      setItemPlaylistId("");
-      setItemTrackId("");
-      await refreshAll();
-    } catch {
-      setStatus(t("dashboard.cannotAddToPlaylist"));
-      showToast(t("dashboard.cannotAddToPlaylist"), "error");
-    }
-  }
-
-  async function handleReorderPlaylist(draggingId: number, dropIndex: number) {
-    try {
-      await reorderPlaylistItem(draggingId, dropIndex);
-      setStatus(t("dashboard.playlistReordered"));
-      showToast(t("dashboard.playlistReordered"), "success");
-      await refreshAll();
-    } catch {
-      setStatus(t("dashboard.cannotReorderPlaylist"));
-      showToast(t("dashboard.cannotReorderPlaylist"), "error");
-    }
-  }
-
   if (isLoading) {
     return (
       <DashboardShell

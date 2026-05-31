@@ -33,7 +33,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { WorkspaceRailCard } from "@/shared/layout/workspace";
-import { parseAudioFileMetadata } from "@/lib/audio-metadata";
+import { parseAudioFileMetadata, type ParsedAudioMeta } from "@/lib/audio-metadata";
 import { deriveTitleFromFileName } from "@/features/tracks/model/upload-types";
 import { cn } from "@/lib/utils";
 
@@ -376,8 +376,8 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
   const [urlTitle, setUrlTitle] = useState("");
 
   const queue = useTrackUploadQueue({
-    onItemComplete: (_item, track) => {
-      if (track.duplicate) showToast(t("upload.studio.duplicate"), "info");
+    onItemComplete: (item) => {
+      if (item.status === "duplicate") showToast(t("upload.studio.duplicate"), "info");
     },
     onBatchSettled: () => onUploadComplete?.(),
   });
@@ -396,7 +396,7 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
       }
       const entries: PreviewItem[] = [];
       for (const file of audioFiles) {
-        const meta = await parseAudioFileMetadata(file).catch(() => ({}));
+        const meta = await parseAudioFileMetadata(file).catch((): Partial<ParsedAudioMeta> => ({}));
         entries.push({
           id: newId(),
           kind: "file",
