@@ -1,0 +1,83 @@
+---
+description: DRF APIView conventions — thin views, services, permissions, responses
+globs: apps/api/**/views*.py,apps/api/**/api/views/**/*.py
+alwaysApply: false
+---
+
+# DRF APIView
+
+Thin HTTP layer only. Business logic lives in `services/`; read queries in `selectors/`. See `docs/project-structure.md`.
+
+## When to use
+
+| Use **APIView** | Use **ViewSet** |
+|-----------------|-----------------|
+| Single action or custom endpoint (`explore`, `search/global`) | CRUD on one model (`TrackViewSet`, `ChannelViewSet`) |
+| Non-resource routes (upload init/chunk/finalize, admin overview) | Nested `@action` on a resource collection |
+| Service returns `Response` directly (queue ops) | Standard list/create/retrieve/update/destroy |
+
+## View template
+
+```python
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.<domain>.services.<use_case> import do_something
+
+
+class ExampleView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, channel_id: int):
+        q = (request.query_params.get("q") or "").strip()
+        return Response(do_something(request, channel_id, q=q))
+```
+
+## Rules
+
+1. **Always set `permission_classes`** — default is `AllowAny`. Typical: `IsAuthenticated`; public read: `AllowAny`; admin: add custom `BasePermission` (e.g. `SuperuserRequired`).
+2. **Parse input in the view** — query params / `request.data`; pass primitives to services, not raw `request`.
+3. **No fat views** — no transactions, broadcasts, or multi-step orchestration in `views.py`. Delegate to `services/`.
+4. **Serializers for shape** — use `ModelSerializer` in `api/serializers.py` for JSON I/O; services may return dicts or `Response`.
+5. **Errors** — `Response({"detail": "<snake_case_code>"}, status=status.HTTP_4xx)`. Codes: `not_found`, `permission_denied`, `invalid_credentials`. Match existing endpoints in the same domain.
+6. **Lookups** — `get_object_or_404(Model, …)` for 404; or explicit `.first()` + `not_found` when hiding existence.
+7. **URLs** — register in `apps/<domain>/api/urls.py` with `.as_view()`; `config/urls.py` only `include`s domain urls.
+8. **Naming** — `<Resource><Action>View` (`ExploreFeedView`, `ChannelQueueJumpView`).
+
+## Good vs bad
+
+```python
+# ✅ GOOD — discovery/api/views.py pattern
+def get(self, request):
+    return Response(build_explore_feed(request, q=q, lang=lang))
+
+# ✅ GOOD — channels/services returns Response; view is one line
+def get(self, request, channel_id: int):
+    return queue_service.get_channel_queue(request.user, channel_id)
+
+# ❌ BAD — business logic, ORM, and side effects in the view
+def post(self, request, channel_id: int):
+    with transaction.atomic():
+        item = ChannelQueueItem.objects.create(...)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(...)
+```
+
+## File layout
+
+```text
+apps/<domain>/api/views.py          # small domain
+apps/<domain>/api/views/<topic>.py  # split when large (channels: queue, playback)
+apps/<domain>/services/<use_case>.py
+apps/<domain>/api/urls.py
+```
+
+## Checklist (new endpoint)
+
+- [ ] Logic in service/selector, not view
+- [ ] `permission_classes` explicit
+- [ ] Error codes consistent with sibling endpoints
+- [ ] URL added to domain `api/urls.py`
+- [ ] Frontend client in `apps/web/src/lib/api/` (not raw fetch)
+- [ ] Test in `apps/<domain>/tests/test_api.py` when behavior is non-trivial

@@ -7,6 +7,7 @@ if [ -r /etc/nginx/ssl/dev.crt ] && [ -r /etc/nginx/ssl/dev.key ]; then
   cp /templates/02-https.conf /etc/nginx/conf.d/02-https.conf
   echo "[nginx] HTTPS enabled — https://<this-machine-ip>:8443"
 else
+  rm -f /etc/nginx/conf.d/02-https.conf
   echo "[nginx] TLS missing: put dev.crt + dev.key in infra/nginx/ssl (run generate-dev-certs.sh). HTTPS :8443 disabled until then."
 fi
 exec /docker-entrypoint.sh nginx -g "daemon off;"
