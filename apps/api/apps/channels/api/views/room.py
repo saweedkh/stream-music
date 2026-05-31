@@ -4,6 +4,7 @@ import json
 import uuid
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -43,12 +44,13 @@ from apps.channels.models import (
     ChannelTrackReaction,
     InviteToken,
 )
-
+from apps.channels.services.brand_media import assign_channel_brand_logo, clear_channel_brand_logo
+from apps.channels.services.party_recap import build_party_recap
+from apps.playlists.api.serializers import TrackSerializer
 from apps.playback.api.serializers import PlaybackEventSerializer
 from apps.playback.models import PlaybackEvent, PlaybackSession
 from apps.playback.services.channel_queue import tracks_accessible_to_user
 from apps.playback.services.state_store import playback_state_store
-from apps.playlists.api.serializers import TrackSerializer
 from apps.tracks.models import Track
 
 
@@ -414,6 +416,12 @@ class ChannelNotificationPreferenceView(APIView):
 
 
 
+def _request_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ("1", "true", "yes", "on")
+
+
 class ChannelSettingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -474,8 +482,16 @@ class ChannelSettingsView(APIView):
                         ex[k] = v
                 channel.experience = ex
                 update_fields.append("experience")
-        if "brand_logo" in getattr(request, "FILES", {}):
-            channel.brand_logo = request.FILES["brand_logo"]
+        if _request_bool(request.data.get("brand_logo_clear")):
+            clear_channel_brand_logo(channel)
+            update_fields.append("brand_logo")
+        uploaded_logo = getattr(request, "FILES", {}).get("brand_logo")
+        if uploaded_logo is not None:
+            try:
+                assign_channel_brand_logo(channel, uploaded_logo)
+            except DjangoValidationError as exc:
+                code = exc.messages[0] if exc.messages else "brand_logo_invalid"
+                return Response({"detail": str(code)}, status=status.HTTP_400_BAD_REQUEST)
             update_fields.append("brand_logo")
         if not update_fields:
             return Response(ChannelSerializer(channel, context={"request": request}).data)
@@ -552,7 +568,12 @@ class ChannelMembersView(APIView):
                 channel_id=channel_id, user=request.user, is_active=True
             ).exists():
                 return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
-        members = ChannelMembership.objects.filter(channel_id=channel_id).select_related("user").order_by("joined_at")
+        from apps.social.services.avatar import avatar_urls_for_user_ids
+
+        member_list = list(
+            ChannelMembership.objects.filter(channel_id=channel_id).select_related("user").order_by("joined_at")
+        )
+        avatars = avatar_urls_for_user_ids([m.user_id for m in member_list])
         data = [
             {
                 "id": m.id,
@@ -561,9 +582,10 @@ class ChannelMembersView(APIView):
                 "role": m.role,
                 "is_active": m.is_active,
                 "joined_at": m.joined_at,
+                "avatar_url": avatars.get(m.user_id),
                 **user_badge_flags(m.user),
             }
-            for m in members
+            for m in member_list
         ]
         return Response({"results": data})
 

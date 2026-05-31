@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { importTrackFromUrl, uploadTrackChunked, type TrackSummary } from "@/lib/api";
-import { parseAudioFileMetadata } from "@/lib/audio-metadata";
+import { parseAudioFileMetadata, type ParsedAudioMeta } from "@/lib/audio-metadata";
 import { uploadTrackResumable } from "@/lib/resumable-upload";
 import {
   deriveTitleFromFileName,
@@ -12,6 +12,7 @@ import {
 
 type UseTrackUploadQueueOptions = {
   onItemComplete?: (item: UploadQueueItem, track: TrackSummary) => void;
+  onItemFailed?: (item: UploadQueueItem, message: string) => void;
   onBatchSettled?: () => void;
 };
 
@@ -19,7 +20,16 @@ function newId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
-export function useTrackUploadQueue({ onItemComplete, onBatchSettled }: UseTrackUploadQueueOptions) {
+type EnqueueEntry = {
+  kind: "file" | "url";
+  file?: File;
+  url?: string;
+  title: string;
+  artist?: string;
+  album?: string;
+};
+
+export function useTrackUploadQueue({ onItemComplete, onItemFailed, onBatchSettled }: UseTrackUploadQueueOptions) {
   const [items, setItems] = useState<UploadQueueItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const itemsRef = useRef(items);
@@ -69,9 +79,10 @@ export function useTrackUploadQueue({ onItemComplete, onBatchSettled }: UseTrack
       } catch (error) {
         const message = error instanceof Error ? error.message : "upload_failed";
         updateItem(item.id, { status: "failed", error: message });
+        onItemFailed?.(item, message);
       }
     },
-    [onItemComplete, updateItem],
+    [onItemComplete, onItemFailed, updateItem],
   );
 
   const pump = useCallback(async () => {
@@ -103,12 +114,52 @@ export function useTrackUploadQueue({ onItemComplete, onBatchSettled }: UseTrack
     }
   }, [onBatchSettled, uploadOne]);
 
+  const enqueueEntries = useCallback(
+    async (entries: EnqueueEntry[], visibility: TrackSummary["visibility"]) => {
+      if (!entries.length) return;
+      const queued: UploadQueueItem[] = entries.map((entry) => {
+        let title = entry.title.trim();
+        if (!title) {
+          if (entry.kind === "file" && entry.file) title = deriveTitleFromFileName(entry.file.name);
+          else if (entry.url) {
+            try {
+              title = deriveTitleFromFileName(new URL(entry.url).pathname.split("/").pop() || "Imported track");
+            } catch {
+              title = "Imported track";
+            }
+          } else {
+            title = "Untitled track";
+          }
+        }
+        return {
+          id: newId(),
+          kind: entry.kind,
+          file: entry.file,
+          url: entry.url?.trim(),
+          title,
+          artist: entry.artist,
+          album: entry.album,
+          visibility,
+          status: "queued" as const,
+          progress: 0,
+        };
+      });
+      setItems((prev) => {
+        const next = [...prev, ...queued];
+        itemsRef.current = next;
+        return next;
+      });
+      queueMicrotask(() => void pump());
+    },
+    [pump],
+  );
+
   const enqueueFiles = useCallback(
     async (files: File[], visibility: TrackSummary["visibility"]) => {
       if (!files.length) return;
       const entries: UploadQueueItem[] = [];
       for (const file of files) {
-        const meta = await parseAudioFileMetadata(file).catch(() => ({}));
+        const meta = await parseAudioFileMetadata(file).catch((): Partial<ParsedAudioMeta> => ({}));
         entries.push({
           id: newId(),
           kind: "file",
@@ -197,6 +248,7 @@ export function useTrackUploadQueue({ onItemComplete, onBatchSettled }: UseTrack
     items,
     isRunning,
     stats,
+    enqueueEntries,
     enqueueFiles,
     enqueueUrl,
     retryItem,

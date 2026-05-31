@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Loader2, RefreshCw, Users } from "lucide-react";
 import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Badge } from "@/shared/ui/badge";
 import { UsernameWithBadges } from "@/shared/ui/user-verified-badge";
 import { Button } from "@/shared/ui/button";
@@ -96,9 +96,12 @@ export function ChannelListenersPanel({
                 key={m.id}
                 className="flex items-center gap-2 rounded-full border border-brand/25 bg-[var(--brand-subtle)] py-1 pl-1 pr-3"
               >
-                <Avatar className="h-8 w-8 border border-brand/40">
-                  <AvatarFallback className="text-xs">{(m.username || "?").slice(0, 1)}</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  username={m.username}
+                  avatarUrl={m.avatar_url ?? memberByUserId.get(m.id)?.avatar_url}
+                  className="h-8 w-8 border border-brand/40"
+                  fallbackClassName="text-xs"
+                />
                 <UsernameWithBadges
                   username={m.username}
                   flags={memberByUserId.get(m.id)}
@@ -143,9 +146,12 @@ export function ChannelListenersPanel({
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback>{(member.username || "?").slice(0, 1)}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      username={member.username}
+                      avatarUrl={member.avatar_url}
+                      className="h-9 w-9 shrink-0"
+                      fallbackClassName="text-sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <UsernameWithBadges
                         username={member.username}
@@ -185,9 +191,7 @@ export function ChannelListenersPanel({
                 </li>
                 {inactiveMembers.map((member) => (
                   <li key={member.id} className="flex items-center gap-3 rounded-lg px-2 py-2.5 opacity-60 hover:bg-muted/20">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback>{(member.username || "?").slice(0, 1)}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar username={member.username} avatarUrl={member.avatar_url} className="h-9 w-9" />
                     <div className="min-w-0 flex-1">
                       <UsernameWithBadges
                         username={member.username}

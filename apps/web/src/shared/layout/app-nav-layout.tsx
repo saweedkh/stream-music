@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { DashboardMobileHeader } from "@/features/dashboard/components/dashboard-mobile-header";
 import { DashboardSidebar } from "@/features/dashboard/components/dashboard-sidebar";
-import type { AdminSection, ProfileSection } from "@/features/dashboard/model/dashboard-nav-config";
+import type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
 import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import { JoinChannelDialog } from "@/features/dashboard/components/join-channel-dialog";
 import { getMe, type AuthUser } from "@/lib/api";
@@ -18,20 +18,16 @@ import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
   activeTab: DashboardTab;
-  activeProfileSection: ProfileSection;
   activeAdminSection: AdminSection;
-  onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => void;
-  onSelectProfileSection: (section: ProfileSection) => void;
+  onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => void;
   onSelectAdminSection: (section: AdminSection) => void;
   children: ReactNode;
 };
 
 export function AppNavLayout({
   activeTab,
-  activeProfileSection,
   activeAdminSection,
   onSelectMainTab,
-  onSelectProfileSection,
   onSelectAdminSection,
   children,
 }: AppNavLayoutProps) {
@@ -44,11 +40,9 @@ export function AppNavLayout({
   const contentKey =
     pathname?.startsWith("/explore")
       ? "explore"
-      : activeTab === "settings"
-        ? `settings-${activeProfileSection}`
-        : activeTab === "admin"
-          ? `admin-${activeAdminSection}`
-          : activeTab;
+      : activeTab === "admin"
+        ? `admin-${activeAdminSection}`
+        : activeTab;
 
   useEffect(() => {
     getMe()
@@ -77,14 +71,9 @@ export function AppNavLayout({
   const sidebarProps = {
     activePathname: pathname,
     activeTab,
-    activeProfileSection,
     activeAdminSection,
-    onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => {
+    onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => {
       onSelectMainTab(tab);
-      setMobileNavOpen(false);
-    },
-    onSelectProfileSection: (section: ProfileSection) => {
-      onSelectProfileSection(section);
       setMobileNavOpen(false);
     },
     onSelectAdminSection: (section: AdminSection) => {

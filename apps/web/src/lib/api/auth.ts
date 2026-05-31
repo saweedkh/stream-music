@@ -27,7 +27,18 @@ export async function getMe(): Promise<MeBootstrap | null> {
   return (await res.json()) as MeBootstrap;
 }
 
+export async function checkUsernameAvailable(username: string): Promise<{ available: boolean; reason?: string }> {
+  const q = new URLSearchParams({ username: username.trim() });
+  const res = await fetch(
+    `${getApiBase()}/api/auth/username-available?${q}`,
+    await withAuthHeaders({ method: "GET" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot check username"));
+  return (await res.json()) as { available: boolean; reason?: string };
+}
+
 export async function patchMeProfile(payload: {
+  username?: string;
   email?: string;
   first_name?: string;
   last_name?: string;
@@ -96,7 +107,7 @@ export async function deleteWebPushSubscriptions(endpoint?: string): Promise<voi
 export async function listUsers() {
   const res = await fetch(`${getApiBase()}/api/auth/users`, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error("Cannot load users");
-  return (await res.json()) as { results: Array<{ id: number; username: string }> };
+  return (await res.json()) as { results: Array<{ id: number; username: string; avatar_url?: string | null }> };
 }
 
 export async function getServerTime() {

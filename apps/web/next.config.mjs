@@ -7,11 +7,14 @@ const nextConfig = {
   output: "standalone",
   async rewrites() {
     const rewrites = [{ source: "/favicon.ico", destination: "/icon.svg" }];
-    if (devRemoteOrigin) {
+    const apiUpstream =
+      devRemoteOrigin ||
+      (process.env.NODE_ENV === "development" ? process.env.API_UPSTREAM?.replace(/\/$/, "") || "http://127.0.0.1:8000" : "");
+    if (apiUpstream) {
       rewrites.push(
-        { source: "/api/:path*", destination: `${devRemoteOrigin}/api/:path*` },
-        { source: "/ws/:path*", destination: `${devRemoteOrigin}/ws/:path*` },
-        { source: "/audio/:path*", destination: `${devRemoteOrigin}/audio/:path*` },
+        { source: "/api/:path*", destination: `${apiUpstream}/api/:path*` },
+        { source: "/ws/:path*", destination: `${apiUpstream}/ws/:path*` },
+        { source: "/audio/:path*", destination: `${apiUpstream}/audio/:path*` },
       );
     }
     return rewrites;

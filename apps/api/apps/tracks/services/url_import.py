@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import ipaddress
 import os
 import socket
+import ssl
 import tempfile
-import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 
 from django.conf import settings
@@ -40,8 +40,19 @@ _MAGIC_PREFIXES = (
     b"\x00\x00\x00",
 )
 _MAX_REDIRECTS = 3
-_CONNECT_TIMEOUT = 15
-_READ_TIMEOUT = 120
+_DEFAULT_TIMEOUT_SECONDS = 120
+_FETCH_HEADERS = {
+    "User-Agent": "StreamMusic/1.0 (+url-import)",
+    "Accept": "audio/*,application/octet-stream",
+}
+
+
+def _request_timeout_seconds() -> int:
+    """Always return a plain int — never a (connect, read) tuple."""
+    raw = getattr(settings, "URL_IMPORT_TIMEOUT", _DEFAULT_TIMEOUT_SECONDS)
+    if isinstance(raw, (list, tuple)):
+        return int(raw[-1])
+    return int(raw)
 
 
 def _max_bytes() -> int:
@@ -116,51 +127,76 @@ def _looks_like_audio(data: bytes) -> bool:
     return any(data.startswith(prefix) for prefix in _MAGIC_PREFIXES)
 
 
+def _read_limited_body(resp: http.client.HTTPResponse, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        block = resp.read(1024 * 256)
+        if not block:
+            break
+        total += len(block)
+        if total > max_bytes:
+            raise ValueError("file_too_large")
+        chunks.append(block)
+    body = b"".join(chunks)
+    if not body:
+        raise ValueError("empty_file")
+    return body
+
+
 def _fetch_with_redirect_guard(url: str) -> tuple[bytes, str, str]:
     current = url
+    timeout = _request_timeout_seconds()
     for _ in range(_MAX_REDIRECTS + 1):
         parsed = validate_remote_url(current)
         filename = _filename_from_url(parsed)
-        req = urllib.request.Request(
-            current,
-            headers={"User-Agent": "StreamMusic/1.0 (+url-import)", "Accept": "audio/*,application/octet-stream"},
-            method="GET",
-        )
+        host = parsed.hostname or ""
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+
+        if parsed.scheme == "https":
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+                host,
+                port,
+                timeout=timeout,
+                context=ssl.create_default_context(),
+            )
+        else:
+            conn = http.client.HTTPConnection(host, port, timeout=timeout)
+
         try:
-            with urllib.request.urlopen(req, timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT)) as resp:
-                content_type = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            conn.request("GET", path, headers=_FETCH_HEADERS)
+            resp = conn.getresponse()
+            try:
+                if resp.status in {301, 302, 303, 307, 308}:
+                    location = resp.getheader("Location")
+                    resp.read()
+                    if not location:
+                        raise ValueError("invalid_redirect")
+                    current = urllib.parse.urljoin(current, location)
+                    continue
+                if resp.status < 200 or resp.status >= 300:
+                    raise ValueError("fetch_failed")
+
+                content_type = (resp.getheader("Content-Type") or "").split(";")[0].strip().lower()
                 if content_type and not (
                     content_type.startswith("audio/")
                     or content_type in {"application/octet-stream", "binary/octet-stream", "application/ogg"}
                 ):
                     raise ValueError("invalid_content_type")
-                chunks: list[bytes] = []
-                total = 0
-                max_bytes = _max_bytes()
-                while True:
-                    block = resp.read(1024 * 256)
-                    if not block:
-                        break
-                    total += len(block)
-                    if total > max_bytes:
-                        raise ValueError("file_too_large")
-                    chunks.append(block)
-                body = b"".join(chunks)
-                if not body:
-                    raise ValueError("empty_file")
+
+                body = _read_limited_body(resp, _max_bytes())
                 if not _looks_like_audio(body):
                     raise ValueError("invalid_audio")
                 return body, filename, content_type or "application/octet-stream"
-        except urllib.error.HTTPError as exc:
-            if exc.code in {301, 302, 303, 307, 308}:
-                location = exc.headers.get("Location")
-                if not location:
-                    raise ValueError("invalid_redirect") from exc
-                current = urllib.parse.urljoin(current, location)
-                continue
+            finally:
+                resp.close()
+        except OSError as exc:
             raise ValueError("fetch_failed") from exc
-        except urllib.error.URLError as exc:
-            raise ValueError("fetch_failed") from exc
+        finally:
+            conn.close()
     raise ValueError("too_many_redirects")
 
 

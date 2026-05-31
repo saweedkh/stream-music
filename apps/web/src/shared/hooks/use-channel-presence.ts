@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-export type PresenceMember = { id: number; username: string };
+export type PresenceMember = { id: number; username: string; avatar_url?: string | null };
 
 type SocialPayload = {
   action?: string;

@@ -94,11 +94,16 @@ export async function listSupportTicketMessages(ticketId: number, options?: { li
 
 export async function postSupportTicketMessage(
   ticketId: number,
-  payload: { body: string; is_internal?: boolean },
+  payload: { body: string; is_internal?: boolean; file?: File | null },
 ) {
+  const form = new FormData();
+  form.append("body", payload.body);
+  if (payload.is_internal) form.append("is_internal", "true");
+  if (payload.file) form.append("attachment", payload.file);
+
   const res = await fetch(
     `${getApiBase()}/api/support/tickets/${ticketId}/messages`,
-    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+    await withAuthFormData({ method: "POST", body: form }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot send message"));
   return (await res.json()) as { message: SupportMessageRow; ticket: SupportTicketRow };

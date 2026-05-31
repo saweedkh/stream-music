@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.contrib.auth.models import User
 from django.db.models import Q
 from rest_framework import permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -110,6 +111,7 @@ class SupportTicketDetailView(APIView):
 
 class SupportTicketMessagesView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request, ticket_id: int):
         if not can_access_ticket(ticket_id, request.user.id):
@@ -126,8 +128,13 @@ class SupportTicketMessagesView(APIView):
     def post(self, request, ticket_id: int):
         body = request.data.get("body")
         is_internal = bool(request.data.get("is_internal"))
+        attachment = request.FILES.get("attachment")
         msg_dict, ticket_dict, err = apply_send_message(
-            ticket_id, request.user, str(body or ""), is_internal=is_internal
+            ticket_id,
+            request.user,
+            str(body or ""),
+            is_internal=is_internal,
+            attachment=attachment,
         )
         if err == "not_found":
             return Response({"detail": err}, status=status.HTTP_404_NOT_FOUND)
@@ -135,6 +142,8 @@ class SupportTicketMessagesView(APIView):
             return Response({"detail": err}, status=status.HTTP_403_FORBIDDEN)
         if err == "rate_limited":
             return Response({"detail": err}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        if err in ("attachment_too_large", "invalid_attachment", "invalid_attachment_type"):
+            return Response({"detail": err}, status=status.HTTP_400_BAD_REQUEST)
         if err:
             return Response({"detail": err}, status=status.HTTP_400_BAD_REQUEST)
         if ticket_dict:

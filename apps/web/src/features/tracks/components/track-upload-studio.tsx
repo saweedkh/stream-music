@@ -1,30 +1,26 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
   Check,
-  CheckCircle2,
   CloudUpload,
-  Copy,
-  Globe,
   Link2,
   Loader2,
-  Lock,
   Music2,
   Plus,
-  RefreshCw,
   Upload,
   X,
 } from "lucide-react";
+import { TrackAccessPicker } from "@/features/tracks/components/track-access-picker";
+import { MobileUploadProgressDock } from "@/features/tracks/components/mobile-upload-progress-dock";
+import { UploadQueuePanel } from "@/features/tracks/components/upload-queue-panel";
 import { useTrackUploadQueue } from "@/features/tracks/hooks/use-track-upload-queue";
 import { formatFileSize } from "@/features/tracks/model/upload-types";
 import {
   toBackendVisibility,
-  TRACK_ACCESS_HINT_KEYS,
-  TRACK_ACCESS_LABEL_KEYS,
   type TrackAccess,
 } from "@/features/tracks/model/track-access";
+import { useIsLgUp } from "@/shared/hooks/use-media-query";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
 import { Badge } from "@/shared/ui/badge";
@@ -57,14 +53,6 @@ function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
-function QueueStatusIcon({ status }: { status: string }) {
-  if (status === "uploading") return <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden />;
-  if (status === "done") return <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden />;
-  if (status === "duplicate") return <Copy className="h-4 w-4 text-amber-500" aria-hidden />;
-  if (status === "failed") return <AlertCircle className="h-4 w-4 text-rose-500" aria-hidden />;
-  return <Music2 className="h-4 w-4 text-muted-foreground" aria-hidden />;
-}
-
 type UploadStudioFormProps = {
   mode: UploadMode;
   onModeChange: (mode: UploadMode) => void;
@@ -88,41 +76,6 @@ type UploadStudioFormProps = {
   onClearFinished: () => void;
   compact?: boolean;
 };
-
-function AccessPicker({ access, onAccessChange }: { access: TrackAccess; onAccessChange: (a: TrackAccess) => void }) {
-  const { t } = useTranslations();
-  const options: TrackAccess[] = ["public", "private"];
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-medium text-muted-foreground">{t("tracks.accessLabel")}</Label>
-      <div className="grid grid-cols-2 gap-2">
-        {options.map((opt) => {
-          const active = access === opt;
-          const Icon = opt === "public" ? Globe : Lock;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onAccessChange(opt)}
-              className={cn(
-                "flex flex-col items-start gap-1 rounded-xl border px-3 py-3 text-start transition-all",
-                active
-                  ? "border-brand/50 bg-brand/10 shadow-sm ring-1 ring-brand/20"
-                  : "border-border/60 bg-background/50 hover:border-border hover:bg-muted/30",
-              )}
-            >
-              <span className={cn("flex items-center gap-1.5 text-sm font-semibold", active ? "text-brand" : "text-foreground")}>
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                {t(TRACK_ACCESS_LABEL_KEYS[opt])}
-              </span>
-              <span className="text-[11px] leading-snug text-muted-foreground">{t(TRACK_ACCESS_HINT_KEYS[opt])}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function UploadStudioForm({
   mode,
@@ -176,7 +129,7 @@ function UploadStudioForm({
         </button>
       </div>
 
-      <AccessPicker access={access} onAccessChange={onAccessChange} />
+      <TrackAccessPicker access={access} onAccessChange={onAccessChange} />
 
       {mode === "files" ? (
         <div
@@ -308,58 +261,15 @@ function UploadStudioForm({
       ) : null}
 
       {queueItems.length > 0 ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("upload.studio.queueTitle")}</p>
-            {(queueStats.done > 0 || queueStats.failed > 0) && !isRunning ? (
-              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onClearFinished}>
-                {t("upload.studio.clearFinished")}
-              </Button>
-            ) : null}
-          </div>
-          <ul className="max-h-56 space-y-2 overflow-y-auto">
-            {queueItems.map((item) => (
-              <li key={item.id} className="rounded-xl border border-border/50 bg-background/70 px-3 py-2.5">
-                <div className="flex items-start gap-3">
-                  <QueueStatusIcon status={item.status} />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{item.title}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {item.kind === "file" && item.file
-                            ? formatFileSize(item.file.size)
-                            : item.url}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-0.5">
-                        {item.status === "failed" ? (
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => onRetry(item.id)}>
-                            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                          </Button>
-                        ) : null}
-                        {item.status !== "uploading" ? (
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => onRemoveQueue(item.id)}>
-                            <X className="h-3.5 w-3.5" aria-hidden />
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    {item.status === "uploading" && item.kind === "file" ? (
-                      <div className="h-1 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${item.progress}%` }} />
-                      </div>
-                    ) : null}
-                    {item.error ? <p className="text-[11px] text-rose-500">{item.error}</p> : null}
-                    {item.status === "duplicate" ? (
-                      <p className="text-[11px] text-amber-600">{t("upload.studio.duplicate")}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <UploadQueuePanel
+          items={queueItems}
+          stats={queueStats}
+          isRunning={isRunning}
+          onRetry={onRetry}
+          onRemove={onRemoveQueue}
+          onClearFinished={onClearFinished}
+          compact={compact}
+        />
       ) : null}
     </div>
   );
@@ -368,6 +278,7 @@ function UploadStudioForm({
 export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) {
   const { t } = useTranslations();
   const { showToast } = useToast();
+  const isLgUp = useIsLgUp();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<UploadMode>("files");
   const [access, setAccess] = useState<TrackAccess>("public");
@@ -379,10 +290,17 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
     onItemComplete: (item) => {
       if (item.status === "duplicate") showToast(t("upload.studio.duplicate"), "info");
     },
+    onItemFailed: (_item, message) => {
+      showToast(message, "error");
+    },
     onBatchSettled: () => onUploadComplete?.(),
   });
 
   const visibility = toBackendVisibility(access);
+
+  useEffect(() => {
+    if (isLgUp) setSheetOpen(false);
+  }, [isLgUp]);
 
   const addFilesToPreview = useCallback(
     async (files: FileList | File[] | null) => {
@@ -439,15 +357,21 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
 
   const confirmPreview = async () => {
     if (!previewItems.length) return;
-    const files = previewItems.filter((p) => p.kind === "file" && p.file).map((p) => p.file!);
-    const urls = previewItems.filter((p) => p.kind === "url" && p.url);
-    if (files.length) await queue.enqueueFiles(files, visibility);
-    for (const u of urls) {
-      if (u.url) queue.enqueueUrl(u.url, visibility, u.title);
-    }
+    const count = previewItems.length;
+    await queue.enqueueEntries(
+      previewItems.map((p) => ({
+        kind: p.kind,
+        file: p.file,
+        url: p.url,
+        title: p.title,
+        artist: p.artist,
+        album: p.album,
+      })),
+      visibility,
+    );
     setPreviewItems([]);
-    setSheetOpen(false);
-    showToast(t("upload.studio.started", { count: String(previewItems.length) }), "success");
+    if (!isLgUp) setSheetOpen(true);
+    showToast(t("upload.studio.started", { count: String(count) }), "success");
   };
 
   const formProps: UploadStudioFormProps = {
@@ -490,6 +414,14 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
         <UploadStudioForm {...formProps} />
       </section>
 
+      <MobileUploadProgressDock
+        items={queue.items}
+        stats={queue.stats}
+        isRunning={queue.isRunning}
+        sheetOpen={sheetOpen}
+        onExpand={() => setSheetOpen(true)}
+      />
+
       <div className="fixed bottom-[calc(var(--player-mini-inset,0px)+1rem+env(safe-area-inset-bottom))] end-4 z-30 lg:hidden">
         <Button
           type="button"
@@ -502,10 +434,15 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
         </Button>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[92dvh] gap-0 overflow-y-auto p-0">
+      <Sheet open={sheetOpen && !isLgUp} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[92dvh] gap-0 overflow-y-auto p-0 lg:hidden">
           <SheetTitle className="sr-only">{t("upload.studio.title")}</SheetTitle>
-          <WorkspaceRailCard icon={CloudUpload} title={t("upload.studio.title")} description={t("upload.studio.subtitle")} className="border-0 shadow-none">
+          <WorkspaceRailCard
+            icon={CloudUpload}
+            title={t("upload.studio.title")}
+            description={t("upload.studio.subtitle")}
+            className="relative z-10 border-0 shadow-none"
+          >
             <UploadStudioForm {...formProps} compact />
           </WorkspaceRailCard>
         </SheetContent>

@@ -1,24 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Pencil, Search, Star, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Loader2, Music2, Search, SlidersHorizontal, Star, Trash2 } from "lucide-react";
+import { TrackEditDialog } from "@/features/tracks/components/track-edit-dialog";
+import { TrackLibraryRow } from "@/features/tracks/components/track-library-row";
 import { useTrackLibrary } from "@/features/tracks/hooks/use-track-library";
-import {
-  fromBackendVisibility,
-  toBackendVisibility,
-  TRACK_ACCESS_LABEL_KEYS,
-  type TrackAccess,
-} from "@/features/tracks/model/track-access";
+import { fromBackendVisibility, type TrackAccess } from "@/features/tracks/model/track-access";
+import { useIsLgUp } from "@/shared/hooks/use-media-query";
+import { WorkspaceChip, WorkspaceChipGroup, WorkspaceEmpty } from "@/shared/layout/workspace";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { FavoriteStarButton } from "@/shared/ui/favorite-star-button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { Skeleton } from "@/shared/ui/skeleton";
 import type { TrackSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -30,13 +27,18 @@ type TrackLibraryPanelProps = {
 export function TrackLibraryPanel({ refreshSignal = 0 }: TrackLibraryPanelProps) {
   const { t } = useTranslations();
   const { showToast } = useToast();
-  const lib = useTrackLibrary((key) => showToast(t(key as "tracks.loadFailed"), "error"));
+  const onLoadError = useCallback(() => {
+    showToast(t("tracks.loadFailed"), "error");
+  }, [showToast, t]);
+  const lib = useTrackLibrary(onLoadError);
   const { refresh } = lib;
+  const isLgUp = useIsLgUp();
 
   useEffect(() => {
     if (refreshSignal > 0) void refresh();
   }, [refreshSignal, refresh]);
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [editTrack, setEditTrack] = useState<TrackSummary | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editArtist, setEditArtist] = useState("");
@@ -46,6 +48,8 @@ export function TrackLibraryPanel({ refreshSignal = 0 }: TrackLibraryPanelProps)
 
   const [deleteTarget, setDeleteTarget] = useState<TrackSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const activeFilterCount = [lib.genre, lib.album, lib.favoritesOnly].filter(Boolean).length;
 
   function openEdit(track: TrackSummary) {
     setEditTrack(track);
@@ -88,195 +92,210 @@ export function TrackLibraryPanel({ refreshSignal = 0 }: TrackLibraryPanelProps)
     }
   }
 
+  const filterFields = (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">{t("tracks.filterGenre")}</Label>
+        <Select value={lib.genre} onChange={(e) => lib.setGenre(e.target.value)}>
+          <option value="">{t("tracks.filterAll")}</option>
+          {lib.facetGenres.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">{t("tracks.filterAlbum")}</Label>
+        <Select value={lib.album} onChange={(e) => lib.setAlbum(e.target.value)}>
+          <option value="">{t("tracks.filterAll")}</option>
+          {lib.facetAlbums.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </Select>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <Card className="border-border/60 bg-card/50 shadow-sm">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>{t("tracks.musicLibraryTitle")}</CardTitle>
-              <CardDescription>{t("tracks.musicLibraryDescription", { count: String(lib.total) })}</CardDescription>
+      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+        <header className="border-b border-border/50 bg-gradient-to-r from-brand/[0.07] via-transparent to-violet-500/[0.05] px-4 py-4 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand/12 text-brand shadow-inner">
+                <Music2 className="size-5" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-semibold tracking-tight">{t("tracks.musicLibraryTitle")}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("tracks.musicLibraryDescription", { count: String(lib.total) })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="space-y-3 border-b border-border/40 px-4 py-3 sm:px-5">
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                className="h-10 bg-background/60 ps-9"
+                placeholder={t("tracks.searchPlaceholder")}
+                value={lib.search}
+                onChange={(e) => lib.setSearch(e.target.value)}
+              />
             </div>
             <Button
               type="button"
-              size="sm"
-              variant={lib.favoritesOnly ? "default" : "outline"}
-              className={cn("h-8 gap-1.5", lib.favoritesOnly && "bg-amber-500/90 hover:bg-amber-500")}
-              onClick={() => lib.setFavoritesOnly(!lib.favoritesOnly)}
+              variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
+              size="icon"
+              className="relative h-10 w-10 shrink-0 sm:hidden"
+              aria-label={t("tracks.filters")}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((v) => !v)}
             >
-              <Star className={cn("h-3.5 w-3.5", lib.favoritesOnly && "fill-current")} aria-hidden />
-              {lib.favoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />
+              {activeFilterCount > 0 ? (
+                <span className="absolute -end-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
             </Button>
           </div>
 
-          <div className="relative">
-            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input
-              className="ps-9"
-              placeholder={t("tracks.searchPlaceholder")}
-              value={lib.search}
-              onChange={(e) => lib.setSearch(e.target.value)}
-            />
-          </div>
+          <WorkspaceChipGroup>
+            <WorkspaceChip selected={lib.favoritesOnly} onClick={() => lib.setFavoritesOnly(!lib.favoritesOnly)}>
+              <span className="inline-flex items-center gap-1.5">
+                <Star className={cn("size-3.5", lib.favoritesOnly && "fill-current")} aria-hidden />
+                {lib.favoritesOnly ? t("favorites.showAll") : t("favorites.showOnly")}
+              </span>
+            </WorkspaceChip>
+            {lib.genre ? (
+              <WorkspaceChip selected onClick={() => lib.setGenre("")}>
+                {lib.genre} ×
+              </WorkspaceChip>
+            ) : null}
+            {lib.album ? (
+              <WorkspaceChip selected onClick={() => lib.setAlbum("")}>
+                {lib.album} ×
+              </WorkspaceChip>
+            ) : null}
+          </WorkspaceChipGroup>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label className="text-xs">{t("tracks.filterGenre")}</Label>
-              <Select value={lib.genre} onChange={(e) => lib.setGenre(e.target.value)}>
-                <option value="">{t("tracks.filterAll")}</option>
-                {lib.facetGenres.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t("tracks.filterAlbum")}</Label>
-              <Select value={lib.album} onChange={(e) => lib.setAlbum(e.target.value)}>
-                <option value="">{t("tracks.filterAll")}</option>
-                {lib.facetAlbums.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
+          <div className={cn("grid gap-3 sm:grid-cols-2", !filtersOpen && "hidden sm:grid")}>{filterFields}</div>
+        </div>
 
-        <CardContent>
+        <div className="px-1 py-2 sm:px-2">
           {lib.loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-14 w-full rounded-xl" />
-              <Skeleton className="h-14 w-full rounded-xl" />
-              <Skeleton className="h-14 w-full rounded-xl" />
+            <div className="space-y-2 px-2 py-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-[4.25rem] w-full rounded-xl" />
+              ))}
             </div>
           ) : lib.tracks.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border/70 py-14 text-center text-sm text-muted-foreground">
-              {lib.search || lib.genre || lib.album || lib.favoritesOnly ? t("tracks.emptyFiltered") : t("tracks.empty")}
-            </p>
+            <WorkspaceEmpty icon={Music2} title={lib.search || lib.genre || lib.album || lib.favoritesOnly ? undefined : t("tracks.empty")}>
+              {lib.search || lib.genre || lib.album || lib.favoritesOnly ? t("tracks.emptyFiltered") : null}
+            </WorkspaceEmpty>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="divide-y divide-border/40">
               {lib.tracks.map((track) => (
-                <li
+                <TrackLibraryRow
                   key={track.id}
-                  className="flex items-center gap-2 rounded-xl border border-transparent px-2 py-2 transition-colors hover:border-border/60 hover:bg-muted/25 sm:gap-3 sm:px-3"
-                >
-                  <FavoriteStarButton
-                    favorited={Boolean(track.is_favorited)}
-                    busy={lib.favoriteBusyId === track.id}
-                    label={track.is_favorited ? t("favorites.remove") : t("favorites.add")}
-                    onToggle={() => void lib.toggleFavorite(track.id, !track.is_favorited)}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{track.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[track.artist, track.album].filter(Boolean).join(" · ") || t("tracks.noMeta")}
-                    </p>
-                  </div>
-                  <Badge variant={fromBackendVisibility(track.visibility) === "public" ? "success" : "secondary"} className="hidden shrink-0 text-[10px] sm:inline-flex">
-                    {t(TRACK_ACCESS_LABEL_KEYS[fromBackendVisibility(track.visibility)])}
-                  </Badge>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label={t("tracks.edit")} onClick={() => openEdit(track)}>
-                      <Pencil className="h-3.5 w-3.5" aria-hidden />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-rose-500 hover:text-rose-600"
-                      aria-label={t("tracks.delete")}
-                      onClick={() => setDeleteTarget(track)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    </Button>
-                  </div>
-                </li>
+                  track={track}
+                  favoriteBusy={lib.favoriteBusyId === track.id}
+                  onToggleFavorite={() => void lib.toggleFavorite(track.id, !track.is_favorited)}
+                  onEdit={() => openEdit(track)}
+                  onDelete={() => setDeleteTarget(track)}
+                />
               ))}
             </ul>
           )}
+        </div>
 
-          {lib.total > lib.pageSize ? (
-            <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/50 pt-4">
-              <p className="text-xs text-muted-foreground">
-                {t("tracks.pageInfo", {
-                  from: String(lib.total === 0 ? 0 : (lib.currentPage - 1) * lib.pageSize + 1),
-                  to: String(Math.min(lib.currentPage * lib.pageSize, lib.total)),
-                  total: String(lib.total),
-                })}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  disabled={lib.currentPage <= 1 || lib.loading}
-                  onClick={() => lib.goToPage(lib.currentPage - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </Button>
-                <span className="min-w-[4rem] text-center text-xs tabular-nums text-muted-foreground">
-                  {lib.currentPage} / {lib.pageCount}
-                </span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  disabled={lib.currentPage >= lib.pageCount || lib.loading}
-                  onClick={() => lib.goToPage(lib.currentPage + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
+        {lib.total > lib.pageSize ? (
+          <footer className="flex items-center justify-between gap-3 border-t border-border/50 bg-muted/15 px-4 py-3 sm:px-5">
+            <p className="text-xs text-muted-foreground">
+              {t("tracks.pageInfo", {
+                from: String(lib.total === 0 ? 0 : (lib.currentPage - 1) * lib.pageSize + 1),
+                to: String(Math.min(lib.currentPage * lib.pageSize, lib.total)),
+                total: String(lib.total),
+              })}
+            </p>
+            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/80 p-0.5">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-full"
+                disabled={lib.currentPage <= 1 || lib.loading}
+                onClick={() => lib.goToPage(lib.currentPage - 1)}
+                aria-label={t("tracks.prevPage")}
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </Button>
+              <span className="min-w-[4.5rem] px-1 text-center text-xs font-medium tabular-nums text-muted-foreground">
+                {lib.currentPage} / {lib.pageCount}
+              </span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-full"
+                disabled={lib.currentPage >= lib.pageCount || lib.loading}
+                onClick={() => lib.goToPage(lib.currentPage + 1)}
+                aria-label={t("tracks.nextPage")}
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </Button>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          </footer>
+        ) : null}
+      </section>
 
-      <Dialog open={editTrack !== null} onOpenChange={(open) => !open && setEditTrack(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("tracks.editTitle")}</DialogTitle>
-            <DialogDescription>{t("tracks.editDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-track-title">{t("tracks.title")}</Label>
-              <Input id="edit-track-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+      <TrackEditDialog
+        track={editTrack}
+        title={editTitle}
+        artist={editArtist}
+        album={editAlbum}
+        access={editAccess}
+        busy={editBusy}
+        onTitleChange={setEditTitle}
+        onArtistChange={setEditArtist}
+        onAlbumChange={setEditAlbum}
+        onAccessChange={setEditAccess}
+        onClose={() => setEditTrack(null)}
+        onSave={() => void saveEdit()}
+      />
+
+      <Sheet open={deleteTarget !== null && !isLgUp} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <SheetContent side="bottom" className="gap-0 p-0">
+          <SheetTitle className="sr-only">{t("tracks.deleteTitle")}</SheetTitle>
+          <div className="px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-600">
+              <Trash2 className="size-5" aria-hidden />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-track-artist">{t("tracks.artist")}</Label>
-              <Input id="edit-track-artist" value={editArtist} onChange={(e) => setEditArtist(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-track-album">{t("tracks.album")}</Label>
-              <Input id="edit-track-album" value={editAlbum} onChange={(e) => setEditAlbum(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-track-access">{t("tracks.accessLabel")}</Label>
-              <Select id="edit-track-access" value={editAccess} onChange={(e) => setEditAccess(e.target.value as TrackAccess)}>
-                <option value="public">{t("tracks.accessPublic")}</option>
-                <option value="private">{t("tracks.accessPrivate")}</option>
-              </Select>
+            <h3 className="text-center text-lg font-semibold">{t("tracks.deleteTitle")}</h3>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              {t("tracks.deleteDescription", { title: deleteTarget?.title ?? "" })}
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-2">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+                {t("tracks.cancel")}
+              </Button>
+              <Button variant="destructive" disabled={deleteBusy} onClick={() => void confirmDelete()}>
+                {deleteBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+                {t("tracks.delete")}
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTrack(null)}>
-              {t("tracks.cancel")}
-            </Button>
-            <Button disabled={editBusy || !editTitle.trim()} onClick={() => void saveEdit()}>
-              {editBusy ? <Loader2 className="me-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-              {t("tracks.save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog open={deleteTarget !== null && isLgUp} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("tracks.deleteTitle")}</DialogTitle>

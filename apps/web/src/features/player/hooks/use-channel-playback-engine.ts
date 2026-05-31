@@ -17,7 +17,7 @@ import {
 import { audienceVolume } from "@/features/player/model/playback-audience";
 import { applyDriftCorrection, expectedTimeSeconds } from "@/features/player/model/sync-client";
 import { ChannelClosedError, getChannelState, getServerTime } from "@/lib/api";
-import { resolveTrackMediaSrc } from "@/lib/media-url";
+import { resolveMediaSrc } from "@/lib/media-url";
 
 export type PlaybackSyncSnapshot = {
   offsetMs: number;
@@ -528,7 +528,7 @@ export function useChannelPlaybackEngine({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const src = resolveTrackMediaSrc(activeTrackPath);
+    const src = resolveMediaSrc(activeTrackPath);
     const loadId = ++loadGenerationRef.current;
 
     if (!src) {

@@ -7,12 +7,11 @@ import { useTranslations } from "@/shared/providers/locale-provider";
 import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
 import {
   type AdminSection,
-  type ProfileSection,
   dashboardNavSections,
   isDashboardRouteNavItem,
   type DashboardNavSection,
 } from "@/features/dashboard/model/dashboard-nav-config";
-import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
+import { isAccountDashboardTab, type DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import { NotificationCenter } from "@/shared/notifications/notification-center";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
@@ -32,10 +31,8 @@ function SectionDivider() {
 type DashboardSidebarProps = {
   activePathname?: string | null;
   activeTab: DashboardTab;
-  activeProfileSection: ProfileSection;
   activeAdminSection: AdminSection;
-  onSelectMainTab: (tab: Exclude<DashboardTab, "settings" | "admin">) => void;
-  onSelectProfileSection: (section: ProfileSection) => void;
+  onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => void;
   onSelectAdminSection: (section: AdminSection) => void;
   onJoinChannelClick?: () => void;
   user: AuthUser | null;
@@ -54,7 +51,6 @@ function sectionHasActive(
   section: DashboardNavSection,
   activePathname: string | null | undefined,
   activeTab: DashboardTab,
-  activeProfileSection: ProfileSection,
   activeAdminSection: AdminSection,
 ): boolean {
   if (section.variant === "main") {
@@ -66,7 +62,7 @@ function sectionHasActive(
     );
   }
   if (section.variant === "account") {
-    return activeTab === "settings" && section.items.some((item) => item.id === activeProfileSection);
+    return isAccountDashboardTab(activeTab);
   }
   return activeTab === "admin" && section.items.some((item) => item.id === activeAdminSection);
 }
@@ -74,14 +70,13 @@ function sectionHasActive(
 function defaultExpanded(
   activePathname: string | null | undefined,
   activeTab: DashboardTab,
-  activeProfileSection: ProfileSection,
   activeAdminSection: AdminSection,
 ): Record<CollapsibleSectionId, boolean> {
   return {
     channels: activeTab === "channels" || activeTab === "following" || Boolean(activePathname?.startsWith("/explore")),
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
     help: activeTab === "support",
-    account: activeTab === "settings",
+    account: isAccountDashboardTab(activeTab),
     admin: activeTab === "admin",
   };
 }
@@ -89,10 +84,8 @@ function defaultExpanded(
 export function DashboardSidebar({
   activePathname,
   activeTab,
-  activeProfileSection,
   activeAdminSection,
   onSelectMainTab,
-  onSelectProfileSection,
   onSelectAdminSection,
   onJoinChannelClick,
   user,
@@ -103,7 +96,7 @@ export function DashboardSidebar({
   const sections = dashboardNavSections(Boolean(user?.is_superuser));
 
   const [expanded, setExpanded] = useState<Record<CollapsibleSectionId, boolean>>(() =>
-    defaultExpanded(activePathname, activeTab, activeProfileSection, activeAdminSection),
+    defaultExpanded(activePathname, activeTab, activeAdminSection),
   );
   useEffect(() => {
     setExpanded((prev) => {
@@ -111,7 +104,7 @@ export function DashboardSidebar({
       if (activeTab === "channels" || activePathname?.startsWith("/explore")) next.channels = true;
       if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
       if (activeTab === "support") next.help = true;
-      if (activeTab === "settings") next.account = true;
+      if (isAccountDashboardTab(activeTab)) next.account = true;
       if (activeTab === "admin") next.admin = true;
       return next;
     });
@@ -121,13 +114,8 @@ export function DashboardSidebar({
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function handleMainTab(tab: Exclude<DashboardTab, "settings" | "admin">) {
+  function handleMainTab(tab: Exclude<DashboardTab, "admin">) {
     onSelectMainTab(tab);
-    onSidebarAction?.();
-  }
-
-  function handleProfile(section: ProfileSection) {
-    onSelectProfileSection(section);
     onSidebarAction?.();
   }
 
@@ -193,7 +181,7 @@ export function DashboardSidebar({
 
         {sections.map((section, sectionIndex) => {
           const isOpen = expanded[section.id];
-          const hasActive = sectionHasActive(section, activePathname, activeTab, activeProfileSection, activeAdminSection);
+          const hasActive = sectionHasActive(section, activePathname, activeTab, activeAdminSection);
           const isAdminSection = section.variant === "admin";
 
           return (
@@ -294,12 +282,12 @@ export function DashboardSidebar({
                   {section.variant === "account"
                     ? section.items.map((item) => {
                         const Icon = item.icon;
-                        const isActive = activeTab === "settings" && activeProfileSection === item.id;
+                        const isActive = activeTab === item.id;
                         return (
                           <li key={item.id}>
                             <button
                               type="button"
-                              onClick={() => handleProfile(item.id)}
+                              onClick={() => handleMainTab(item.id)}
                               className={cn(
                                 "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
                                 isActive

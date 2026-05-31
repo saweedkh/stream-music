@@ -50,11 +50,13 @@ import {
   rotatePrivateInvite,
   rotatePublicLink,
   updateChannelSettings,
+  clearChannelBrandLogo,
   uploadChannelBrandLogo,
   type ChannelMember,
   type JoinRequestRow,
   type PlaylistSummary,
 } from "@/lib/api";
+import { ChannelBrandEditor } from "@/features/channels/components/channel-brand-editor";
 import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
 import { adminSegmentBtn } from "@/features/channels/components/channel-admin-panel-styles";
 import { ChannelMemberRosterActions } from "@/features/channels/components/channel-member-roster-actions";
@@ -78,6 +80,7 @@ type Props = {
   viewAsListener?: boolean;
   onViewAsListenerChange?: (value: boolean) => void;
   embedded?: boolean;
+  initialBrandLogoUrl?: string | null;
 };
 
 type AdminTab = "settings" | "invites" | "people";
@@ -160,6 +163,7 @@ export function ChannelAdminPanel({
   viewAsListener = false,
   onViewAsListenerChange,
   embedded = true,
+  initialBrandLogoUrl = null,
 }: Props) {
   const { t } = useTranslations();
   const { showToast } = useToast();
@@ -414,16 +418,16 @@ export function ChannelAdminPanel({
   }
 
   async function uploadBrandLogo(file: File) {
-    setBusy("logo");
-    try {
-      await uploadChannelBrandLogo(channelId, file);
-      showToast(t("room.admin.toast.logoUpdated"), "success");
-      router.refresh();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t("room.admin.toast.logoUploadFailed"), "error");
-    } finally {
-      setBusy(null);
-    }
+    const url = await uploadChannelBrandLogo(channelId, file);
+    showToast(t("room.admin.toast.logoUpdated"), "success");
+    router.refresh();
+    return url;
+  }
+
+  async function removeBrandLogo() {
+    await clearChannelBrandLogo(channelId);
+    showToast(t("room.admin.toast.logoRemoved"), "success");
+    router.refresh();
   }
 
   async function loadMembers() {
@@ -812,19 +816,13 @@ export function ChannelAdminPanel({
                   />
                   <p className="text-xs text-muted-foreground">{t("room.admin.settings.scheduledStartHint")}</p>
                 </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor={`ch-brand-logo-${channelId}`}>{t("room.admin.settings.brandLogo")}</Label>
-                  <Input
-                    id={`ch-brand-logo-${channelId}`}
-                    type="file"
-                    accept="image/*"
-                    className="cursor-pointer border-border bg-card/80"
-                    disabled={busy === "logo"}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void uploadBrandLogo(f);
-                      e.target.value = "";
-                    }}
+                <div className="sm:col-span-2">
+                  <ChannelBrandEditor
+                    channelName={name.trim() || initialName}
+                    brandLogoUrl={initialBrandLogoUrl}
+                    disabled={!channelIsActive}
+                    onUpload={uploadBrandLogo}
+                    onRemove={removeBrandLogo}
                   />
                 </div>
               </div>

@@ -76,7 +76,13 @@ def _presence_snapshot(channel_id: int) -> tuple[list[dict], int]:
         names: dict[int, str] = {}
         for u in User.objects.filter(id__in=redis_uids).only("id", "username"):
             names[u.id] = u.username
-        members = [{"id": uid, "username": names.get(uid, "?")} for uid in redis_uids]
+        from apps.social.services.avatar import avatar_urls_for_user_ids
+
+        avatars = avatar_urls_for_user_ids(redis_uids)
+        members = [
+            {"id": uid, "username": names.get(uid, "?"), "avatar_url": avatars.get(uid)}
+            for uid in redis_uids
+        ]
         return members, len(redis_uids)
     now = time.monotonic()
     bucket = _PRESENCE.get(channel_id, {})
@@ -88,7 +94,13 @@ def _presence_snapshot(channel_id: int) -> tuple[list[dict], int]:
     if uids:
         for u in User.objects.filter(id__in=uids).only("id", "username"):
             names[u.id] = u.username
-    members = [{"id": uid, "username": names.get(uid, "?")} for uid in uids]
+    from apps.social.services.avatar import avatar_urls_for_user_ids
+
+    avatars = avatar_urls_for_user_ids(uids)
+    members = [
+        {"id": uid, "username": names.get(uid, "?"), "avatar_url": avatars.get(uid)}
+        for uid in uids
+    ]
     return members, len(bucket)
 
 

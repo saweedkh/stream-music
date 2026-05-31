@@ -11,17 +11,17 @@ import { ChannelManagementSection } from "@/features/dashboard/components/channe
 import { FollowingChannelsSection } from "@/features/dashboard/components/following-channels-section";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/components/dashboard-panel-shell";
+import { adminSectionFromSearch, dashboardTabFromSearch } from "@/features/dashboard/model/dashboard-nav-config";
+import type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
 import {
-  adminSectionFromSearch,
-  profileSectionFromSearch,
-  type AdminSection,
-  type ProfileSection,
-} from "@/features/dashboard/model/dashboard-nav-config";
-import { type DashboardTab, isDashboardTab } from "@/features/dashboard/model/dashboard-types";
+  isAccountDashboardTab,
+  type AccountDashboardTab,
+  type DashboardTab,
+} from "@/features/dashboard/model/dashboard-types";
 import { AdminPanelHub } from "@/features/dashboard/components/admin-panel-hub";
-import { SupportHub } from "@/features/dashboard/components/support-hub";
+import { SupportHub } from "@/features/support";
 import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
-import { PlaylistManager } from "@/features/dashboard/components/playlist-manager";
+import { PlaylistSection } from "@/features/dashboard/components/playlist-section";
 import { TrackLibrarySection } from "@/features/dashboard/components/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/components/track-sharing-section";
 import {
@@ -43,6 +43,7 @@ import {
 } from "@/lib/api";
 import { loadPendingUpload, type PendingChunkUpload } from "@/lib/resumable-upload";
 import { createChannelSchema } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 
 export function DashboardWorkspace() {
   const { t } = useTranslations();
@@ -50,9 +51,8 @@ export function DashboardWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabFromUrl = searchParams.get("tab");
-  const profileSection = profileSectionFromSearch(searchParams);
   const adminSection = adminSectionFromSearch(searchParams);
+  const tabFromUrl = dashboardTabFromSearch(searchParams);
 
   const navigateDashboard = useCallback(
     (params: URLSearchParams) => {
@@ -63,22 +63,10 @@ export function DashboardWorkspace() {
   );
 
   const navigateMainTab = useCallback(
-    (tab: Exclude<DashboardTab, "settings" | "admin">) => {
+    (tab: Exclude<DashboardTab, "admin">) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", tab);
       params.delete("section");
-      params.delete("adminSection");
-      navigateDashboard(params);
-    },
-    [navigateDashboard, searchParams],
-  );
-
-  const navigateProfileSection = useCallback(
-    (section: ProfileSection) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "settings");
-      if (section === "overview") params.delete("section");
-      else params.set("section", section);
       params.delete("adminSection");
       navigateDashboard(params);
     },
@@ -114,8 +102,22 @@ export function DashboardWorkspace() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashboardTab>(isDashboardTab(tabFromUrl) ? tabFromUrl : "channels");
+  const [activeTab, setActiveTab] = useState<DashboardTab>(tabFromUrl);
   const [pendingUpload, setPendingUpload] = useState<PendingChunkUpload | null>(null);
+  const [supportScreen, setSupportScreen] = useState<"list" | "chat">("list");
+
+  useEffect(() => {
+    if (activeTab !== "support") setSupportScreen("list");
+  }, [activeTab]);
+
+  async function refreshTracksForSharing() {
+    try {
+      const trackData = await listTracks({ limit: 500 });
+      setTracks(normalizeTrackList(trackData));
+    } catch {
+      /* library panel handles its own refresh */
+    }
+  }
 
   async function refreshAll() {
     setIsLoading(true);
@@ -160,13 +162,20 @@ export function DashboardWorkspace() {
       navigateMainTab("playlists");
       return;
     }
-    if (!isDashboardTab(queryTab)) return;
-    if (queryTab === "admin" && currentUser && !currentUser.is_superuser) {
+    const resolved = dashboardTabFromSearch(searchParams);
+    if (resolved === "admin" && currentUser && !currentUser.is_superuser) {
       navigateMainTab("channels");
       return;
     }
-    setActiveTab(queryTab);
-  }, [searchParams, currentUser, navigateMainTab]);
+    if (queryTab === "settings" || searchParams.get("section")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", resolved);
+      params.delete("section");
+      navigateDashboard(params);
+      return;
+    }
+    setActiveTab(resolved);
+  }, [searchParams, currentUser, navigateMainTab, navigateDashboard]);
 
   async function handleCreateChannel() {
     const result = createChannelSchema(t).safeParse({ channelName, memberLimit });
@@ -198,17 +207,18 @@ export function DashboardWorkspace() {
     return (
       <DashboardShell
         activeTab={activeTab}
-        activeProfileSection={profileSection}
         activeAdminSection={adminSection}
         onSelectMainTab={navigateMainTab}
-        onSelectProfileSection={navigateProfileSection}
         onSelectAdminSection={navigateAdminSection}
       >
         <DashboardPanelShell
           tab={activeTab}
-          profileSection={activeTab === "settings" ? profileSection : undefined}
           adminSection={activeTab === "admin" ? adminSection : undefined}
-          className="lg:min-h-0 lg:flex-1"
+          className={cn(
+          "lg:min-h-0 lg:flex-1",
+          activeTab === "sharing" &&
+            "[&_.workspace-panel__body]:[-ms-overflow-style:none] [&_.workspace-panel__body]:[scrollbar-width:none] [&_.workspace-panel__body]:[&::-webkit-scrollbar]:hidden",
+        )}
         >
           <div className="space-y-4">
             <Skeleton className="h-20 w-full rounded-xl" />
@@ -290,20 +300,23 @@ export function DashboardWorkspace() {
   ) : null;
 
   return (
-    <DashboardShell
-      activeTab={activeTab}
-      activeProfileSection={profileSection}
-      activeAdminSection={adminSection}
-      onSelectMainTab={navigateMainTab}
-      onSelectProfileSection={navigateProfileSection}
-      onSelectAdminSection={navigateAdminSection}
-    >
-      <DashboardPanelShell
-        tab={activeTab}
-        profileSection={activeTab === "settings" ? profileSection : undefined}
-        adminSection={activeTab === "admin" ? adminSection : undefined}
-        flush={activeTab === "playlists" || activeTab === "support"}
-        className="lg:min-h-0 lg:flex-1"
+      <DashboardShell
+        activeTab={activeTab}
+        activeAdminSection={adminSection}
+        onSelectMainTab={navigateMainTab}
+        onSelectAdminSection={navigateAdminSection}
+      >
+        <DashboardPanelShell
+          tab={activeTab}
+          adminSection={activeTab === "admin" ? adminSection : undefined}
+        className={cn(
+          "lg:min-h-0 lg:flex-1",
+          activeTab === "sharing" &&
+            "[&_.workspace-panel__body]:[-ms-overflow-style:none] [&_.workspace-panel__body]:[scrollbar-width:none] [&_.workspace-panel__body]:[&::-webkit-scrollbar]:hidden",
+          activeTab === "support" &&
+            supportScreen === "chat" &&
+            "[&_.workspace-panel__header]:hidden [&_.workspace-panel__body]:flex [&_.workspace-panel__body]:min-h-0 [&_.workspace-panel__body]:flex-1 [&_.workspace-panel__body]:overflow-hidden [&_.workspace-panel__body]:p-0 max-lg:[&_.workspace-panel__body]:overflow-visible",
+        )}
       >
         {pendingUpload && activeTab !== "tracks" ? interruptedUploadAlert : null}
 
@@ -327,12 +340,12 @@ export function DashboardWorkspace() {
 
         {activeTab === "tracks" ? (
           <TrackLibrarySection
-            onUploadComplete={() => void refreshAll()}
+            onUploadComplete={() => void refreshTracksForSharing()}
             resumeUploadBanner={interruptedUploadAlert}
           />
         ) : null}
 
-        {activeTab === "playlists" ? <PlaylistManager /> : null}
+        {activeTab === "playlists" ? <PlaylistSection /> : null}
 
         {activeTab === "sharing" ? (
           <TrackSharingSection
@@ -351,11 +364,11 @@ export function DashboardWorkspace() {
           />
         ) : null}
 
-        {activeTab === "support" ? <SupportHub user={currentUser} /> : null}
+        {activeTab === "support" ? <SupportHub user={currentUser} onScreenChange={setSupportScreen} /> : null}
 
-        {activeTab === "settings" ? (
+        {isAccountDashboardTab(activeTab) ? (
           <UserProfileHub
-            activeSection={profileSection}
+            tab={activeTab as AccountDashboardTab}
             channelCount={channels.length}
             trackCount={tracks.length}
             playlistCount={playlists.length}

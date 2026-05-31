@@ -4,14 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Compass } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import {
-  ADMIN_NAV,
-  adminSectionMeta,
-  profileNavIconForSection,
-  profileSectionMeta,
-  type AdminSection,
-  type ProfileSection,
-} from "@/features/dashboard/model/dashboard-nav-config";
+import { ADMIN_NAV, adminSectionMeta, type AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
 import { DASHBOARD_TAB_ICONS, DASHBOARD_TAB_META } from "@/features/dashboard/model/dashboard-nav-meta";
 import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -20,7 +13,6 @@ import { cn } from "@/lib/utils";
 
 export type WorkspacePanelProps = {
   tab: DashboardTab;
-  profileSection?: ProfileSection;
   adminSection?: AdminSection;
   children: ReactNode;
   badge?: ReactNode;
@@ -40,7 +32,6 @@ export type WorkspacePanelProps = {
  */
 export function WorkspacePanel({
   tab,
-  profileSection,
   adminSection,
   children,
   badge,
@@ -52,29 +43,24 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const { t } = useTranslations();
 
-  const profileIcon = tab === "settings" && profileSection ? profileNavIconForSection(profileSection) : undefined;
   const adminItem = tab === "admin" && adminSection ? ADMIN_NAV.find((n) => n.id === adminSection) : null;
-  const subsectionIcon = profileIcon ?? adminItem?.icon;
   const headerIconFromKey: LucideIcon | undefined = headerIconKey === "compass" ? Compass : undefined;
-  const Icon = headerIconFromKey ?? subsectionIcon ?? DASHBOARD_TAB_ICONS[tab];
+  const Icon = headerIconFromKey ?? adminItem?.icon ?? DASHBOARD_TAB_ICONS[tab];
 
   const titleKey =
     headerTitleKey ??
-    (tab === "settings" && profileSection
-      ? profileSectionMeta(profileSection).titleKey
-      : tab === "admin" && adminSection
-        ? adminSectionMeta(adminSection).titleKey
-        : DASHBOARD_TAB_META[tab].titleKey);
+    (tab === "admin" && adminSection
+      ? adminSectionMeta(adminSection).titleKey
+      : DASHBOARD_TAB_META[tab].titleKey);
 
   const descriptionKey =
     headerDescriptionKey ??
-    (tab === "settings" && profileSection
-      ? profileSectionMeta(profileSection).descriptionKey
-      : tab === "admin" && adminSection
-        ? adminSectionMeta(adminSection).descriptionKey
-        : DASHBOARD_TAB_META[tab].descriptionKey);
+    (tab === "admin" && adminSection
+      ? adminSectionMeta(adminSection).descriptionKey
+      : DASHBOARD_TAB_META[tab].descriptionKey);
 
   const isAdminTab = tab === "admin";
+  const isSecurityTab = tab === "security";
 
   return (
     <div
@@ -93,7 +79,7 @@ export function WorkspacePanel({
           flush && "max-lg:hidden",
         )}
       >
-        <WorkspacePanelIcon icon={Icon} variant={isAdminTab ? "amber" : "brand"} />
+        <WorkspacePanelIcon icon={Icon} variant={isAdminTab ? "amber" : isSecurityTab ? "emerald" : "brand"} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">{t(titleKey)}</h2>
@@ -126,14 +112,16 @@ export function WorkspacePanelIcon({
   className,
 }: {
   icon: LucideIcon;
-  variant?: "brand" | "amber";
+  variant?: "brand" | "amber" | "emerald";
   className?: string;
 }) {
   return (
     <div
       className={cn(
         "flex size-10 shrink-0 items-center justify-center rounded-xl",
-        variant === "amber" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400" : "bg-brand/12 text-brand",
+        variant === "amber" && "bg-amber-500/12 text-amber-600 dark:text-amber-400",
+        variant === "emerald" && "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
+        variant === "brand" && "bg-brand/12 text-brand",
         className,
       )}
     >

@@ -4,40 +4,46 @@ import {
   Award,
   Bell,
   Compass,
-  Crown,
   KeyRound,
   LayoutGrid,
   LifeBuoy,
   ListMusic,
   Music,
-  Palette,
   Radio,
   Server,
   Share2,
-  Sparkles,
   User,
   Users,
 } from "lucide-react";
-import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
+import {
+  ACCOUNT_DASHBOARD_TABS,
+  isAccountDashboardTab,
+  isDashboardTab,
+  type AccountDashboardTab,
+  type DashboardTab,
+} from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
-export const PROFILE_SECTIONS = ["overview", "profile", "appearance", "security", "notifications"] as const;
-export type ProfileSection = (typeof PROFILE_SECTIONS)[number];
+export const PROFILE_SECTIONS = ACCOUNT_DASHBOARD_TABS;
+export type ProfileSection = AccountDashboardTab;
 
 export const ADMIN_SECTIONS = ["overview", "users", "badges", "channels", "system"] as const;
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
 export function isProfileSection(value: string | null): value is ProfileSection {
-  return value !== null && (PROFILE_SECTIONS as readonly string[]).includes(value);
+  return isAccountDashboardTab(value);
 }
 
-export function isAdminSection(value: string | null): value is AdminSection {
-  return value !== null && (ADMIN_SECTIONS as readonly string[]).includes(value);
-}
-
-export function profileSectionFromSearch(params: URLSearchParams): ProfileSection {
-  const raw = params.get("section");
-  return isProfileSection(raw) ? raw : "overview";
+/** Maps legacy `?tab=settings&section=` URLs to account dashboard tabs. */
+export function dashboardTabFromSearch(params: URLSearchParams): DashboardTab {
+  const tab = params.get("tab");
+  if (tab === "settings") {
+    const section = params.get("section");
+    if (section === "security" || section === "notifications") return section;
+    return "profile";
+  }
+  if (isDashboardTab(tab)) return tab;
+  return "channels";
 }
 
 export function adminSectionFromSearch(params: URLSearchParams): AdminSection {
@@ -45,8 +51,12 @@ export function adminSectionFromSearch(params: URLSearchParams): AdminSection {
   return isAdminSection(raw) ? raw : "overview";
 }
 
-export type ProfileNavItem = {
-  id: ProfileSection;
+export function isAdminSection(value: string | null): value is AdminSection {
+  return value !== null && (ADMIN_SECTIONS as readonly string[]).includes(value);
+}
+
+export type AccountNavItem = {
+  id: AccountDashboardTab;
   labelKey: MessageKey;
   icon: LucideIcon;
 };
@@ -57,17 +67,14 @@ export type AdminNavItem = {
   icon: LucideIcon;
 };
 
-export const PROFILE_NAV: ProfileNavItem[] = [
-  { id: "overview", labelKey: "profile.nav.overview", icon: Sparkles },
+export const ACCOUNT_NAV: AccountNavItem[] = [
   { id: "profile", labelKey: "profile.nav.profile", icon: User },
-  { id: "appearance", labelKey: "profile.nav.appearance", icon: Palette },
   { id: "security", labelKey: "profile.nav.security", icon: KeyRound },
   { id: "notifications", labelKey: "profile.nav.notifications", icon: Bell },
 ];
 
-export function profileNavIconForSection(section: ProfileSection): LucideIcon | undefined {
-  return PROFILE_NAV.find((item) => item.id === section)?.icon;
-}
+/** @deprecated Use ACCOUNT_NAV */
+export const PROFILE_NAV = ACCOUNT_NAV;
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { id: "overview", labelKey: "admin.nav.overview", icon: Activity },
@@ -77,7 +84,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: "system", labelKey: "admin.nav.system", icon: Server },
 ];
 
-export type DashboardMainTab = Exclude<DashboardTab, "settings" | "admin">;
+export type DashboardMainTab = Exclude<DashboardTab, AccountDashboardTab | "admin">;
 
 export type DashboardMainNavItem = {
   id: DashboardMainTab;
@@ -109,7 +116,7 @@ export type DashboardNavSection =
       id: "account";
       titleKey: MessageKey;
       variant: "account";
-      items: ProfileNavItem[];
+      items: AccountNavItem[];
     }
   | {
       id: "admin";
@@ -150,7 +157,7 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
       id: "account",
       titleKey: "dashboard.sidebar.section.account",
       variant: "account",
-      items: PROFILE_NAV,
+      items: ACCOUNT_NAV,
     },
   ];
 
@@ -164,20 +171,6 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
   }
 
   return sections;
-}
-
-export function profileSectionMeta(section: ProfileSection): { titleKey: MessageKey; descriptionKey: MessageKey } {
-  const map: Record<ProfileSection, { titleKey: MessageKey; descriptionKey: MessageKey }> = {
-    overview: { titleKey: "profile.sectionOverviewTitle", descriptionKey: "profile.sectionOverviewDescription" },
-    profile: { titleKey: "profile.accountTitle", descriptionKey: "profile.accountDescription" },
-    appearance: { titleKey: "profile.appearanceTitle", descriptionKey: "profile.appearanceDescription" },
-    security: { titleKey: "profile.securityTitle", descriptionKey: "profile.securityDescription" },
-    notifications: {
-      titleKey: "profile.sectionNotificationsTitle",
-      descriptionKey: "profile.sectionNotificationsDescription",
-    },
-  };
-  return map[section];
 }
 
 export function adminSectionMeta(section: AdminSection): { titleKey: MessageKey; descriptionKey?: MessageKey } {

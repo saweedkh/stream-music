@@ -17,7 +17,7 @@ export function TrackLibrarySection({ onUploadComplete, resumeUploadBanner }: Pr
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-20 lg:pb-0">
+    <div className="flex flex-col gap-5 pb-28 lg:pb-0">
       {resumeUploadBanner}
       <TrackUploadStudio onUploadComplete={handleUploadComplete} />
       <TrackLibraryPanel refreshSignal={refreshSignal} />

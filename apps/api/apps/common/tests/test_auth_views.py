@@ -69,6 +69,42 @@ class AuthViewsTests(TestCase):
         self.assertEqual(data["user"]["first_name"], "Carol")
         self.assertEqual(data["user"]["last_name"], "D")
 
+    def test_patch_me_username_when_available(self):
+        User.objects.create_user(username="carol2", email="c@example.com", password="pw123456")
+        csrf = self._prime_csrf()
+        self.client.post(
+            "/api/auth/login",
+            {"username": "carol2", "password": "pw123456"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        csrf = self.client.cookies["csrftoken"].value
+        res = self.client.patch(
+            "/api/auth/me",
+            {"username": "carol_renamed"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["user"]["username"], "carol_renamed")
+
+    def test_username_available_endpoint(self):
+        User.objects.create_user(username="taken_name", password="pw123456")
+        User.objects.create_user(username="owner", password="pw123456")
+        csrf = self._prime_csrf()
+        self.client.post(
+            "/api/auth/login",
+            {"username": "owner", "password": "pw123456"},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        csrf = self.client.cookies["csrftoken"].value
+        free = self.client.get("/api/auth/username-available?username=new_handle", HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(free.status_code, 200)
+        self.assertTrue(free.json()["available"])
+        taken = self.client.get("/api/auth/username-available?username=taken_name", HTTP_X_CSRFTOKEN=csrf)
+        self.assertFalse(taken.json()["available"])
+
     def test_change_password_wrong_current(self):
         User.objects.create_user(username="dave", password="pw123456")
         csrf = self._prime_csrf()

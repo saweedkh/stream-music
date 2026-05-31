@@ -14,6 +14,7 @@ class UserPublicProfile(models.Model):
     )
     bio = models.CharField(max_length=500, blank=True, default="")
     is_public = models.BooleanField(default=False)
+    avatar = models.FileField(upload_to="avatars/%Y/%m/", null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

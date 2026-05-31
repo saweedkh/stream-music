@@ -80,8 +80,8 @@ export function WorkspaceRailCard({
       <div className="border-b border-[var(--workspace-divider)] px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-3">
           {Icon ? (
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/90 text-brand-foreground">
-              <Icon className="size-[1.125rem]" aria-hidden />
+            <span className="relative z-[1] flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+              <Icon className="size-[1.125rem]" aria-hidden strokeWidth={2.25} />
             </span>
           ) : null}
           <div className="min-w-0">

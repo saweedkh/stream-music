@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, ListMusic, Music, Radio, Search, User, Share2 } from "lucide-react";
+import { LayoutDashboard, ListMusic, Music, Radio, Search, Share2 } from "lucide-react";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import {
   CommandDialog,
@@ -167,8 +168,8 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   className="flex items-center justify-between gap-2"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <User className="h-4 w-4 shrink-0" />
-                    <span className="truncate">@{u.username}</span>
+                    <UserAvatar username={u.username} displayName={u.display_name} avatarUrl={u.avatar_url} className="h-8 w-8" />
+                    <span className="truncate">{u.display_name || `@${u.username}`}</span>
                   </span>
                   <Button
                     type="button"

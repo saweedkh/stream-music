@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ListMusic, Radio, User, UserPlus, UserMinus } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -96,9 +96,13 @@ export default function PublicUserProfilePage() {
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
       <Card>
         <CardHeader className="flex flex-row items-start gap-4">
-          <Avatar className="h-14 w-14">
-            <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            username={data.user.username}
+            displayName={displayName}
+            avatarUrl={data.profile.avatar_url ?? data.user.avatar_url}
+            className="h-14 w-14"
+            fallbackClassName="bg-gradient-to-br from-brand/30 to-brand/5 text-lg"
+          />
           <div className="min-w-0 flex-1">
             <CardTitle className="flex flex-wrap items-center gap-2">
               <User className="h-5 w-5 text-muted-foreground" />
@@ -120,7 +124,7 @@ export default function PublicUserProfilePage() {
         {data.is_self ? (
           <CardContent>
             <Button asChild variant="secondary" size="sm">
-              <Link href="/dashboard?tab=settings">{t("profile.public.editInSettings")}</Link>
+              <Link href="/dashboard?tab=profile">{t("profile.public.editInSettings")}</Link>
             </Button>
           </CardContent>
         ) : null}

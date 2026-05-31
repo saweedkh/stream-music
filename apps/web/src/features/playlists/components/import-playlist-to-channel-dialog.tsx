@@ -101,7 +101,7 @@ export function ImportPlaylistToChannelDialog({ open, onOpenChange, channelId, o
             ) : filtered.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.playlist.importEmpty")}</p>
             ) : (
-              <ul className="space-y-1 pr-2">
+              <ul className="space-y-1 pe-2">
                 {filtered.map((pl) => (
                   <li key={pl.id}>
                     <button

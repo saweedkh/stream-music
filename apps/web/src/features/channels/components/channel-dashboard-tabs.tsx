@@ -853,6 +853,7 @@ export function ChannelDashboardTabs(props: Props) {
             channelIsActive={channelIsActive}
             canDeleteChannel={isChannelOwner}
             initialExperience={initialExperience ?? null}
+            initialBrandLogoUrl={brandLogoUrl}
             viewAsListener={viewAsListener}
             onViewAsListenerChange={setViewAsListener}
             embedded

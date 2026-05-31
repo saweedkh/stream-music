@@ -27,6 +27,7 @@ export type AuthUser = {
   badges?: UserBadge[];
   bio?: string;
   is_public?: boolean;
+  avatar_url?: string | null;
   /** ISO datetime from Django `User.date_joined`. */
   date_joined?: string;
 };

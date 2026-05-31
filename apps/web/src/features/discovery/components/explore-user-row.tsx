@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, UserPlus } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import type { PublicUserProfile } from "@/lib/api";
@@ -16,12 +16,6 @@ type ExploreUserRowProps = {
   busy: boolean;
   onToggleFollow: () => void;
 };
-
-function userInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase() || "?";
-}
 
 export function ExploreUserRow({ username, displayName, profile, following, busy, onToggleFollow }: ExploreUserRowProps) {
   const { t } = useTranslations();
@@ -44,11 +38,14 @@ export function ExploreUserRow({ username, displayName, profile, following, busy
         href={`/users/${encodeURIComponent(username)}`}
         className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none"
       >
-        <Avatar className="h-11 w-11 shrink-0 rounded-xl border-[var(--workspace-divider)] bg-[var(--workspace-stat)]">
-          <AvatarFallback className="rounded-xl bg-gradient-to-br from-brand/30 via-muted/20 to-transparent font-display text-sm font-bold text-brand">
-            {userInitials(displayName)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          username={username}
+          displayName={displayName}
+          avatarUrl={profile?.profile?.avatar_url ?? profile?.user?.avatar_url}
+          className="h-11 w-11 shrink-0 rounded-xl border border-[var(--workspace-divider)]"
+          imageClassName="rounded-xl"
+          fallbackClassName="rounded-xl bg-gradient-to-br from-brand/30 via-muted/20 to-transparent font-display text-sm font-bold"
+        />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold tracking-tight text-foreground">{displayName}</span>
           <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

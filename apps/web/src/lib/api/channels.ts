@@ -150,6 +150,7 @@ export async function updateChannelSettings(
     join_requires_approval?: boolean;
     public_join_slug?: string | null;
     experience?: ChannelExperienceSettings;
+    brand_logo_clear?: boolean;
   },
 ) {
   const res = await fetch(
@@ -168,7 +169,18 @@ export async function uploadChannelBrandLogo(channelId: string, file: File) {
     await withAuthFormData({ method: "PATCH", body }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot upload channel logo"));
-  return res.json() as Promise<{ brand_logo_url?: string | null }>;
+  const data = (await res.json()) as { brand_logo_url?: string | null };
+  return data.brand_logo_url ?? null;
+}
+
+export async function clearChannelBrandLogo(channelId: string) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${channelId}/settings`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify({ brand_logo_clear: true }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove channel logo"));
+  const data = (await res.json()) as { brand_logo_url?: string | null };
+  return data.brand_logo_url ?? null;
 }
 
 export async function getSimilarTracks(channelId: string, fromTrackId: number) {

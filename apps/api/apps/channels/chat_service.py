@@ -59,7 +59,7 @@ def _track_previews_from_body(body: str) -> list[dict]:
     return [{"id": t.id, "title": t.title, "artist": t.artist or "", "album": t.album or ""} for t in rows]
 
 
-def message_to_dict(msg: ChannelChatMessage) -> dict:
+def message_to_dict(msg: ChannelChatMessage, *, avatar_urls: dict[int, str | None] | None = None) -> dict:
     reactions = []
     for r in msg.reactions.all().select_related("user"):
         reactions.append(
@@ -82,11 +82,20 @@ def message_to_dict(msg: ChannelChatMessage) -> dict:
                 "body": (parent.body or "")[:120],
             }
     body = "" if deleted else (msg.body or "")
+    avatar_url = None
+    if msg.user_id:
+        if avatar_urls is not None:
+            avatar_url = avatar_urls.get(msg.user_id)
+        else:
+            from apps.social.services.avatar import avatar_url_for_user_id
+
+            avatar_url = avatar_url_for_user_id(msg.user_id)
     return {
         "id": msg.id,
         "channel": msg.channel_id,
         "user_id": msg.user_id,
         "username": msg.user.username if msg.user_id else "?",
+        "avatar_url": avatar_url,
         **author_flags,
         "body": body,
         "reply_to_id": getattr(msg, "reply_to_id", None),
@@ -113,8 +122,18 @@ def fetch_chat_history(channel_id: int, *, limit: int = 80, before_id: int | Non
     if before_id is not None:
         qs = qs.filter(id__lt=before_id)
     rows = list(qs[:lim])
+    user_ids: set[int] = set()
+    for m in rows:
+        if m.user_id:
+            user_ids.add(m.user_id)
+        for r in m.reactions.all():
+            if r.user_id:
+                user_ids.add(r.user_id)
+    from apps.social.services.avatar import avatar_urls_for_user_ids
+
+    avatars = avatar_urls_for_user_ids(user_ids)
     rows.reverse()
-    return [message_to_dict(m) for m in rows]
+    return [message_to_dict(m, avatar_urls=avatars) for m in rows]
 
 
 def can_access_chat(channel_id: int, user_id: int) -> bool:

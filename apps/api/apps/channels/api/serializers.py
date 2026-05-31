@@ -1,10 +1,17 @@
 from rest_framework import serializers
 
 from apps.channels.models import (
-    Channel, ChannelAuditLog, ChannelChatMessage, ChannelJoinRequest, ChannelMembership,
-    ChannelNotificationPreference, ChannelPlaylistSuggestion, ChannelTrackReaction,
+    Channel,
+    ChannelAuditLog,
+    ChannelChatMessage,
+    ChannelJoinRequest,
+    ChannelMembership,
+    ChannelNotificationPreference,
+    ChannelPlaylistSuggestion,
+    ChannelTrackReaction,
     InviteToken,
 )
+from apps.channels.services.brand_media import brand_logo_url_for
 
 class ChannelSerializer(serializers.ModelSerializer):
     membership_is_active = serializers.SerializerMethodField()
@@ -47,12 +54,7 @@ class ChannelSerializer(serializers.ModelSerializer):
         ]
 
     def get_brand_logo_url(self, obj):
-        if not obj.brand_logo:
-            return None
-        url = obj.brand_logo.url
-        # Always return relative media path to avoid broken absolute hosts
-        # when requests pass through local proxies/tunnels.
-        return url
+        return brand_logo_url_for(obj)
 
     def get_is_playing(self, obj):
         session = getattr(obj, "playback_session", None)
@@ -82,6 +84,7 @@ class ChannelChatMessageSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     pinned_by_username = serializers.CharField(source="pinned_by.username", read_only=True)
+    avatar_url = serializers.SerializerMethodField()
     reactions = serializers.SerializerMethodField()
 
     class Meta:
@@ -91,6 +94,7 @@ class ChannelChatMessageSerializer(serializers.ModelSerializer):
             "channel",
             "user_id",
             "username",
+            "avatar_url",
             "body",
             "is_pinned",
             "pinned_at",
@@ -101,6 +105,14 @@ class ChannelChatMessageSerializer(serializers.ModelSerializer):
             "reactions",
         ]
         read_only_fields = fields
+
+    def get_avatar_url(self, obj):
+        cache = self.context.get("avatar_urls")
+        if cache is not None:
+            return cache.get(obj.user_id)
+        from apps.social.services.avatar import avatar_url_for_user_id
+
+        return avatar_url_for_user_id(obj.user_id)
 
     def get_reactions(self, obj):
         cache = getattr(obj, "_prefetched_objects_cache", {})

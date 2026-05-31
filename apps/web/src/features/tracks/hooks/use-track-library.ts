@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   deleteTrack,
   getTrackFacets,
@@ -20,11 +20,14 @@ function isPaginated(data: TrackSummary[] | PaginatedTracks): data is PaginatedT
 }
 
 export function useTrackLibrary(onError?: (message: string) => void) {
-  const [search, setSearch] = useState("");
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const [search, setSearchState] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [genre, setGenre] = useState("");
-  const [album, setAlbum] = useState("");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [genre, setGenreState] = useState("");
+  const [album, setAlbumState] = useState("");
+  const [favoritesOnly, setFavoritesOnlyState] = useState(false);
   const [offset, setOffset] = useState(0);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,18 +35,33 @@ export function useTrackLibrary(onError?: (message: string) => void) {
   const [facetGenres, setFacetGenres] = useState<string[]>([]);
   const [facetAlbums, setFacetAlbums] = useState<string[]>([]);
   const [favoriteBusyId, setFavoriteBusyId] = useState<number | null>(null);
+  const facetsLoadedRef = useRef(false);
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setOffset(0);
+    }, 350);
     return () => window.clearTimeout(id);
   }, [search]);
 
-  useEffect(() => {
+  const setGenre = useCallback((value: string) => {
+    setGenreState(value);
     setOffset(0);
-  }, [debouncedSearch, genre, album, favoritesOnly]);
+  }, []);
 
-  const fetchPage = useCallback(
-    async (pageOffset = offset) => {
+  const setAlbum = useCallback((value: string) => {
+    setAlbumState(value);
+    setOffset(0);
+  }, []);
+
+  const setFavoritesOnly = useCallback((value: boolean) => {
+    setFavoritesOnlyState(value);
+    setOffset(0);
+  }, []);
+
+  const loadPage = useCallback(
+    async (pageOffset: number) => {
       setLoading(true);
       try {
         const data = await listTracks({
@@ -63,19 +81,53 @@ export function useTrackLibrary(onError?: (message: string) => void) {
           setTotal(list.length);
         }
       } catch {
-        onError?.("tracks.loadFailed");
+        onErrorRef.current?.("tracks.loadFailed");
       } finally {
         setLoading(false);
       }
     },
-    [album, debouncedSearch, favoritesOnly, genre, offset, onError],
+    [album, debouncedSearch, favoritesOnly, genre],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      try {
+        const data = await listTracks({
+          search: debouncedSearch || undefined,
+          genre: genre || undefined,
+          album: album || undefined,
+          favorited: favoritesOnly || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        });
+        if (cancelled) return;
+        if (isPaginated(data)) {
+          setTracks(data.results);
+          setTotal(data.total);
+        } else {
+          const list = normalizeTrackList(data);
+          setTracks(list);
+          setTotal(list.length);
+        }
+      } catch {
+        if (!cancelled) onErrorRef.current?.("tracks.loadFailed");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedSearch, genre, album, favoritesOnly, offset]);
 
   const refreshFacets = useCallback(async () => {
     try {
       const facets = await getTrackFacets();
       setFacetGenres(facets.genres);
       setFacetAlbums(facets.albums);
+      facetsLoadedRef.current = true;
     } catch {
       setFacetGenres([]);
       setFacetAlbums([]);
@@ -83,12 +135,9 @@ export function useTrackLibrary(onError?: (message: string) => void) {
   }, []);
 
   useEffect(() => {
+    if (facetsLoadedRef.current) return;
     void refreshFacets();
   }, [refreshFacets]);
-
-  useEffect(() => {
-    void fetchPage(offset);
-  }, [fetchPage, offset]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
@@ -99,8 +148,9 @@ export function useTrackLibrary(onError?: (message: string) => void) {
   };
 
   const refresh = useCallback(async () => {
-    await Promise.all([fetchPage(offset), refreshFacets()]);
-  }, [fetchPage, offset, refreshFacets]);
+    await loadPage(offset);
+    await refreshFacets();
+  }, [loadPage, offset, refreshFacets]);
 
   const toggleFavorite = async (trackId: number, next: boolean) => {
     setFavoriteBusyId(trackId);
@@ -127,14 +177,15 @@ export function useTrackLibrary(onError?: (message: string) => void) {
       album: payload.album.trim() || undefined,
       visibility: toBackendVisibility(payload.access),
     });
-    await fetchPage(offset);
+    await loadPage(offset);
+    await refreshFacets();
   };
 
   const removeTrack = async (trackId: number) => {
     await deleteTrack(trackId);
     const nextOffset = tracks.length === 1 && offset > 0 ? offset - PAGE_SIZE : offset;
     if (nextOffset !== offset) setOffset(nextOffset);
-    else await fetchPage(offset);
+    else await loadPage(offset);
     await refreshFacets();
   };
 
@@ -143,7 +194,7 @@ export function useTrackLibrary(onError?: (message: string) => void) {
     total,
     loading,
     search,
-    setSearch,
+    setSearch: setSearchState,
     genre,
     setGenre,
     album,

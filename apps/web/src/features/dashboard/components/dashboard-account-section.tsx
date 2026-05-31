@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Check, ChevronDown, Languages, LogOut, Moon, Sun } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -60,11 +60,12 @@ export function DashboardAccountSection({ user, onAction, preferencesInMenu = fa
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-3 px-1">
-          <Avatar className="h-9 w-9 border border-border">
-            <AvatarFallback className="bg-muted text-xs font-medium">
-              {(user.username || "?").slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            username={user.username}
+            avatarUrl={user.avatar_url}
+            className="h-9 w-9 border border-border"
+            fallbackClassName="bg-muted text-xs font-medium text-foreground"
+          />
           <div className="min-w-0">
             <UsernameWithBadges username={user.username} flags={user} usernameClassName="text-sm font-medium text-foreground" />
             <p className="text-xs text-muted-foreground">{t("nav.account")}</p>
@@ -98,11 +99,12 @@ export function DashboardAccountSection({ user, onAction, preferencesInMenu = fa
             "data-[state=open]:bg-muted/40",
           )}
         >
-          <Avatar className="h-10 w-10 shrink-0 ring-2 ring-brand/15">
-            <AvatarFallback className="bg-gradient-to-br from-brand/25 to-brand/5 text-sm font-semibold text-brand">
-              {(user.username || "?").slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            username={user.username}
+            avatarUrl={user.avatar_url}
+            className="h-10 w-10 shrink-0 ring-2 ring-brand/15"
+            fallbackClassName="bg-gradient-to-br from-brand/25 to-brand/5 text-sm font-semibold"
+          />
           <div className="min-w-0 flex-1 text-start">
             <UsernameWithBadges username={user.username} flags={user} usernameClassName="text-sm font-semibold text-foreground" />
             <p className="text-[11px] text-muted-foreground">{t("dashboard.preferences")}</p>

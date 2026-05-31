@@ -13,12 +13,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.user_badges import user_badge_flags
+from apps.social.services.avatar import avatar_url_for_user_id
 from apps.channels.models import UserNotificationSettings, WebPushSubscription
 from apps.core.api.serializers import (
+    USERNAME_PATTERN,
     AuthUserProfileUpdateSerializer,
     AuthUserSerializer,
     PasswordChangeSerializer,
     UserNotificationSettingsSerializer,
+    normalize_username,
 )
 
 
@@ -48,7 +51,10 @@ class RegisterView(APIView):
             return Response({"detail": "username_taken"}, status=status.HTTP_400_BAD_REQUEST)
         user = User.objects.create_user(username=username, email=email, password=password)
         login(request, user)
-        return Response({"user": AuthUserSerializer(user).data}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"user": AuthUserSerializer(user, context={"request": request}).data},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class LoginView(APIView):
@@ -61,7 +67,7 @@ class LoginView(APIView):
         if user is None:
             return Response({"detail": "invalid_credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         login(request, user)
-        return Response({"user": AuthUserSerializer(user).data})
+        return Response({"user": AuthUserSerializer(user, context={"request": request}).data})
 
 
 class LogoutView(APIView):
@@ -72,11 +78,27 @@ class LogoutView(APIView):
         return Response({"detail": "logged_out"})
 
 
+class UsernameAvailabilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        raw = normalize_username(request.query_params.get("username") or "")
+        if not raw:
+            return Response({"available": False, "reason": "required"})
+        if raw == request.user.username:
+            return Response({"available": True})
+        if not USERNAME_PATTERN.match(raw):
+            return Response({"available": False, "reason": "username_invalid"})
+        if User.objects.filter(username__iexact=raw).exclude(pk=request.user.pk).exists():
+            return Response({"available": False, "reason": "username_taken"})
+        return Response({"available": True})
+
+
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        body = {"user": AuthUserSerializer(request.user).data}
+        body = {"user": AuthUserSerializer(request.user, context={"request": request}).data}
         prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
         body["notification_settings"] = UserNotificationSettingsSerializer(prefs).data
         pub = (getattr(django_settings, "WEBPUSH_VAPID_PUBLIC_KEY", None) or "").strip()
@@ -88,7 +110,7 @@ class MeView(APIView):
         ser = AuthUserProfileUpdateSerializer(request.user, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
-        body = {"user": AuthUserSerializer(request.user).data}
+        body = {"user": AuthUserSerializer(request.user, context={"request": request}).data}
         prefs, _ = UserNotificationSettings.objects.get_or_create(user_id=request.user.id)
         body["notification_settings"] = UserNotificationSettingsSerializer(prefs).data
         pub = (getattr(django_settings, "WEBPUSH_VAPID_PUBLIC_KEY", None) or "").strip()
@@ -165,7 +187,13 @@ class UsersListView(APIView):
         return Response(
             {
                 "results": [
-                    {"id": user.id, "username": user.username, **user_badge_flags(user)} for user in users
+                    {
+                        "id": user.id,
+                        "username": user.username,
+                        "avatar_url": avatar_url_for_user_id(user.id),
+                        **user_badge_flags(user),
+                    }
+                    for user in users
                 ]
             }
         )

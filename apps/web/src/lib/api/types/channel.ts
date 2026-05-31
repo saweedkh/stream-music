@@ -114,6 +114,7 @@ export type ChannelMember = {
   id: number;
   user_id: number;
   username: string;
+  avatar_url?: string | null;
   is_staff?: boolean;
   is_superuser?: boolean;
   is_premium?: boolean;

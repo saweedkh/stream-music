@@ -81,6 +81,10 @@ class SupportMessage(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_messages")
     body = models.TextField()
     is_internal = models.BooleanField(default=False, help_text="Visible to support staff only.")
+    attachment = models.FileField(upload_to="support/%Y/%m/", blank=True, null=True)
+    attachment_name = models.CharField(max_length=255, blank=True, default="")
+    attachment_size = models.PositiveIntegerField(default=0)
+    attachment_content_type = models.CharField(max_length=128, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     edited_at = models.DateTimeField(null=True, blank=True)
 

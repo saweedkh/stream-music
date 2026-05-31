@@ -15,6 +15,7 @@ export type DiscoverableUser = {
   id: number;
   username: string;
   display_name: string;
+  avatar_url?: string | null;
 };
 
 async function filterPublicUsers(
@@ -38,6 +39,7 @@ async function filterPublicUsers(
     return {
       ...user,
       display_name: displayNameFromProfile(profile, user.username),
+      avatar_url: profile.profile.avatar_url ?? profile.user.avatar_url ?? null,
     };
   });
   mergeProfiles(profiles);

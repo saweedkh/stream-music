@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: UserNotificationSettings = {
   updated_at: "",
 };
 
-export function NotificationPreferencesCard() {
+export function NotificationPreferencesCard({ variant = "card" }: { variant?: "card" | "plain" }) {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const setNotificationPrefs = useNotificationStore((s) => s.setPrefs);
@@ -156,30 +156,24 @@ export function NotificationPreferencesCard() {
   }
 
   if (loading) {
+    const loadingBody = (
+      <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" aria-hidden />
+        {t("common.loading")}
+      </div>
+    );
+    if (variant === "plain") return loadingBody;
     return (
       <Card className="border-border/90 bg-card/40">
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" aria-hidden />
-          {t("common.loading")}
-        </CardContent>
+        <CardContent>{loadingBody}</CardContent>
       </Card>
     );
   }
 
   const canUsePush = isPushEnvironmentSupported() && Boolean(vapidPublic);
 
-  return (
-    <Card className="w-full border-border/40 bg-[var(--surface-inset)]">
-      <CardHeader className="sr-only">
-        <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-          <Bell className="size-5 text-brand/90" aria-hidden />
-          {t("settings.cardTitle")}
-        </CardTitle>
-        <CardDescription className="text-muted-foreground">
-          {t("settings.cardDescription")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+  const body = (
+    <div className="space-y-6">
         {envIssue ? (
           <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
             {envIssue}
@@ -375,7 +369,21 @@ export function NotificationPreferencesCard() {
         ) : saving ? (
           <p className="text-xs text-muted-foreground">Saving preferences…</p>
         ) : null}
-      </CardContent>
+    </div>
+  );
+
+  if (variant === "plain") return body;
+
+  return (
+    <Card className="w-full border-border/40 bg-[var(--surface-inset)]">
+      <CardHeader className="sr-only">
+        <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+          <Bell className="size-5 text-brand/90" aria-hidden />
+          {t("settings.cardTitle")}
+        </CardTitle>
+        <CardDescription className="text-muted-foreground">{t("settings.cardDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

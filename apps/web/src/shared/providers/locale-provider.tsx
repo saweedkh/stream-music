@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { DirectionProvider } from "@radix-ui/react-direction";
 import { translate, type MessageKey } from "@/lib/i18n/messages";
 import {
   DEFAULT_LOCALE,
@@ -82,7 +83,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   return (
     <LocaleContext.Provider value={value}>
-      {ready ? children : null}
+      <DirectionProvider dir={value.dir}>{ready ? children : null}</DirectionProvider>
     </LocaleContext.Provider>
   );
 }

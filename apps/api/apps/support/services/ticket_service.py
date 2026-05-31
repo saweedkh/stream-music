@@ -17,6 +17,18 @@ _SUPPORT_SEND_WINDOW = 30
 _SUPPORT_SEND_MAX = 15
 _MAX_OPEN_TICKETS_PER_USER = 25
 _MESSAGE_MAX_LEN = 8000
+_ATTACHMENT_MAX_BYTES = 2 * 1024 * 1024
+_ATTACHMENT_ALLOWED_TYPES = frozenset(
+    {
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf",
+        "text/plain",
+    }
+)
+_ATTACHMENT_ALLOWED_EXT = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".txt"})
 
 
 def is_support_staff(user) -> bool:
@@ -47,7 +59,14 @@ def _rate_ok(ticket_id: int, user_id: int) -> bool:
 def _author_dict(user) -> dict:
     if user is None:
         return {"id": None, "username": "?"}
-    return {"id": user.id, "username": user.username, **user_badge_flags(user)}
+    from apps.social.services.avatar import avatar_url_for_user_id
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "avatar_url": avatar_url_for_user_id(user.id),
+        **user_badge_flags(user),
+    }
 
 
 def _unread_count(ticket: SupportTicket, user_id: int, *, staff_view: bool) -> int:
@@ -89,11 +108,44 @@ def ticket_to_dict(ticket: SupportTicket, *, viewer: User, include_requester: bo
     return data
 
 
+def _attachment_dict(msg: SupportMessage) -> dict | None:
+    if not msg.attachment:
+        return None
+    try:
+        url = msg.attachment.url
+    except Exception:
+        url = ""
+    if not url:
+        return None
+    return {
+        "url": url,
+        "name": msg.attachment_name or msg.attachment.name.split("/")[-1],
+        "size": msg.attachment_size or 0,
+        "content_type": msg.attachment_content_type or "",
+    }
+
+
+def _validate_attachment(upload) -> str | None:
+    if upload is None:
+        return None
+    size = getattr(upload, "size", 0) or 0
+    if size <= 0:
+        return "invalid_attachment"
+    if size > _ATTACHMENT_MAX_BYTES:
+        return "attachment_too_large"
+    content_type = (getattr(upload, "content_type", "") or "").split(";")[0].strip().lower()
+    name = (getattr(upload, "name", "") or "").lower()
+    ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
+    if content_type not in _ATTACHMENT_ALLOWED_TYPES and ext not in _ATTACHMENT_ALLOWED_EXT:
+        return "invalid_attachment_type"
+    return None
+
+
 def message_to_dict(msg: SupportMessage, *, viewer: User) -> dict:
     staff_view = is_support_staff(viewer)
     if msg.is_internal and not staff_view:
         return {}
-    return {
+    data = {
         "id": msg.id,
         "ticket_id": msg.ticket_id,
         "author_id": msg.author_id,
@@ -104,6 +156,10 @@ def message_to_dict(msg: SupportMessage, *, viewer: User) -> dict:
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
         "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
     }
+    att = _attachment_dict(msg)
+    if att:
+        data["attachment"] = att
+    return data
 
 
 def fetch_ticket_messages(ticket_id: int, viewer: User, *, limit: int = 80, before_id: int | None = None) -> list[dict]:
@@ -136,7 +192,12 @@ def mark_ticket_read(ticket_id: int, user_id: int, message_id: int | None = None
 
 
 def _touch_ticket_from_message(ticket: SupportTicket, msg: SupportMessage, *, status_hint: str | None = None) -> None:
-    preview = (msg.body or "").replace("\n", " ").strip()[:280]
+    if (msg.body or "").strip():
+        preview = (msg.body or "").replace("\n", " ").strip()[:280]
+    elif msg.attachment_name:
+        preview = f"📎 {msg.attachment_name}"[:280]
+    else:
+        preview = "📎 attachment"
     ticket.last_message_at = msg.created_at or timezone.now()
     ticket.last_message_preview = preview
     update_fields = ["last_message_at", "last_message_preview", "updated_at"]
@@ -196,10 +257,16 @@ def apply_send_message(
     body: str,
     *,
     is_internal: bool = False,
+    attachment=None,
 ) -> tuple[dict | None, dict | None, str | None]:
     raw = (body or "").strip()
-    if not raw or len(raw) > _MESSAGE_MAX_LEN:
+    if not raw and not attachment:
         return None, None, "invalid_body"
+    if raw and len(raw) > _MESSAGE_MAX_LEN:
+        return None, None, "invalid_body"
+    att_err = _validate_attachment(attachment)
+    if att_err:
+        return None, None, att_err
     if not _rate_ok(ticket_id, user.id):
         return None, None, "rate_limited"
 
@@ -218,7 +285,13 @@ def apply_send_message(
     if not staff and ticket.requester_id != user.id:
         return None, None, "forbidden"
 
-    msg = SupportMessage.objects.create(ticket=ticket, author=user, body=raw, is_internal=is_internal)
+    msg = SupportMessage(ticket=ticket, author=user, body=raw, is_internal=is_internal)
+    if attachment is not None:
+        msg.attachment = attachment
+        msg.attachment_name = (getattr(attachment, "name", "") or "")[:255]
+        msg.attachment_size = int(getattr(attachment, "size", 0) or 0)
+        msg.attachment_content_type = (getattr(attachment, "content_type", "") or "")[:128]
+    msg.save()
     msg = SupportMessage.objects.select_related("author").get(id=msg.id)
 
     if is_internal:

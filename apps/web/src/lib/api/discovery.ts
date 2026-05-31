@@ -1,4 +1,4 @@
-import { getApiBase, withAuthHeaders, extractApiError } from "./client";
+import { getApiBase, withAuthFormData, withAuthHeaders, extractApiError } from "./client";
 import type {
   GlobalSearchResult,
   ExploreFeed,
@@ -42,13 +42,39 @@ export async function getPublicUserProfile(username: string): Promise<PublicUser
   return (await res.json()) as PublicUserProfile;
 }
 
+export type MePublicProfilePayload = {
+  bio: string;
+  is_public: boolean;
+  avatar_url: string | null;
+};
+
 export async function patchMePublicProfile(payload: { bio?: string; is_public?: boolean }) {
   const res = await fetch(
     `${getApiBase()}/api/auth/me/public-profile`,
     await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot update profile"));
-  return (await res.json()) as { bio: string; is_public: boolean };
+  return (await res.json()) as MePublicProfilePayload;
+}
+
+export async function uploadMeAvatar(file: File): Promise<MePublicProfilePayload> {
+  const body = new FormData();
+  body.append("avatar", file);
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/public-profile`,
+    await withAuthFormData({ method: "PATCH", body }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot upload avatar"));
+  return (await res.json()) as MePublicProfilePayload;
+}
+
+export async function clearMeAvatar(): Promise<MePublicProfilePayload> {
+  const res = await fetch(
+    `${getApiBase()}/api/auth/me/public-profile`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify({ avatar_clear: true }) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot remove avatar"));
+  return (await res.json()) as MePublicProfilePayload;
 }
 
 export async function getUserFollow(username: string) {

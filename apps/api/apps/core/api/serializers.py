@@ -1,5 +1,9 @@
-from rest_framework import serializers
+import re
+
 from django.contrib.auth.models import User
+from rest_framework import serializers
+
+USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 
 from apps.channels.models import UserNotificationSettings
 
@@ -25,6 +29,7 @@ class AuthUserSerializer(serializers.ModelSerializer):
     is_premium = serializers.SerializerMethodField()
     bio = serializers.SerializerMethodField()
     is_public = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -41,6 +46,7 @@ class AuthUserSerializer(serializers.ModelSerializer):
             "date_joined",
             "bio",
             "is_public",
+            "avatar_url",
         ]
 
     def _public_profile(self, obj):
@@ -56,6 +62,13 @@ class AuthUserSerializer(serializers.ModelSerializer):
         row = self._public_profile(obj)
         return bool(row.is_public) if row else False
 
+    def get_avatar_url(self, obj):
+        from apps.social.services.avatar import avatar_url_for
+
+        row = self._public_profile(obj)
+        request = self.context.get("request")
+        return avatar_url_for(row, request=request)
+
     def get_badges(self, obj):
         from apps.accounts.user_badges import badges_for_user
 
@@ -69,12 +82,33 @@ class AuthUserSerializer(serializers.ModelSerializer):
         return SLUG_PREMIUM in slugs
 
 
+def normalize_username(value: str) -> str:
+    return (value or "").strip()
+
+
+def validate_username_value(value: str, *, exclude_user_id: int | None = None) -> str:
+    username = normalize_username(value)
+    if not USERNAME_PATTERN.match(username):
+        raise serializers.ValidationError("username_invalid")
+    qs = User.objects.filter(username__iexact=username)
+    if exclude_user_id is not None:
+        qs = qs.exclude(pk=exclude_user_id)
+    if qs.exists():
+        raise serializers.ValidationError("username_taken")
+    return username
+
+
 class AuthUserProfileUpdateSerializer(serializers.ModelSerializer):
-    """Partial update for the signed-in user (username is immutable here)."""
+    """Partial update for the signed-in user."""
 
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name"]
+        fields = ["username", "email", "first_name", "last_name"]
+
+    def validate_username(self, value: str) -> str:
+        if self.instance and normalize_username(value) == self.instance.username:
+            return self.instance.username
+        return validate_username_value(value, exclude_user_id=self.instance.pk if self.instance else None)
 
 
 class PasswordChangeSerializer(serializers.Serializer):

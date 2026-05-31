@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle, Send, Share2, Sparkles } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Button } from "@/shared/ui/button";
 import { Progress } from "@/shared/ui/progress";
 import {
@@ -186,9 +186,14 @@ export function RoomExperienceChrome({
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex -space-x-2">
           {members.slice(0, 8).map((m) => (
-            <Avatar key={m.id} className="h-9 w-9 border-2 border-background" title={m.username}>
-              <AvatarFallback className="text-xs">{(m.username || "?").slice(0, 1)}</AvatarFallback>
-            </Avatar>
+            <span key={m.id} title={m.username} className="inline-flex">
+              <UserAvatar
+                username={m.username}
+                avatarUrl={m.avatar_url}
+                className="h-9 w-9 border-2 border-background"
+                fallbackClassName="text-xs"
+              />
+            </span>
           ))}
           {members.length === 0 ? (
             <span className="text-xs text-muted-foreground">Listening… connect to see who&apos;s here.</span>

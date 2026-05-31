@@ -28,7 +28,7 @@ class Channel(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     # UI / "experience pack": accent, rehearsal_mode, queue_locked, blind_playlist_id, intro_preview_seconds, veto_skip_threshold, etc.
     experience = models.JSONField(default=dict, blank=True)
-    brand_logo = models.ImageField(upload_to="channel_brand/", null=True, blank=True)
+    brand_logo = models.FileField(upload_to="channel_brand/", null=True, blank=True)
 
 
 class ChannelMembership(models.Model):

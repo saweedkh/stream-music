@@ -3,7 +3,12 @@ import type { PlaylistSummary } from "./playlist";
 import type { TrackSummary } from "./tracks";
 import type { UserBadge } from "./user";
 
-export type GlobalSearchUser = { id: number; username: string; display_name: string };
+export type GlobalSearchUser = {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+};
 
 export type GlobalSearchSharedPlaylist = {
   token: string;
@@ -27,8 +32,9 @@ export type PublicUserProfile = {
     last_name: string;
     badges: UserBadge[];
     date_joined: string | null;
+    avatar_url?: string | null;
   };
-  profile: { bio: string; is_public: boolean };
+  profile: { bio: string; is_public: boolean; avatar_url?: string | null };
   public_channels: ChannelSummary[];
   public_playlists?: PlaylistSummary[];
   stats?: {

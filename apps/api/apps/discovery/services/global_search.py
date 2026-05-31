@@ -43,13 +43,18 @@ def build_global_search(request, q: str) -> dict:
         .filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
         .select_related("public_profile")[:12]
     )
+    from apps.social.services.avatar import avatar_urls_for_user_ids
+
+    user_list = list(user_rows)
+    avatars = avatar_urls_for_user_ids([u.id for u in user_list])
     users = [
         {
             "id": u.id,
             "username": u.username,
             "display_name": (u.get_full_name() or u.username).strip(),
+            "avatar_url": avatars.get(u.id),
         }
-        for u in user_rows
+        for u in user_list
     ]
     shared_links = (
         PlaylistShareLink.objects.filter(is_active=True, playlist__name__icontains=q)

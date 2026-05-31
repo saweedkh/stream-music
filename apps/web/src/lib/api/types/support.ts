@@ -21,7 +21,14 @@ export type SupportTicketRow = {
   assigned_to_username: string | null;
   requester_id?: number;
   requester_username?: string;
-  requester?: { id: number; username: string; badges?: UserBadge[]; is_staff?: boolean; is_superuser?: boolean };
+  requester?: {
+    id: number;
+    username: string;
+    avatar_url?: string | null;
+    badges?: UserBadge[];
+    is_staff?: boolean;
+    is_superuser?: boolean;
+  };
   created_at: string | null;
   updated_at: string | null;
   closed_at: string | null;
@@ -31,16 +38,31 @@ export type SupportTicketRow = {
   is_mine?: boolean;
 };
 
+export type SupportMessageAttachment = {
+  url: string;
+  name: string;
+  size: number;
+  content_type: string;
+};
+
 export type SupportMessageRow = {
   id: number;
   ticket_id: number;
   author_id: number;
-  author: { id: number; username: string; badges?: UserBadge[]; is_staff?: boolean; is_superuser?: boolean };
+  author: {
+    id: number;
+    username: string;
+    avatar_url?: string | null;
+    badges?: UserBadge[];
+    is_staff?: boolean;
+    is_superuser?: boolean;
+  };
   body: string;
   is_internal: boolean;
   is_mine: boolean;
   created_at: string | null;
   edited_at?: string | null;
+  attachment?: SupportMessageAttachment | null;
 };
 
 export type SupportInboxStats = {

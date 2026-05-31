@@ -1,38 +1,45 @@
 "use client";
 
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
-type Props = Omit<React.ComponentPropsWithoutRef<"button">, "onClick"> & {
+/** Compact iOS-style switch; thumb uses logical `start` so RTL matches LTR. */
+const TRACK = "relative inline-flex h-6 w-11 shrink-0 rounded-full p-0.5";
+const THUMB =
+  "pointer-events-none absolute top-0.5 block size-5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.22)] transition-[inset-inline-start] duration-200 ease-out";
+
+export type SwitchProps = Omit<React.ComponentPropsWithoutRef<"button">, "onClick"> & {
   checked: boolean;
-  onCheckedChange: (next: boolean) => void;
+  onCheckedChange: (checked: boolean) => void;
 };
 
-const Switch = React.forwardRef<HTMLButtonElement, Props>(({ className, checked, onCheckedChange, disabled, ...props }, ref) => (
-  <button
-    ref={ref}
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    disabled={disabled}
-    onClick={() => !disabled && onCheckedChange(!checked)}
-    className={cn(
-      "peer inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-transparent px-0.5 transition-colors",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-      checked ? "bg-brand" : "bg-muted",
-      disabled && "cursor-not-allowed opacity-50",
-      className,
-    )}
-    {...props}
-  >
-    <span
+const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
+  ({ className, checked, onCheckedChange, disabled, ...props }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
-        "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200",
-        checked ? "translate-x-[1.25rem]" : "translate-x-0.5",
+        TRACK,
+        "cursor-pointer border-0 transition-colors duration-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        checked ? "bg-brand" : "bg-muted-foreground/25 dark:bg-muted-foreground/35",
+        disabled && "cursor-not-allowed opacity-50",
+        className,
       )}
-    />
-  </button>
-));
+      {...props}
+    >
+      <span
+        className={cn(THUMB, checked ? "start-[calc(100%-1.375rem)]" : "start-0.5")}
+        aria-hidden
+      />
+    </button>
+  ),
+);
 Switch.displayName = "Switch";
 
 export { Switch };
