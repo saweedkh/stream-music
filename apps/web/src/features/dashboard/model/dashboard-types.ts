@@ -5,8 +5,6 @@ export type DashboardTab =
   | "playlists"
   | "sharing"
   | "support"
-  | "favoritePlaylists"
-  | "favoriteTracks"
   | "settings"
   | "admin";
 
@@ -17,8 +15,6 @@ export const DASHBOARD_TABS: DashboardTab[] = [
   "playlists",
   "sharing",
   "support",
-  "favoritePlaylists",
-  "favoriteTracks",
   "settings",
   "admin",
 ];

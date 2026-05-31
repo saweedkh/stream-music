@@ -100,7 +100,7 @@ export function isDashboardRouteNavItem(item: DashboardChannelsNavItem): item is
 
 export type DashboardNavSection =
   | {
-      id: "channels" | "library" | "help" | "favorites";
+      id: "channels" | "library" | "help";
       titleKey: MessageKey;
       variant: "main";
       items: DashboardMainNavItem[] | DashboardChannelsNavItem[];
@@ -145,15 +145,6 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
       titleKey: "dashboard.sidebar.section.help",
       variant: "main",
       items: [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }],
-    },
-    {
-      id: "favorites",
-      titleKey: "dashboard.sidebar.section.favorites",
-      variant: "main",
-      items: [
-        { id: "favoritePlaylists", labelKey: "profile.nav.favoritePlaylists", icon: ListMusic },
-        { id: "favoriteTracks", labelKey: "profile.nav.favoriteTracks", icon: Music },
-      ],
     },
     {
       id: "account",

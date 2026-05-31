@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Alert } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -20,40 +20,29 @@ import {
 import { type DashboardTab, isDashboardTab } from "@/features/dashboard/model/dashboard-types";
 import { AdminPanelHub } from "@/features/dashboard/components/admin-panel-hub";
 import { SupportHub } from "@/features/dashboard/components/support-hub";
-import { ProfileFavoritesPanel } from "@/features/dashboard/components/profile-favorites-panel";
 import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
 import { PlaylistManager } from "@/features/dashboard/components/playlist-manager";
 import { TrackLibrarySection } from "@/features/dashboard/components/track-library-section";
 import { TrackSharingSection } from "@/features/dashboard/components/track-sharing-section";
 import {
-  addPlaylistItem,
   addTrackSharePermission,
   createChannel,
-  createPlaylist,
   getMe,
   listChannels,
-  listPlaylistItems,
   listPlaylists,
-  getTrackFacets,
   listTracks,
   listTrackSharePermissions,
   listUsers,
   removeTrackSharePermission,
-  reorderPlaylistItem,
   normalizeTrackList,
-  setTrackFavorite,
-  uploadTrackChunked,
   type ChannelSummary,
-  type PlaylistItemSummary,
   type PlaylistSummary,
   type TrackSharePermission,
   type AuthUser,
   type TrackSummary,
 } from "@/lib/api";
-import { parseAudioFileMetadata } from "@/lib/audio-metadata";
 import { loadPendingUpload, type PendingChunkUpload } from "@/lib/resumable-upload";
-import { uploadTrackResumable } from "@/lib/resumable-upload";
-import { createChannelSchema, createPlaylistSchema, uploadTrackSchema } from "@/lib/validation";
+import { createChannelSchema } from "@/lib/validation";
 
 export function DashboardWorkspace() {
   const { t } = useTranslations();
@@ -62,8 +51,8 @@ export function DashboardWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
-  const profileSection = useMemo(() => profileSectionFromSearch(searchParams), [searchParams]);
-  const adminSection = useMemo(() => adminSectionFromSearch(searchParams), [searchParams]);
+  const profileSection = profileSectionFromSearch(searchParams);
+  const adminSection = adminSectionFromSearch(searchParams);
 
   const navigateDashboard = useCallback(
     (params: URLSearchParams) => {
@@ -110,7 +99,6 @@ export function DashboardWorkspace() {
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
-  const [playlistItems, setPlaylistItems] = useState<PlaylistItemSummary[]>([]);
   const [users, setUsers] = useState<Array<{ id: number; username: string }>>([]);
   const [trackShares, setTrackShares] = useState<TrackSharePermission[]>([]);
   const [, setStatus] = useState<string | null>(null);
@@ -119,97 +107,15 @@ export function DashboardWorkspace() {
   const [channelPrivacy, setChannelPrivacy] = useState<ChannelSummary["privacy"]>("public");
   const [memberLimit, setMemberLimit] = useState("50");
 
-  const [trackTitle, setTrackTitle] = useState("");
-  const [trackVisibility, setTrackVisibility] = useState<TrackSummary["visibility"]>("private");
-  const [trackFile, setTrackFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<PendingChunkUpload | null>(null);
-
-  const [playlistName, setPlaylistName] = useState("");
-  const [playlistChannel, setPlaylistChannel] = useState<string>("none");
-  const [itemPlaylistId, setItemPlaylistId] = useState<string>("");
-  const [itemTrackId, setItemTrackId] = useState<string>("");
   const [shareTrackId, setShareTrackId] = useState<string>("");
   const [shareUserId, setShareUserId] = useState<string>("");
   const [shareChannelId, setShareChannelId] = useState<string>("");
-  const [draggingPlaylistItemId, setDraggingPlaylistItemId] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DashboardTab>(isDashboardTab(tabFromUrl) ? tabFromUrl : "channels");
-  const [tracksFavoritesOnly, setTracksFavoritesOnly] = useState(false);
-  const [favoriteBusyTrackId, setFavoriteBusyTrackId] = useState<number | null>(null);
-  const [filterGenre, setFilterGenre] = useState("");
-  const [filterAlbum, setFilterAlbum] = useState("");
-  const [filterTag, setFilterTag] = useState("");
-  const [facetGenres, setFacetGenres] = useState<string[]>([]);
-  const [facetAlbums, setFacetAlbums] = useState<string[]>([]);
-  const [facetTags, setFacetTags] = useState<string[]>([]);
-  const [batchFiles, setBatchFiles] = useState<File[]>([]);
-
-  const groupedPlaylistItems = useMemo(() => {
-    const result: Record<number, PlaylistItemSummary[]> = {};
-    for (const item of playlistItems) {
-      if (!result[item.playlist]) result[item.playlist] = [];
-      result[item.playlist].push(item);
-    }
-    Object.keys(result).forEach((key) => result[Number(key)].sort((a, b) => a.position - b.position));
-    return result;
-  }, [playlistItems]);
-  function deriveTitleFromFile(file: File) {
-    return file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
-  }
-
-  function handleTrackFileSelect(file: File | null) {
-    setTrackFile(file);
-    if (!file) return;
-    setTrackTitle((current) => (current.trim() ? current : deriveTitleFromFile(file)));
-    void parseAudioFileMetadata(file).then((meta) => {
-      if (meta.title) setTrackTitle((current) => (current.trim() ? current : meta.title!));
-    });
-    setFieldErrors((prev) => {
-      const { trackFile: _trackFile, trackTitle: _trackTitle, ...rest } = prev;
-      return rest;
-    });
-  }
-
-  async function loadTracksForLibrary(favoritedOnly: boolean) {
-    const data = await listTracks({
-      ...(favoritedOnly ? { favorited: true } : {}),
-      ...(filterGenre ? { genre: filterGenre } : {}),
-      ...(filterAlbum ? { album: filterAlbum } : {}),
-      ...(filterTag ? { tag: filterTag } : {}),
-    });
-    setTracks(normalizeTrackList(data));
-  }
-
-  async function handleTrackFavoriteToggle(trackId: number, next: boolean) {
-    setFavoriteBusyTrackId(trackId);
-    try {
-      await setTrackFavorite(trackId, next);
-      if (tracksFavoritesOnly && !next) {
-        setTracks((prev) => prev.filter((t) => t.id !== trackId));
-      } else {
-        setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, is_favorited: next } : t)));
-      }
-      showToast(t("favorites.updated"), "success");
-    } catch {
-      showToast(t("favorites.updateFailed"), "error");
-    } finally {
-      setFavoriteBusyTrackId(null);
-    }
-  }
-
-  async function handleTracksFavoritesOnlyChange(on: boolean) {
-    setTracksFavoritesOnly(on);
-    try {
-      await loadTracksForLibrary(on);
-    } catch {
-      showToast(t("dashboard.loadFailed"), "error");
-    }
-  }
+  const [pendingUpload, setPendingUpload] = useState<PendingChunkUpload | null>(null);
 
   async function refreshAll() {
     setIsLoading(true);
@@ -217,26 +123,15 @@ export function DashboardWorkspace() {
       const me = await getMe();
       setCurrentUser(me?.user ?? null);
       setCurrentUserId(me?.user?.id ?? null);
-      const [c, trackData, p, u, facets] = await Promise.all([
+      const [c, trackData, p, u] = await Promise.all([
         listChannels(),
-        listTracks({
-          ...(tracksFavoritesOnly ? { favorited: true } : {}),
-          ...(filterGenre ? { genre: filterGenre } : {}),
-          ...(filterAlbum ? { album: filterAlbum } : {}),
-          ...(filterTag ? { tag: filterTag } : {}),
-        }),
+        listTracks({ limit: 500 }),
         listPlaylists(),
         listUsers(),
-        getTrackFacets().catch(() => ({ genres: [], albums: [], tags: [] })),
       ]);
-      setFacetGenres(facets.genres);
-      setFacetAlbums(facets.albums);
-      setFacetTags(facets.tags);
-      const pi = await listPlaylistItems();
       setChannels(c);
       setTracks(normalizeTrackList(trackData));
       setPlaylists(p);
-      setPlaylistItems(pi);
       setUsers(u.results);
     } catch {
       setStatus(t("dashboard.loadFailed"));
@@ -251,19 +146,18 @@ export function DashboardWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "tracks") return;
-    void loadTracksForLibrary(tracksFavoritesOnly);
-  }, [filterGenre, filterAlbum, filterTag]);
-
-  useEffect(() => {
     setPendingUpload(loadPendingUpload());
   }, []);
 
   useEffect(() => {
     const queryTab = searchParams.get("tab");
     const legacySection = searchParams.get("section");
-    if (queryTab === "settings" && (legacySection === "favoriteTracks" || legacySection === "favoritePlaylists")) {
-      navigateMainTab(legacySection);
+    if (queryTab === "favoriteTracks" || legacySection === "favoriteTracks") {
+      navigateMainTab("tracks");
+      return;
+    }
+    if (queryTab === "favoritePlaylists" || legacySection === "favoritePlaylists") {
+      navigateMainTab("playlists");
       return;
     }
     if (!isDashboardTab(queryTab)) return;
@@ -297,105 +191,6 @@ export function DashboardWorkspace() {
     } catch {
       setStatus(t("dashboard.createChannelFailed"));
       showToast(t("dashboard.createChannelFailed"), "error");
-    }
-  }
-
-  async function handleUploadTrack() {
-    const normalizedTitle = trackTitle.trim() || (trackFile ? deriveTitleFromFile(trackFile) : "");
-    const result = uploadTrackSchema(t).safeParse({ trackTitle: normalizedTitle, trackFile });
-    const nextErrors: Record<string, string> = {};
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const field = String(issue.path[0] ?? "");
-        if (field === "trackTitle" || field === "trackFile") nextErrors[field] = issue.message;
-      }
-    }
-    setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
-    if (Object.keys(nextErrors).length) {
-      showToast(t("dashboard.fixTrackFields"), "error");
-      return;
-    }
-    if (!trackFile) return;
-    try {
-      setIsUploading(true);
-      setUploadProgress(0);
-      setTrackTitle(normalizedTitle);
-      await uploadTrackResumable(
-        uploadTrackChunked,
-        { title: normalizedTitle, visibility: trackVisibility, file: trackFile },
-        { onProgress: setUploadProgress },
-      );
-      setStatus(t("dashboard.trackUploaded"));
-      showToast(t("dashboard.trackUploaded"), "success");
-      setTrackTitle("");
-      setTrackFile(null);
-      setUploadProgress(100);
-      await refreshAll();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("dashboard.uploadFailed");
-      setStatus(message);
-      showToast(message, "error");
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function handleBatchUpload(files: FileList | null) {
-    if (!files?.length) {
-      setBatchFiles([]);
-      return;
-    }
-    const list = Array.from(files);
-    setBatchFiles(list);
-    setIsUploading(true);
-    let done = 0;
-    try {
-      for (const file of list) {
-        const meta = await parseAudioFileMetadata(file);
-        const title = meta.title ?? file.name.replace(/\.[^/.]+$/, "");
-        setUploadProgress(Math.round((done / list.length) * 100));
-        await uploadTrackResumable(
-          uploadTrackChunked,
-          {
-            title,
-            artist: meta.artist,
-            album: meta.album,
-            visibility: trackVisibility,
-            file,
-          },
-          { onProgress: (p) => setUploadProgress(Math.round(((done + p / 100) / list.length) * 100)) },
-        );
-        done += 1;
-      }
-      showToast(t("tracks.batchDone", { count: String(done) }), "success");
-      setBatchFiles([]);
-      await refreshAll();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t("dashboard.uploadFailed"), "error");
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-    }
-  }
-
-  async function handleCreatePlaylist() {
-    const result = createPlaylistSchema(t).safeParse({ playlistName });
-    if (!result.success) {
-      setFieldErrors((prev) => ({ ...prev, playlistName: result.error.issues[0]?.message ?? t("validation.playlistNameRequired") }));
-      showToast(t("dashboard.enterPlaylistName"), "error");
-      return;
-    }
-    try {
-      await createPlaylist({ name: playlistName, channel: playlistChannel !== "none" ? Number(playlistChannel) : null });
-      setStatus(t("dashboard.playlistCreated"));
-      showToast(t("dashboard.playlistCreated"), "success");
-      setPlaylistName("");
-      setPlaylistChannel("none");
-      await refreshAll();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("dashboard.createPlaylistFailed");
-      setStatus(message);
-      showToast(message, "error");
     }
   }
 
@@ -509,7 +304,7 @@ export function DashboardWorkspace() {
   }
 
   const interruptedUploadAlert = pendingUpload ? (
-    <Alert tone="info" className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <Alert tone="info" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-sm">
         {t("dashboard.interruptedUpload")} <strong>{pendingUpload.fileName}</strong> (
         {Math.round((pendingUpload.written / Math.max(1, pendingUpload.fileSize)) * 100)}% {t("dashboard.done")})
@@ -518,8 +313,6 @@ export function DashboardWorkspace() {
         size="sm"
         variant="secondary"
         onClick={() => {
-          setTrackTitle(pendingUpload.title);
-          setTrackVisibility(pendingUpload.visibility as TrackSummary["visibility"]);
           if (activeTab !== "tracks") navigateMainTab("tracks");
           showToast(t("dashboard.resumeUploadHint"), "info");
         }}
@@ -566,38 +359,10 @@ export function DashboardWorkspace() {
         ) : null}
 
         {activeTab === "tracks" ? (
-          <>
-            {interruptedUploadAlert}
-            <TrackLibrarySection
-              tracks={tracks}
-              trackTitle={trackTitle}
-              trackVisibility={trackVisibility}
-              selectedTrackFileName={trackFile?.name}
-              isUploading={isUploading}
-              uploadProgress={uploadProgress}
-              errors={fieldErrors}
-              favoritesOnly={tracksFavoritesOnly}
-              favoriteBusyTrackId={favoriteBusyTrackId}
-              onTrackTitleChange={setTrackTitle}
-              onTrackVisibilityChange={setTrackVisibility}
-              onTrackFileChange={handleTrackFileSelect}
-              onTrackFileDrop={handleTrackFileSelect}
-              onUploadTrack={handleUploadTrack}
-              onFavoritesOnlyChange={(on) => void handleTracksFavoritesOnlyChange(on)}
-              onToggleFavorite={(trackId, next) => void handleTrackFavoriteToggle(trackId, next)}
-              filterGenre={filterGenre}
-              filterAlbum={filterAlbum}
-              filterTag={filterTag}
-              facetGenres={facetGenres}
-              facetAlbums={facetAlbums}
-              facetTags={facetTags}
-              onFilterGenreChange={setFilterGenre}
-              onFilterAlbumChange={setFilterAlbum}
-              onFilterTagChange={setFilterTag}
-              onBatchFiles={(files) => void handleBatchUpload(files)}
-              batchFileCount={batchFiles.length}
-            />
-          </>
+          <TrackLibrarySection
+            onUploadComplete={() => void refreshAll()}
+            resumeUploadBanner={interruptedUploadAlert}
+          />
         ) : null}
 
         {activeTab === "playlists" ? <PlaylistManager /> : null}
@@ -620,10 +385,6 @@ export function DashboardWorkspace() {
         ) : null}
 
         {activeTab === "support" ? <SupportHub user={currentUser} /> : null}
-
-        {activeTab === "favoritePlaylists" ? <ProfileFavoritesPanel kind="playlists" /> : null}
-
-        {activeTab === "favoriteTracks" ? <ProfileFavoritesPanel kind="tracks" /> : null}
 
         {activeTab === "settings" ? (
           <UserProfileHub

@@ -75,7 +75,6 @@ export function WorkspacePanel({
         : DASHBOARD_TAB_META[tab].descriptionKey);
 
   const isAdminTab = tab === "admin";
-  const isFavoritesTab = tab === "favoritePlaylists" || tab === "favoriteTracks";
 
   return (
     <div
@@ -94,7 +93,7 @@ export function WorkspacePanel({
           flush && "max-lg:hidden",
         )}
       >
-        <WorkspacePanelIcon icon={Icon} variant={isAdminTab || isFavoritesTab ? "amber" : "brand"} />
+        <WorkspacePanelIcon icon={Icon} variant={isAdminTab ? "amber" : "brand"} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">{t(titleKey)}</h2>

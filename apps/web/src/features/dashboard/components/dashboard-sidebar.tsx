@@ -19,7 +19,7 @@ import { Separator } from "@/shared/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type CollapsibleSectionId = "channels" | "library" | "help" | "favorites" | "account" | "admin";
+type CollapsibleSectionId = "channels" | "library" | "help" | "account" | "admin";
 
 function SectionDivider() {
   return (
@@ -81,7 +81,6 @@ function defaultExpanded(
     channels: activeTab === "channels" || activeTab === "following" || Boolean(activePathname?.startsWith("/explore")),
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
     help: activeTab === "support",
-    favorites: activeTab === "favoritePlaylists" || activeTab === "favoriteTracks",
     account: activeTab === "settings",
     admin: activeTab === "admin",
   };
@@ -112,7 +111,6 @@ export function DashboardSidebar({
       if (activeTab === "channels" || activePathname?.startsWith("/explore")) next.channels = true;
       if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
       if (activeTab === "support") next.help = true;
-      if (activeTab === "favoritePlaylists" || activeTab === "favoriteTracks") next.favorites = true;
       if (activeTab === "settings") next.account = true;
       if (activeTab === "admin") next.admin = true;
       return next;

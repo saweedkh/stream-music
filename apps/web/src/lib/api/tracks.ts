@@ -208,6 +208,23 @@ export async function uploadTrackChunked(
   return track;
 }
 
+export async function importTrackFromUrl(payload: {
+  url: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  genre?: string;
+  tags?: string[];
+  visibility: TrackSummary["visibility"];
+}): Promise<TrackSummary & { duplicate?: boolean }> {
+  const res = await fetch(
+    `${getApiBase()}/api/tracks/upload/from-url`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot import track from URL"));
+  return (await res.json()) as TrackSummary & { duplicate?: boolean };
+}
+
 export async function getChunkUploadStatus(uploadId: string) {
   const res = await fetch(`${getApiBase()}/api/tracks/upload/${encodeURIComponent(uploadId)}/status`, {
     credentials: "include",
