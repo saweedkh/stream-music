@@ -1530,6 +1530,75 @@ const en = {
   "api.error.incomplete_upload": "Upload is incomplete.",
   "api.error.private": "This content is private.",
   "api.error.invite_invalid": "Invalid invite.",
+
+  /* ── Landing page ─────────────────────────────────────────── */
+  "landing.brand.nativeName": "بیت روم",
+  "landing.eyebrow": "Real-time music, together",
+  "landing.headline1": "Listen together,",
+  "landing.headline2": "in real time",
+  "landing.subtitle":
+    "Create a room, invite your friends, and everyone hears the same beat at the exact same moment — with live chat, shared queue, and synchronized playback.",
+  "landing.cta.start": "Create a room",
+  "landing.cta.explore": "Explore rooms",
+  "landing.cta.signin": "Sign in",
+  "landing.cta.register": "Get started free",
+  "landing.scrollHint": "scroll",
+
+  "landing.badge.sync": "Real-time sync",
+  "landing.badge.queue": "Shared queue",
+  "landing.badge.explore": "Discover rooms",
+
+  "landing.features.eyebrow": "Features",
+  "landing.features.title1": "Everything you need to",
+  "landing.features.title2": "listen together",
+  "landing.features.subtitle":
+    "Beat Room is a full group-listening platform — not just a player.",
+
+  "landing.feat.sync.title": "Perfectly in sync",
+  "landing.feat.sync.desc":
+    "Everyone in the room hears the exact same beat, at the exact same millisecond. No drift. No lag.",
+  "landing.feat.chat.title": "Live reactions",
+  "landing.feat.chat.desc":
+    "Send messages, reply to friends, pin moments, and float emojis while the music plays.",
+  "landing.feat.queue.title": "Shared queue & voting",
+  "landing.feat.queue.desc":
+    "Build a shared queue, shuffle it, and vote on the next track — together.",
+  "landing.feat.rooms.title": "Flexible rooms",
+  "landing.feat.rooms.desc":
+    "Public, private, or unlisted. Invite with a link, QR code, or private token.",
+  "landing.feat.discover.title": "Discover & follow",
+  "landing.feat.discover.desc":
+    "Find live public rooms, trending playlists, and follow channels you love.",
+  "landing.feat.everywhere.title": "Your devices, everywhere",
+  "landing.feat.everywhere.desc":
+    "Install as a PWA or native app on iOS and Android. No app store required.",
+
+  "landing.how.eyebrow": "How it works",
+  "landing.how.title": "Three steps to start",
+  "landing.how.step1.title": "Create a room",
+  "landing.how.step1.desc":
+    "Give your room a name. Choose public, private, or unlisted. Upload tracks or import a playlist.",
+  "landing.how.step2.title": "Invite your friends",
+  "landing.how.step2.desc":
+    "Share a link, QR code, or private token. Friends join with a single tap.",
+  "landing.how.step3.title": "Listen together",
+  "landing.how.step3.desc":
+    "Synchronized playback, live chat, shared queue, and floating emoji reactions — all in one room.",
+
+  "landing.cta.section.title1": "Ready to listen",
+  "landing.cta.section.title2": "together?",
+  "landing.cta.section.desc":
+    "Sign up now, create your first room, and invite your friends.",
+  "landing.cta.section.primary": "Get started free ↗",
+  "landing.cta.section.secondary": "Sign in",
+
+  "landing.footer.copy": "Built with ❤ — All rights reserved",
+  "landing.footer.signin": "Sign in",
+  "landing.footer.register": "Register",
+  "landing.footer.explore": "Explore",
+  "landing.footer.navigate": "Navigate",
+  "landing.footer.account": "Account",
+  "landing.footer.backToTop": "Back to top",
 } as const;
 
 const fa: Record<keyof typeof en, string> = {
@@ -3058,6 +3127,75 @@ const fa: Record<keyof typeof en, string> = {
   "api.error.incomplete_upload": "آپلود ناقص است.",
   "api.error.private": "این محتوا خصوصی است.",
   "api.error.invite_invalid": "دعوت‌نامه نامعتبر است.",
+
+  /* ── Landing page ─────────────────────────────────────────── */
+  "landing.brand.nativeName": "بیت روم",
+  "landing.eyebrow": "موسیقی زنده، باهم",
+  "landing.headline1": "موسیقی با هم،",
+  "landing.headline2": "در زمان واقعی",
+  "landing.subtitle":
+    "یه اتاق بساز، دوستاتو دعوت کن و همه با هم دقیقاً یه لحظه از موسیقی رو بشنوید — با چت زنده، صف مشترک و پخش‌کننده همگام.",
+  "landing.cta.start": "اتاق جدید بساز",
+  "landing.cta.explore": "کاوش اتاق‌ها",
+  "landing.cta.signin": "ورود",
+  "landing.cta.register": "شروع رایگان",
+  "landing.scrollHint": "بیشتر",
+
+  "landing.badge.sync": "پخش همگام",
+  "landing.badge.queue": "صف مشترک",
+  "landing.badge.explore": "کاوش اتاق‌ها",
+
+  "landing.features.eyebrow": "قابلیت‌ها",
+  "landing.features.title1": "همه چیزی که برای",
+  "landing.features.title2": "شنیدن باهم",
+  "landing.features.subtitle":
+    "Beat Room یه پلتفرم کامل برای موسیقی گروهی‌ه — نه فقط یه پخش‌کننده.",
+
+  "landing.feat.sync.title": "دقیقاً همگام",
+  "landing.feat.sync.desc":
+    "همه اعضای اتاق دقیقاً یک لحظه از موسیقی رو می‌شنوند — بدون drift، بدون تأخیر.",
+  "landing.feat.chat.title": "واکنش زنده",
+  "landing.feat.chat.desc":
+    "پیام بفرست، جواب بده، لحظه‌ها رو سنجاق کن و ایموجی شناور بفرست — همزمان با موسیقی.",
+  "landing.feat.queue.title": "صف و رأی‌گیری",
+  "landing.feat.queue.desc":
+    "صف مشترک بساز، shuffle کن و با رأی‌گیری گروهی ترک بعدی رو انتخاب کن.",
+  "landing.feat.rooms.title": "اتاق انعطاف‌پذیر",
+  "landing.feat.rooms.desc":
+    "عمومی، خصوصی یا فهرست‌نشده. با لینک، QR کد یا توکن خصوصی دعوت کن.",
+  "landing.feat.discover.title": "کشف و دنبال کردن",
+  "landing.feat.discover.desc":
+    "اتاق‌های زنده عمومی، پلی‌لیست‌های محبوب رو پیدا کن و کانال‌هایی که دوست داری دنبال کن.",
+  "landing.feat.everywhere.title": "روی همه دستگاه‌ها",
+  "landing.feat.everywhere.desc":
+    "به‌عنوان PWA نصب کن یا از اپ بومی iOS و Android استفاده کن — بدون نیاز به App Store.",
+
+  "landing.how.eyebrow": "چطور کار می‌کنه",
+  "landing.how.title": "سه قدم تا شروع",
+  "landing.how.step1.title": "اتاق بساز",
+  "landing.how.step1.desc":
+    "یه اسم برای اتاقت انتخاب کن. عمومی، خصوصی یا فهرست‌نشده. ترک آپلود کن یا پلی‌لیست وارد کن.",
+  "landing.how.step2.title": "دوستاتو دعوت کن",
+  "landing.how.step2.desc":
+    "لینک، QR کد یا توکن خصوصی بفرست. دوستات با یه ضربه وارد می‌شن.",
+  "landing.how.step3.title": "باهم گوش بدید",
+  "landing.how.step3.desc":
+    "پخش همگام، چت زنده، صف مشترک و ایموجی شناور — همه در یه اتاق.",
+
+  "landing.cta.section.title1": "آماده‌ای موسیقی رو",
+  "landing.cta.section.title2": "باهم بشنوی؟",
+  "landing.cta.section.desc":
+    "همین الان ثبت‌نام کن، اتاق اولت رو بساز و دوستاتو دعوت کن.",
+  "landing.cta.section.primary": "شروع رایگان ↗",
+  "landing.cta.section.secondary": "ورود به حساب",
+
+  "landing.footer.copy": "ساخته شده با ❤ — تمامی حقوق محفوظ است",
+  "landing.footer.signin": "ورود",
+  "landing.footer.register": "ثبت‌نام",
+  "landing.footer.explore": "کاوش",
+  "landing.footer.navigate": "ناوبری",
+  "landing.footer.account": "حساب کاربری",
+  "landing.footer.backToTop": "بازگشت به بالا",
 };
 
 export type MessageKey = keyof typeof en;

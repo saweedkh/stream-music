@@ -602,3 +602,9 @@ select option {
 }
 
 /* end auth */
+
+/* ── Landing wave visualizer ──────────────────────────────── */
+@keyframes wave-bar {
+  0% { transform: scaleY(0.3); opacity: 0.5; }
+  100% { transform: scaleY(1); opacity: 1; }
+}

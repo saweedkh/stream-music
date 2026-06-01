@@ -142,12 +142,14 @@ test.describe("social: following, explore, user follow", () => {
     await viewerCtx.dispose();
   });
 
-  test("health: following and explore endpoints require auth", async ({ playwright }) => {
+  test("health: following feed requires auth; explore is public", async ({ playwright }) => {
     const anon = await playwright.request.newContext({ baseURL: apiURL });
     const feed = await anon.get(`${apiURL}/api/me/following-channels`);
     expect([401, 403]).toContain(feed.status());
     const explore = await anon.get(`${apiURL}/api/explore`);
-    expect([401, 403]).toContain(explore.status());
+    expect(explore.ok()).toBeTruthy();
+    const body = (await explore.json()) as { live_channels: unknown[] };
+    expect(Array.isArray(body.live_channels)).toBeTruthy();
     await anon.dispose();
   });
 });

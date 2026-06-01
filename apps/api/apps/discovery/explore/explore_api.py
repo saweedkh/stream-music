@@ -6,7 +6,7 @@ from apps.discovery.services.explore_feed import build_explore_feed
 
 
 class ExploreFeedView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         q = str(request.query_params.get("q") or "").strip().lower()

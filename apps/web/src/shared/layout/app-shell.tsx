@@ -31,7 +31,7 @@ const GlobalChannelPlayerDock = dynamic(
 );
 
 function isAuthPath(pathname: string | null) {
-  return pathname === "/login" || pathname === "/register";
+  return pathname === "/login" || pathname === "/register" || pathname === "/";
 }
 
 function isSelfShelledPath(pathname: string | null) {
