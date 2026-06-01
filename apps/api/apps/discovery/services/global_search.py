@@ -6,13 +6,12 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 
 from apps.channels.models import Channel
-from apps.channels.api.serializers import ChannelSerializer
-from apps.playlists.api.serializers import PlaylistSerializer
-from apps.tracks.api.serializers import TrackSerializer
-from apps.playlists.models import PlaylistShareLink
+from apps.channels.serializers.channel_serializers import ChannelSerializer
 from apps.discovery.selectors import public_channel_queryset
 from apps.playback.services.channel_queue import tracks_accessible_to_user
-from apps.playlists.models import Playlist
+from apps.playlists.models import Playlist, PlaylistShareLink
+from apps.playlists.playlists.playlist_serializers import PlaylistSerializer
+from apps.tracks.tracks.track_serializers import TrackSerializer
 
 
 def build_global_search(request, q: str) -> dict:

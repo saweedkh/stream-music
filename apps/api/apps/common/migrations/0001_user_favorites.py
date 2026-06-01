@@ -1,12 +1,11 @@
 # Generated manually for user favorites
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -23,7 +22,9 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "track",
-                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="favorited_by", to="tracks.track"),
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, related_name="favorited_by", to="tracks.track"
+                    ),
                 ),
                 (
                     "user",
@@ -47,7 +48,9 @@ class Migration(migrations.Migration):
                 (
                     "playlist",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE, related_name="favorited_by", to="playlists.playlist"
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="favorited_by",
+                        to="playlists.playlist",
                     ),
                 ),
                 (

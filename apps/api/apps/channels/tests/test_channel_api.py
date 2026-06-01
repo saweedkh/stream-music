@@ -57,15 +57,13 @@ class ChannelJoinLeaveTests(APITestCase):
         self.client.force_authenticate(user=self.joiner)
         res = self.client.post(f"/api/channels/{self.channel.id}/join")
         self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
-        self.assertTrue(
-            ChannelMembership.objects.filter(channel=self.channel, user=self.joiner).exists()
-        )
+        self.assertTrue(ChannelMembership.objects.filter(channel=self.channel, user=self.joiner).exists())
 
     def test_leave_channel(self):
         self.client.force_authenticate(user=self.joiner)
         ChannelMembership.objects.create(channel=self.channel, user=self.joiner)
         res = self.client.post(f"/api/channels/{self.channel.id}/leave")
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
 
 
 class ChannelMembersTests(APITestCase):

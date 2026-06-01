@@ -29,6 +29,7 @@ import {
   createAdminBadge,
   deleteAdminBadge,
   getAdminHealth,
+  type AdminSystemHealth,
   getAdminOverview,
   listAdminBadges,
   listAdminChannels,
@@ -85,7 +86,7 @@ export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }
   const { showToast } = useToast();
 
   const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [health, setHealth] = useState<{ status: string; db: boolean; redis: boolean } | null>(null);
+  const [health, setHealth] = useState<AdminSystemHealth | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [channels, setChannels] = useState<AdminChannelRow[]>([]);
@@ -553,20 +554,59 @@ export function AdminPanelHub({ activeSection }: { activeSection: AdminSection }
             </CardHeader>
             <CardContent className="space-y-4">
               {health ? (
-                <ul className="space-y-2 text-sm">
-                  <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
-                    <span>{t("admin.healthStatus")}</span>
-                    <Badge variant={health.status === "ok" ? "success" : "warning"}>{health.status}</Badge>
-                  </li>
-                  <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
-                    <span>PostgreSQL</span>
-                    <Badge variant={health.db ? "success" : "warning"}>{health.db ? "OK" : "FAIL"}</Badge>
-                  </li>
-                  <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
-                    <span>Redis</span>
-                    <Badge variant={health.redis ? "success" : "warning"}>{health.redis ? "OK" : "FAIL"}</Badge>
-                  </li>
-                </ul>
+                <div className="space-y-4 text-sm">
+                  <ul className="space-y-2">
+                    <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
+                      <span>{t("admin.healthStatus")}</span>
+                      <Badge variant={health.status === "ok" ? "success" : "warning"}>{health.status}</Badge>
+                    </li>
+                    <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
+                      <span>PostgreSQL</span>
+                      <Badge variant={health.db ? "success" : "warning"}>{health.db ? "OK" : "FAIL"}</Badge>
+                    </li>
+                    <li className="flex justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
+                      <span>Redis</span>
+                      <Badge variant={health.redis ? "success" : "warning"}>{health.redis ? "OK" : "FAIL"}</Badge>
+                    </li>
+                  </ul>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatCard
+                      label={t("admin.metric.playing")}
+                      value={health.channels_playing}
+                      icon={Radio}
+                    />
+                    <StatCard
+                      label={t("admin.metric.listeners")}
+                      value={health.realtime.listeners_in_presence}
+                      icon={Activity}
+                    />
+                    <StatCard
+                      label={t("admin.metric.mediaGb")}
+                      value={health.media_audio_gb}
+                      icon={Server}
+                    />
+                    <StatCard
+                      label={t("admin.metric.celeryWorkers")}
+                      value={health.celery.workers}
+                      sub={health.celery.reachable ? "OK" : "—"}
+                      icon={Server}
+                    />
+                  </div>
+                  {health.disk.used_percent != null ? (
+                    <div>
+                      <p className="mb-1 text-xs text-muted-foreground">{t("admin.metric.disk")}</p>
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-brand"
+                          style={{ width: `${Math.min(100, health.disk.used_percent)}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {health.disk.free_gb} GB {t("admin.metric.free")}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
               <Button variant="secondary" onClick={() => void loadOverview()}>
                 {t("common.refresh")}

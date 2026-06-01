@@ -8,6 +8,8 @@ import { PlaylistDetail } from "@/features/playlists/components/playlist-detail"
 import { PlaylistSidebar } from "@/features/playlists/components/playlist-sidebar";
 import { AddTracksDialog } from "@/features/playlists/components/add-tracks-dialog";
 import { AddPlaylistToChannelDialog } from "@/features/playlists/components/add-playlist-to-channel-dialog";
+import { PlaylistBackupExportButton } from "@/features/dashboard/components/playlist-backup-export-button";
+import { PlaylistBackupImportButton } from "@/features/dashboard/components/playlist-backup-import-button";
 import { usePlaylistItems } from "@/features/playlists/hooks/use-playlist-items";
 import { usePlaylistLibrary } from "@/features/playlists/hooks/use-playlist-library";
 import {
@@ -268,6 +270,8 @@ export function PlaylistsPage() {
                     ))}
                   </Select>
                 ) : null}
+                <PlaylistBackupExportButton />
+                <PlaylistBackupImportButton onImported={() => void lib.refresh()} />
               </div>
 
               {lib.playlists.length > 0 ? (

@@ -5,7 +5,7 @@ import { Radio } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { ChannelAvatar } from "@/features/dashboard/channels/channel-shared";
+import { ChannelAvatar } from "@/features/dashboard";
 import { ExploreChannelFollowControls } from "@/features/discovery/components/explore-channel-follow-controls";
 import { exploreJoinHref } from "@/features/discovery/model/explore-utils";
 import type { ExploreChannelFollowActions } from "@/features/discovery/hooks/use-explore-channel-follow";

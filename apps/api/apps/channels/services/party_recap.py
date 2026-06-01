@@ -24,7 +24,9 @@ def _build_excitement_heatmap(channel_id: int, rows: list, *, buckets: int = 24)
             weight = 3.0 if ev in ("next", "skip", "vote_skip") else 2.0 if ev == "play" else 1.0
             points.append((row.emitted_at, weight))
 
-    chat_msgs = ChannelChatMessage.objects.filter(channel_id=channel_id, deleted_at__isnull=True).only("id", "created_at")[:500]
+    chat_msgs = ChannelChatMessage.objects.filter(channel_id=channel_id, deleted_at__isnull=True).only(
+        "id", "created_at"
+    )[:500]
     msg_ids = [m.id for m in chat_msgs]
     msg_times = {m.id: m.created_at for m in chat_msgs if m.created_at}
     if msg_ids:
@@ -54,7 +56,7 @@ def _build_excitement_heatmap(channel_id: int, rows: list, *, buckets: int = 24)
     max_score = max(bucket_scores) or 1.0
     out_buckets = []
     for i, sc in enumerate(bucket_scores):
-        pct = int(round(100 * sc / max_score)) if max_score else 0
+        pct = round(100 * sc / max_score) if max_score else 0
         label_min = int((i / buckets) * span // 60)
         out_buckets.append(
             {
@@ -94,6 +96,21 @@ def build_party_recap(channel: Channel, limit: int = 80) -> dict:
         for r in reversed(list(rows))
     ]
     heatmap = _build_excitement_heatmap(channel.id, rows)
+    reaction_rows = list(
+        ChannelTrackReaction.objects.filter(channel_id=channel.id)
+        .select_related("user")
+        .order_by("created_at")[:200]
+    )
+    reaction_timeline = [
+        {
+            "at": r.created_at.isoformat() if r.created_at else None,
+            "emoji": r.emoji,
+            "user_id": r.user_id,
+            "username": getattr(r.user, "username", "") if r.user_id else "",
+            "track_id": r.track_id,
+        }
+        for r in reaction_rows
+    ]
     listener_peaks = []
     if heatmap.get("buckets"):
         for b in heatmap["buckets"]:
@@ -106,6 +123,7 @@ def build_party_recap(channel: Channel, limit: int = 80) -> dict:
         "total_events": len(rows),
         "top_tracks": top_tracks,
         "timeline": timeline[-40:],
+        "reaction_timeline": reaction_timeline,
         "excitement_heatmap": heatmap,
         "listener_peaks": listener_peaks[:6],
         "generated_at": timezone.now().isoformat(),

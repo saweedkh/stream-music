@@ -15,7 +15,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files import File
 
-from apps.tracks.api.serializers import TrackSerializer
+from apps.tracks.tracks.track_serializers import TrackSerializer
 from apps.tracks.chunk_upload import sanitize_audio_filename
 from apps.tracks.models import Track
 

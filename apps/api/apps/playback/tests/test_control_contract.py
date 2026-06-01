@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from apps.channels.api.views.playback import ChannelControlView
+from apps.channels.channel_id.control.control_api import ChannelControlView
 from apps.playback.consumers import ChannelPlaybackConsumer
 
 

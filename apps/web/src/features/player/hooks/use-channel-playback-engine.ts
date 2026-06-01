@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
-import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience";
 import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/model/playback-payload";
 import { resumeSharedAudioContext } from "@/features/player/components/audio-wave-visualizer";
 import {
@@ -17,7 +17,15 @@ import {
 import { audienceVolume } from "@/features/player/model/playback-audience";
 import { applyDriftCorrection, expectedTimeSeconds } from "@/features/player/model/sync-client";
 import { ChannelClosedError, getChannelState, getServerTime } from "@/lib/api";
+import { crossfadeIn, crossfadeOut } from "@/features/player/model/crossfade";
 import { resolveMediaSrc } from "@/lib/media-url";
+
+const CROSSFADE_ENABLED_KEY = "sm_crossfade_enabled";
+
+function crossfadeEnabled(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  return localStorage.getItem(CROSSFADE_ENABLED_KEY) !== "0";
+}
 
 export type PlaybackSyncSnapshot = {
   offsetMs: number;
@@ -338,6 +346,9 @@ export function useChannelPlaybackEngine({
           setIsBuffering(true);
         }
         const sent = sendSocketMessage({ action, ...payload });
+        if (action === "pause" && typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("sm-playback-user-pause"));
+        }
         if (!sent) {
           pendingSocketCommandRef.current = { action, ...payload };
           onToast?.("Socket reconnecting... command queued.", "error");
@@ -544,6 +555,7 @@ export function useChannelPlaybackEngine({
       return;
     }
 
+    const previousSrc = loadedSrcRef.current;
     loadedSrcRef.current = src;
     autoNextSentForTrackRef.current = null;
     setIsBuffering(true);
@@ -551,6 +563,9 @@ export function useChannelPlaybackEngine({
     let cancelled = false;
 
     void (async () => {
+      if (crossfadeEnabled() && previousSrc && audio.src) {
+        await crossfadeOut(audio);
+      }
       const result = await loadChannelTrack(audio, src, () => loadGenerationRef.current === loadId);
       if (cancelled || loadGenerationRef.current !== loadId) return;
 
@@ -564,6 +579,12 @@ export function useChannelPlaybackEngine({
 
       setDuration(readDuration(audio));
       setIsBuffering(false);
+      const targetVol = volumeRef.current;
+      if (crossfadeEnabled() && previousSrc) {
+        await crossfadeIn(audio, targetVol);
+      } else {
+        audio.volume = targetVol;
+      }
 
       if (isPlayingRef.current) {
         await applyTransportRef.current({ forceSeek: true });

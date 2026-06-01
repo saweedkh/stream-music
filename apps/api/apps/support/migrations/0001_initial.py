@@ -1,12 +1,11 @@
 # State-only: tables remain common_* in the database
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -21,7 +20,12 @@ class Migration(migrations.Migration):
                 migrations.CreateModel(
                     name="SupportTicket",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("reference", models.CharField(db_index=True, max_length=32, unique=True)),
                         ("subject", models.CharField(max_length=200)),
                         ("category", models.CharField(default="general", max_length=32)),
@@ -59,7 +63,12 @@ class Migration(migrations.Migration):
                 migrations.CreateModel(
                     name="SupportMessage",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("body", models.TextField()),
                         ("is_internal", models.BooleanField(default=False)),
                         ("created_at", models.DateTimeField(auto_now_add=True, db_index=True)),
@@ -89,7 +98,12 @@ class Migration(migrations.Migration):
                 migrations.CreateModel(
                     name="SupportTicketRead",
                     fields=[
-                        ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                        (
+                            "id",
+                            models.BigAutoField(
+                                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                            ),
+                        ),
                         ("last_read_message_id", models.PositiveIntegerField(default=0)),
                         ("updated_at", models.DateTimeField(auto_now=True)),
                         (

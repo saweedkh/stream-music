@@ -15,7 +15,7 @@ export type ChatInputBarProps = {
   placeholder: string;
   sendLabel: string;
   maxLength?: number;
-  inputRef?: RefObject<HTMLInputElement | null>;
+  inputRef?: RefObject<HTMLInputElement>;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   inputTestId?: string;
   topSlot?: ReactNode;

@@ -539,6 +539,38 @@ export async function importShareToChannelQueue(channelId: string, shareToken: s
   return (await res.json()) as { added: number; results: QueueItemSummary[] };
 }
 
+export type ChannelBlindGuessRow = {
+  id: number;
+  user_id: number;
+  username: string;
+  track_id: number;
+  guess_text: string;
+  score: number;
+  revealed_at: string | null;
+};
+
+export async function listChannelBlindGuesses(channelId: string, trackId?: number) {
+  const q = trackId != null ? `?track_id=${encodeURIComponent(String(trackId))}` : "";
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/blind-guess${q}`,
+    await withAuthHeaders(),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load blind guesses"));
+  return (await res.json()) as { results: ChannelBlindGuessRow[] };
+}
+
+export async function submitChannelBlindGuess(
+  channelId: string,
+  payload: { track_id: number; guess: string; reveal?: boolean },
+) {
+  const res = await fetch(
+    `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/blind-guess`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot submit blind guess"));
+  return (await res.json()) as { id: number; guess_text: string; score: number; created: boolean };
+}
+
 export async function exportChannelSessionPlaylist(channelId: string, name?: string, saveToChannel = true) {
   const res = await fetch(
     `${getApiBase()}/api/channels/${encodeURIComponent(channelId)}/session/export-playlist`,

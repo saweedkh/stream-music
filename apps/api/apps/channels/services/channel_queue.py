@@ -10,21 +10,23 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 
-from apps.channels.api.helpers import (
+from apps.accounts.user_badges import is_platform_superuser
+from apps.channels.helpers import (
     _channel_closed_response,
     _queue_serialize_context,
     _serialize_queue,
 )
 from apps.channels.models import Channel, ChannelMembership
-from apps.accounts.user_badges import is_platform_superuser
 from apps.playback.models import PlaybackSession
 from apps.playback.permissions import can_control_channel
 from apps.playback.services.state_store import playback_state_store
-from apps.playlists.api.serializers import QueueItemSerializer
 from apps.playlists.models import ChannelQueueItem, ChannelQueueUpvote
+from apps.playlists.playlists.playlist_serializers import QueueItemSerializer
 
 
 def _member_or_superuser(user, channel_id: int) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return False
     if is_platform_superuser(user):
         return True
     return ChannelMembership.objects.filter(channel_id=channel_id, user=user, is_active=True).exists()
@@ -127,9 +129,7 @@ def upvote_queue_item(user, channel_id: int, item_id: int) -> Response:
 def remove_queue_upvote(user, channel_id: int, item_id: int) -> Response:
     if not _member_or_superuser(user, channel_id):
         return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)
-    ChannelQueueUpvote.objects.filter(
-        queue_item_id=item_id, queue_item__channel_id=channel_id, user=user
-    ).delete()
+    ChannelQueueUpvote.objects.filter(queue_item_id=item_id, queue_item__channel_id=channel_id, user=user).delete()
     serialized = _serialize_queue(channel_id, user.id)
     playback_state_store.save_queue_snapshot(channel_id, serialized)
     _broadcast_queue(channel_id, serialized)
@@ -138,7 +138,7 @@ def remove_queue_upvote(user, channel_id: int, item_id: int) -> Response:
 
 def jump_to_queue_item(user, channel_id: int, item_id: int) -> Response:
     from apps.channels.services.playback_control import build_control_payload
-    from apps.playback.api.serializers import PlaybackSessionSerializer
+    from apps.playback.serializers.playback_serializers import PlaybackSessionSerializer
 
     if not can_control_channel(user, channel_id):
         return Response({"detail": "permission_denied"}, status=status.HTTP_403_FORBIDDEN)

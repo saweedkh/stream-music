@@ -4,9 +4,14 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Compass } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import { ADMIN_NAV, adminSectionMeta, type AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
-import { DASHBOARD_TAB_ICONS, DASHBOARD_TAB_META } from "@/features/dashboard/model/dashboard-nav-meta";
-import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
+import {
+  ADMIN_NAV,
+  DASHBOARD_TAB_ICONS,
+  DASHBOARD_TAB_META,
+  adminSectionMeta,
+  type AdminSection,
+  type DashboardTab,
+} from "@/features/dashboard";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { hubPanelRoot, panelLgSurface, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";

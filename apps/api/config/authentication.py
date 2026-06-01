@@ -19,11 +19,11 @@ class LanTrustedCsrfCheck(LanTrustedCsrfMiddleware):
 
 class LanSessionAuthentication(DRFSessionAuthentication):
     def enforce_csrf(self, request):
-        def dummy_get_response(req):  # noqa: ARG001
+        def dummy_get_response(req):
             return None
 
         check = LanTrustedCsrfCheck(dummy_get_response)
         check.process_request(request)
         reason = check.process_view(request, None, (), {})
         if reason:
-            raise exceptions.PermissionDenied("CSRF Failed: %s" % reason)
+            raise exceptions.PermissionDenied(f"CSRF Failed: {reason}")

@@ -11,7 +11,7 @@ export type ChatPanelProps = {
   /** Fill parent height with scrollable thread (channel fullHeight mode). */
   fullHeight?: boolean;
   className?: string;
-  scrollEndRef?: React.RefObject<HTMLDivElement | null>;
+  scrollEndRef?: React.RefObject<HTMLDivElement>;
 };
 
 /** Channel-style chat panel shell: header + ScrollArea thread + footer composer. */

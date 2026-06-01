@@ -5,6 +5,10 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /app/requirements.txt
 # Use devneeds PyPI mirror (default in requirements.txt); override with build-arg on other networks.
 ARG PIP_INDEX_URL=https://pypi.devneeds.ir/simple/

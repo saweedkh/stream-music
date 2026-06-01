@@ -168,7 +168,7 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 
 ### ورود موزیک از دیسک سرور
 
-مثل محیط توسعه، داخل کانتینر backend؛ مسیر مدیا روی ولوم **`media_data`** persist می‌شود. راهنمای CLI: [`docs/import-audio-cli.md`](import-audio-cli.md).
+مثل محیط توسعه، داخل کانتینر backend؛ مسیر مدیا روی ولوم **`media_data`** persist می‌شود. راهنمای CLI: [`docs/architecture.md`](architecture.md#import-ترک-از-دیسک).
 
 ---
 
@@ -191,9 +191,12 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 ```bash
 git pull
 ./deploy/up.sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend python manage.py migrate --noinput
 ```
 
 این دستور ایمیج‌ها را دوباره می‌سازد و کانتینرها را با نسخهٔ جدید بالا می‌آورد. قبل از pull در محیط حساس، در staging تست کنید.
+
+پس از deploy ویژگی‌های اجتماعی/playback، در صورت نیاز بررسی کنید: `GET /api/metrics` (شامل `webpush.ready`)، `GET /api/me/channels-online`، `GET /api/channels/{id}/party-recap`.
 
 ---
 
@@ -218,7 +221,19 @@ git pull
 
 ---
 
-## ۱۳. مرجع فایل‌ها
+## ۱۳. CDN و فایل‌های صوتی (اختیاری)
+
+برای ترافیک بالا:
+
+- سرو فایل‌های `MEDIA_ROOT` از nginx با `Cache-Control` بلند یا origin CDN (Cloudflare، S3+CloudFront).
+- WebSocket روی همان hostname API یا subdomain اختصاصی `wss://` با sticky session.
+- PostgreSQL و Redis تک‌primary بمانند؛ replica فقط برای analytics در صورت نیاز.
+
+پس از حذف/جایگزینی ترک، کش CDN را invalidate کنید.
+
+---
+
+## ۱۴. مرجع فایل‌ها
 
 - `docker-compose.prod.yml` — تعریف سرویس‌های پروداکشن.
 - `apps/api/Dockerfile.prod` — backend بدون mirror اجباری PyPI در Dockerfile توسعه.

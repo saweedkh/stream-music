@@ -6,7 +6,9 @@ alwaysApply: true
 # Stream Music — Agent Rules
 
 Read these docs when making non-trivial changes:
-- `docs/project-structure.md` — architecture, folders, migration map
+- `README.md`, `apps/web/README.md`, `apps/api/README.md` — product features (repo / front / back)
+- `docs/README.md` — documentation index
+- `docs/architecture.md` — structure, domains, conventions
 - `docs/CONVENTIONS.md` — lint, commits, PR, security
 - `docs/realtime-contracts.md` — WebSocket events (if touching playback/chat WS)
 
@@ -19,7 +21,7 @@ User may write in Persian; respond in the same language they use.
 | Frontend | `apps/web/` — Next.js 15, React 18, TS, Tailwind, Radix |
 | Backend | `apps/api/` — Django 4.2, DRF, Channels (Daphne) |
 | Deploy | `platform/deploy/` (symlink: `deploy/`) |
-| Docs / ADR | `docs/`, `docs/adr/` |
+| Docs | `docs/` (۴ سند — فهرست در `docs/README.md`) |
 
 Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
 
@@ -27,9 +29,9 @@ Do **not** commit: `.env*`, `deploy/sync.env`, `backups/`, `media/`, secrets.
 
 1. **Thin routes** — `apps/web/src/app/**/page.tsx` = wiring only (guards, layout, import feature page).
 2. **Fat features** — UI logic in `apps/web/src/features/<domain>/`.
-3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (target layout in `docs/project-structure.md`).
+3. **Thin Django views** — business logic in `services/`; reads in `selectors/` (`docs/architecture.md`).
 4. **No scattered `fetch`** — HTTP only via `apps/web/src/lib/api/` modules.
-5. **No feature → feature imports** — share via `shared/`, `lib/`, or extract to a shared module.
+5. **No cross-feature deep imports** — use `@/features/<name>` barrels; share cross-cutting code via `shared/` or `lib/`.
 6. **Minimize scope** — smallest correct diff; match existing naming and patterns.
 7. **Do not expand `apps/common`** with new domains — prefer new app or `services/` split per migration doc.
 
@@ -58,11 +60,12 @@ Reference implementation: `features/discovery/` (Explore).
 ### Backend (target per domain)
 
 ```text
-apps/<domain>/   # today: apps/channels, playback, tracks, playlists; splitting common → discovery, social, …
-  models.py
+apps/<domain>/   # channels, tracks, playlists, discovery, …
+  models.py | models/
   selectors.py
   services/
-  api/views.py, serializers.py, urls.py
+  urls/              # urlpatterns (like models/)
+  <url_path>/        # mirror HTTP path: auth/me/password/password_api.py
   tests/
 ```
 
@@ -81,7 +84,7 @@ apps/<domain>/   # today: apps/channels, playback, tracks, playlists; splitting 
 
 - Run relevant checks before finishing: `cd apps/web && npm run lint` / `npm run build`; `cd apps/api && ruff check .` / tests for touched apps.
 - Prefer useful tests for real behavior; skip trivial tests.
-- WS/API contract changes → update docs or add `docs/adr/NNN-*.md`.
+- WS/API contract changes → update `docs/realtime-contracts.md` or `docs/architecture.md`.
 
 ## Git (agent)
 

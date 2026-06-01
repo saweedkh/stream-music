@@ -14,7 +14,7 @@ import { Input } from "@/shared/ui/input";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
-import { AddPlaylistToChannelDialog } from "@/features/playlists/components/add-playlist-to-channel-dialog";
+import { AddPlaylistToChannelDialog } from "@/features/playlists";
 import { getMe, listChannels, listPlaylists, type ChannelSummary, type PlaylistSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

@@ -9,8 +9,8 @@ from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.utils import timezone
 
-from apps.support.models import SupportMessage, SupportTicket, SupportTicketRead
 from apps.accounts.user_badges import user_badge_flags
+from apps.support.models import SupportMessage, SupportTicket, SupportTicketRead
 
 _SUPPORT_SEND_TS: dict[tuple[int, int], list[float]] = {}
 _SUPPORT_SEND_WINDOW = 30
@@ -32,7 +32,10 @@ _ATTACHMENT_ALLOWED_EXT = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", "
 
 
 def is_support_staff(user) -> bool:
-    return bool(getattr(user, "is_authenticated", False) and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)))
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+    )
 
 
 def can_access_ticket(ticket_id: int, user_id: int) -> bool:
@@ -71,7 +74,9 @@ def _author_dict(user) -> dict:
 
 def _unread_count(ticket: SupportTicket, user_id: int, *, staff_view: bool) -> int:
     last_read = (
-        SupportTicketRead.objects.filter(ticket_id=ticket.id, user_id=user_id).values_list("last_read_message_id", flat=True).first()
+        SupportTicketRead.objects.filter(ticket_id=ticket.id, user_id=user_id)
+        .values_list("last_read_message_id", flat=True)
+        .first()
     ) or 0
     qs = SupportMessage.objects.filter(ticket_id=ticket.id, id__gt=last_read)
     if not staff_view:
@@ -181,9 +186,7 @@ def fetch_ticket_messages(ticket_id: int, viewer: User, *, limit: int = 80, befo
 
 def mark_ticket_read(ticket_id: int, user_id: int, message_id: int | None = None) -> None:
     if message_id is None:
-        message_id = (
-            SupportMessage.objects.filter(ticket_id=ticket_id).aggregate(m=Max("id")).get("m") or 0
-        )
+        message_id = SupportMessage.objects.filter(ticket_id=ticket_id).aggregate(m=Max("id")).get("m") or 0
     SupportTicketRead.objects.update_or_create(
         ticket_id=ticket_id,
         user_id=user_id,
@@ -346,7 +349,9 @@ def patch_ticket(ticket_id: int, user: User, data: dict) -> tuple[SupportTicket 
                     aid = int(raw)
                 except (TypeError, ValueError):
                     return None, "invalid_assignee"
-                assignee = User.objects.filter(id=aid, is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True)).first()
+                assignee = (
+                    User.objects.filter(id=aid, is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True)).first()
+                )
                 if assignee is None:
                     return None, "invalid_assignee"
                 ticket.assigned_to_id = assignee.id
@@ -368,7 +373,7 @@ def patch_ticket(ticket_id: int, user: User, data: dict) -> tuple[SupportTicket 
                 update_fields.append("closed_at")
 
     if update_fields:
-        ticket.save(update_fields=list(dict.fromkeys(update_fields + ["updated_at"])))
+        ticket.save(update_fields=list(dict.fromkeys([*update_fields, "updated_at"])))
     return ticket, None
 
 

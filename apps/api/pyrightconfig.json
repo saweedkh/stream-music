@@ -1,0 +1,21 @@
+{
+  "include": ["."],
+  "exclude": ["**/.venv", "**/migrations", "**/__pycache__"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["."],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "django": true,
+  "reportAttributeAccessIssue": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownParameterType": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportCallIssue": "none",
+  "reportArgumentType": "none",
+  "reportAssignmentType": "none",
+  "reportReturnType": "none",
+  "reportGeneralTypeIssues": "warning"
+}

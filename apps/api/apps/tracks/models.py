@@ -20,7 +20,10 @@ class Track(models.Model):
     duration_seconds = models.FloatField(default=0)
     file_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
     file = models.FileField(upload_to="audio/")
+    file_low = models.FileField(upload_to="audio/low/", null=True, blank=True)
     visibility = models.CharField(max_length=32, choices=Visibility.choices, default=Visibility.PRIVATE)
+    import_source = models.CharField(max_length=32, blank=True, default="")
+    source_url = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
 

@@ -1,6 +1,9 @@
 export { ChannelClosedView } from "./components/channel-closed-view";
 export { ChannelDashboardTabs } from "./components/channel-dashboard-tabs";
+export type { ChannelTabId, ListenerTabId } from "./components/channel-room-config";
 export { JoinLandingClient } from "./components/join-landing-client";
 export { JoinPublicClient } from "./components/join-public-client";
 export { JoinPrivateInviteClient } from "./components/join-private-invite-client";
 export { ChannelFollowButton } from "./components/channel-follow-button";
+export { ROOM_REACTION_EMOJIS } from "./components/room-reaction-constants";
+export type { RoomReactionEmoji } from "./components/room-reaction-constants";

@@ -5,9 +5,12 @@ import { useToast } from "@/shared/ui/toast-provider";
 import { ChannelPlayerFull } from "@/features/player/components/channel-player-full";
 import { ChannelPlayerMini } from "@/features/player/components/channel-player-mini";
 import { NowPlayingReactions } from "@/features/player/components/now-playing-reactions";
-import type { ChannelExperience } from "@/features/experience/components/room-experience-chrome";
+import type { ChannelExperience } from "@/features/experience";
 import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
 import { useChannelPlaybackEngine } from "@/features/player/hooks/use-channel-playback-engine";
+import { useListenHeartbeat } from "@/features/player/hooks/use-listen-heartbeat";
+import { useCapacitorBackgroundPlayback } from "@/features/player/hooks/use-capacitor-background-playback";
+import { useMediaSession } from "@/features/player/hooks/use-media-session";
 
 export type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
 
@@ -75,6 +78,9 @@ export function ChannelPlayer({
     onToast: (message, tone) => showToast(message, tone),
   });
 
+  useListenHeartbeat(channelId, isPlaying, currentTrackId);
+  useCapacitorBackgroundPlayback(isPlaying, channelId);
+
   const [queueMeta, setQueueMeta] = useState<{
     playlistName?: string;
     queueIndex?: number;
@@ -105,6 +111,13 @@ export function ChannelPlayer({
 
   const trackLabel = activeTrackPath ? decodeURIComponent(activeTrackPath.split("/").pop() ?? "Unknown track") : "";
   const title = useMemo(() => trackLabel.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim(), [trackLabel]);
+  useMediaSession({
+    title: title || "Stream Music",
+    isPlaying,
+    onPlay: canControl ? () => void applyControl("play") : undefined,
+    onPause: canControl ? () => void applyControl("pause") : undefined,
+    onNext: canControl ? () => void applyControl("next") : undefined,
+  });
   const artworkLetter = title ? title.charAt(0).toUpperCase() : "♪";
   const seekMax = Math.max(duration, 0.1);
   const seekValue = Math.min(position, seekMax);

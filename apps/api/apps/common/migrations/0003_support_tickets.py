@@ -1,12 +1,11 @@
 # Support ticketing
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("common", "0002_account_badges"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

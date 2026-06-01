@@ -65,7 +65,7 @@ def import_audio_files_under_media(owner: User, *, subdirectory: str | None = No
             with path.open("rb") as fh:
                 track.file.save(path.name, File(fh), save=True)
             created.append({"id": track.id, "title": track.title, "file": track.file.name})
-        except Exception as exc:  # noqa: BLE001 — surface path for operators
+        except Exception as exc:
             errors.append(f"{rel}:{exc!s}")
 
     return {"created": created, "skipped": skipped, "errors": errors}
@@ -141,7 +141,7 @@ def import_audio_from_system_directory(
             with path.open("rb") as fh:
                 track.file.save(rel_storage, File(fh), save=True)
             created.append({"id": track.id, "title": track.title, "file": track.file.name})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(f"{rel_storage}:{exc!s}")
 
     return {"created": created, "skipped": skipped, "errors": errors}

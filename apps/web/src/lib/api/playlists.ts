@@ -6,6 +6,53 @@ import type {
   PlaylistShareLinkInfo,
 } from "./types";
 
+export type PlaylistBackupPayload = {
+  format: string;
+  version: number;
+  exported_at: string;
+  username: string;
+  playlist_count: number;
+  playlists: Array<{
+    id: number;
+    name: string;
+    channel_id: number | null;
+    channel_name: string | null;
+    items: Array<{ position: number; track_id: number; title: string; artist: string }>;
+  }>;
+};
+
+export async function exportPlaylistBackup(): Promise<PlaylistBackupPayload> {
+  const res = await fetch(`${getApiBase()}/api/playlists/backup-export`, await withAuthHeaders());
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot export playlist backup"));
+  return (await res.json()) as PlaylistBackupPayload;
+}
+
+export async function importPlaylistBackup(data: Record<string, unknown>) {
+  const res = await fetch(
+    `${getApiBase()}/api/playlists/backup-import`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(data) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot import playlist backup"));
+  return (await res.json()) as {
+    ok: boolean;
+    created_playlists: number;
+    created_items: number;
+    skipped_items: number;
+    errors: string[];
+  };
+}
+
+export function downloadPlaylistBackupJson(payload: PlaylistBackupPayload): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const stamp = payload.exported_at.slice(0, 10) || "backup";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `stream-music-playlists-${stamp}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function listPlaylists(channelId?: string, options?: { favorited?: boolean }) {
   const params = new URLSearchParams();
   if (channelId != null && channelId !== "") params.set("channel", channelId);

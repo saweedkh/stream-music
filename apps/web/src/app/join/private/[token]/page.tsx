@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { JoinPrivateInviteClient } from "@/features/channels/components/join-private-invite-client";
+import { JoinPrivateInviteClient } from "@/features/channels";
 
 type Props = {
   params: Promise<{ token: string }>;

@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import { AuthGuard } from "@/features/auth";
-import { ChannelClosedView } from "@/features/channels/components/channel-closed-view";
-import { ChannelDashboardTabs } from "@/features/channels/components/channel-dashboard-tabs";
+import { ChannelClosedView, ChannelDashboardTabs } from "@/features/channels";
 import { ChannelClosedError, getChannelState } from "@/lib/api";
 
 type Props = {

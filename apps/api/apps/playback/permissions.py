@@ -9,6 +9,10 @@ def can_control_channel(user, channel_id: int) -> bool:
     return ChannelMembership.objects.filter(
         channel_id=channel_id,
         user=user,
-        role__in=[ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR],
+        role__in=[
+            ChannelMembership.Role.OWNER,
+            ChannelMembership.Role.MODERATOR,
+            ChannelMembership.Role.DJ,
+        ],
         is_active=True,
     ).exists()

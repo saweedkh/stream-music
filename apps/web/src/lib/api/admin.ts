@@ -99,8 +99,23 @@ export async function patchAdminChannel(channelId: number, payload: { is_active?
   return (await res.json()) as { id: number; name: string; is_active: boolean; is_playing: boolean };
 }
 
+export type AdminSystemHealth = {
+  status: string;
+  db: boolean;
+  redis: boolean;
+  server_time: number;
+  channels_active: number;
+  channels_playing: number;
+  tracks_total: number;
+  users_active: number;
+  media_audio_gb: number;
+  disk: { used_percent?: number; free_gb?: number; total_gb?: number; error?: string };
+  celery: { workers: number; tasks_active: number; reachable: boolean };
+  realtime: { channels_with_presence: number; listeners_in_presence: number };
+};
+
 export async function getAdminHealth() {
   const res = await fetch(`${getApiBase()}/api/admin/health`, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load health"));
-  return (await res.json()) as { status: string; db: boolean; redis: boolean };
+  return (await res.json()) as AdminSystemHealth;
 }

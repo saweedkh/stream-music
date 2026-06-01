@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from django.contrib.auth.models import User
 
-from apps.channels.models import Channel
-from apps.accounts.badge_models import SLUG_PREMIUM
+from apps.accounts.models import SLUG_PREMIUM
 from apps.accounts.user_badges import badges_for_user
+from apps.channels.models import Channel
 
 FREE_MAX_OWNED_CHANNELS = 5
 PREMIUM_MAX_OWNED_CHANNELS = 50

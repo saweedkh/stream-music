@@ -36,9 +36,7 @@ class ChannelMembershipTests(TestCase):
         self.channel = Channel.objects.create(name="Test", owner=self.owner)
 
     def test_create_membership(self):
-        m = ChannelMembership.objects.create(
-            channel=self.channel, user=self.member, role=ChannelMembership.Role.MEMBER
-        )
+        m = ChannelMembership.objects.create(channel=self.channel, user=self.member, role=ChannelMembership.Role.MEMBER)
         self.assertEqual(m.role, "member")
         self.assertTrue(m.is_active)
 

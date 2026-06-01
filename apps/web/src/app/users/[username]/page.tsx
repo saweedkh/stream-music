@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ListMusic, Radio, User, UserPlus, UserMinus } from "lucide-react";
+import { ListMusic, PartyPopper, Radio, Sparkles, User, UserPlus, UserMinus } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { UserAvatar } from "@/shared/ui/user-avatar";
 import { Badge } from "@/shared/ui/badge";
@@ -146,6 +146,99 @@ export default function PublicUserProfilePage() {
             </div>
           </CardContent>
         </Card>
+      ) : null}
+
+      {data.gamification ? (
+        <Card data-testid="public-profile-gamification">
+          <CardHeader>
+            <CardTitle className="text-base">{t("profile.public.gamification")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-foreground">
+              {t("profile.public.gamificationSummary", {
+                level: data.gamification.level,
+                points: data.gamification.points,
+                streak: data.gamification.streak_days,
+              })}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {(data.live_channels?.length ?? 0) > 0 ? (
+        <section data-testid="public-profile-live-channels">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <Radio className="h-4 w-4 text-brand" />
+            {t("profile.public.liveNow")}
+          </h2>
+          <ul className="space-y-2">
+            {data.live_channels!.map((ch) => (
+              <li key={ch.id}>
+                <Link
+                  href={`/channel/${ch.id}`}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3"
+                >
+                  <span className="font-medium">{ch.name}</span>
+                  <Badge className="bg-brand text-primary-foreground">{t("profile.public.liveBadge")}</Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {(data.party_highlights?.length ?? 0) > 0 ? (
+        <section data-testid="public-profile-party-highlights">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <PartyPopper className="h-4 w-4" />
+            {t("profile.public.partyHighlights")}
+          </h2>
+          <ul className="space-y-3">
+            {data.party_highlights!.map((h) => (
+              <li key={h.channel_id} className="rounded-xl border border-border/70 bg-card px-4 py-3">
+                <Link href={`/party/${h.channel_id}`} className="font-medium text-brand hover:underline">
+                  {h.channel_name}
+                </Link>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("profile.public.partyEvents", { count: h.total_events })}
+                </p>
+                {h.top_tracks.length > 0 ? (
+                  <ol className="mt-2 list-decimal ps-4 text-sm text-foreground/90">
+                    {h.top_tracks.map((tr) => (
+                      <li key={tr.id}>
+                        {tr.title}
+                        {tr.artist ? ` — ${tr.artist}` : ""}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {(data.recent_activity?.length ?? 0) > 0 ? (
+        <section data-testid="public-profile-activity">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <Sparkles className="h-4 w-4" />
+            {t("profile.public.recentActivity")}
+          </h2>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            {data.recent_activity!.map((ev, i) => (
+              <li key={`${ev.kind}-${ev.created_at}-${i}`}>
+                {ev.channel_name ? (
+                  <Link href={ev.channel_id ? `/channel/${ev.channel_id}` : "#"} className="text-foreground hover:underline">
+                    {ev.channel_name}
+                  </Link>
+                ) : (
+                  "—"
+                )}{" "}
+                · {ev.kind.replace(/_/g, " ")}
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section>

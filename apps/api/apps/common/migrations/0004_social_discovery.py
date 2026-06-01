@@ -1,13 +1,13 @@
 # Social & discovery: public profiles, playlist share links, channel follows
 
+import uuid
+
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
-import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("common", "0003_support_tickets"),
         ("playlists", "0001_initial"),

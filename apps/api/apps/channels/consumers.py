@@ -7,7 +7,6 @@ import json
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from apps.channels.models import ChannelChatMessage, ChannelMembership
 from apps.channels.chat_service import (
     apply_chat_delete,
     apply_chat_edit,
@@ -17,7 +16,8 @@ from apps.channels.chat_service import (
     can_access_chat,
     fetch_chat_history,
 )
-from apps.channels.api.serializers import ChannelChatMessageSerializer
+from apps.channels.models import ChannelChatMessage, ChannelMembership
+from apps.channels.serializers.channel_serializers import ChannelChatMessageSerializer
 from apps.core.services.webpush import notify_channel_chat_message_push
 
 
@@ -200,7 +200,10 @@ class ChannelChatConsumer(AsyncWebsocketConsumer):
             msg = await _pin()
             await self.channel_layer.group_send(
                 self.group_name,
-                {"type": "chat_fanout", "payload": {"type": "CHAT_PINNED", "channel_id": self.channel_id, "message": msg}},
+                {
+                    "type": "chat_fanout",
+                    "payload": {"type": "CHAT_PINNED", "channel_id": self.channel_id, "message": msg},
+                },
             )
             return
 

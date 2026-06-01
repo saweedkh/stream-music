@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { Button } from "@/shared/ui/button";
+import { ChannelBlindGuessPanel } from "@/features/channels/components/channel-blind-guess-panel";
+import { ChannelStatisticsPanel } from "@/features/channels/components/channel-statistics-panel";
+import type { ChannelExperience } from "@/features/experience";
 import { ChannelAdminInlineShell } from "@/features/channels/components/channel-admin-inline-shell";
 import { adminSegmentBtn, adminSectionLabel } from "@/features/channels/components/channel-admin-panel-styles";
 import { listenerFieldClass } from "@/features/channels/components/channel-listener-panel-styles";
@@ -29,12 +32,13 @@ type Props = {
   channelId: string;
   canManage: boolean;
   currentTrackId?: number | null;
+  experience?: ChannelExperience | null;
   embedded?: boolean;
 };
 
 type InsightTab = "recap" | "history" | "reactions" | "suggestions" | "audit";
 
-export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embedded = true }: Props) {
+export function ChannelRoomInsights({ channelId, canManage, currentTrackId, experience, embedded = true }: Props) {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const [history, setHistory] = useState<PlaybackHistoryRow[]>([]);
@@ -116,8 +120,14 @@ export function ChannelRoomInsights({ channelId, canManage, currentTrackId, embe
     </div>
   ) : null;
 
+  const blindMode = Boolean(experience?.blind_playlist_id);
+
   const recapSection = (
-    <section className="px-1">
+    <section className="space-y-4 px-1">
+      {blindMode ? (
+        <ChannelBlindGuessPanel channelId={channelId} currentTrackId={currentTrackId} canReveal={canManage} />
+      ) : null}
+      <ChannelStatisticsPanel channelId={channelId} canViewDetailed={canManage} />
       {recapTop.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{t("room.admin.insights.recapEmpty")}</p>
       ) : (

@@ -5,7 +5,7 @@ from __future__ import annotations
 from django.contrib.auth.models import User
 from django.db.utils import ProgrammingError
 
-from apps.accounts.badge_models import (
+from apps.accounts.models import (
     SLUG_PLATFORM_STAFF,
     SLUG_PLATFORM_SUPERUSER,
     SLUG_PREMIUM,

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/ui/toast-provider";
-import { ROOM_REACTION_EMOJIS } from "@/features/channels/components/room-reaction-constants";
+import { ROOM_REACTION_EMOJIS } from "@/features/channels";
 import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
 
 export type ChannelExperience = {

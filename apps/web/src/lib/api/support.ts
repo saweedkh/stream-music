@@ -1,4 +1,4 @@
-import { getApiBase, withAuthHeaders, extractApiError } from "./client";
+import { getApiBase, withAuthFormData, withAuthHeaders, extractApiError } from "./client";
 import type {
   SupportTicketStatus,
   SupportTicketPriority,

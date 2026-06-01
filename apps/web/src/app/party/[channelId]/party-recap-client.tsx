@@ -5,7 +5,7 @@ import { Share2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useToast } from "@/shared/ui/toast-provider";
 import type { PartyRecap } from "@/lib/api";
-import { PartyRecapHeatmap } from "@/features/party/components/party-recap-heatmap";
+import { PartyRecapHeatmap } from "@/features/party";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 
 export function PartyRecapClient({ recap, channelId }: { recap: PartyRecap; channelId: string }) {

@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
-    "cap:ios": "cap open ios"
+    "cap:ios": "cap open ios",
+    "generate:api-types": "bash ../../tooling/scripts/generate-openapi-typescript.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.2.0",
@@ -73,10 +74,14 @@
     "@testing-library/react": "^16.3.0",
     "@types/node": "^25.9.1",
     "@types/react": "18.3.12",
+    "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.5.2",
     "autoprefixer": "10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.5.18",
     "jsdom": "^26.1.0",
+    "openapi-typescript": "^7.13.0",
     "postcss": "8.4.47",
     "tailwindcss": "3.4.14",
     "typescript": "5.6.3",

@@ -23,10 +23,7 @@ def body_violates_word_filter(body: str, filters: list[str]) -> bool:
     if not filters:
         return False
     low = (body or "").lower()
-    for word in filters:
-        if len(word) >= 2 and word in low:
-            return True
-    return False
+    return any(len(word) >= 2 and word in low for word in filters)
 
 
 def is_user_chat_banned(channel_id: int, user_id: int) -> bool:
@@ -41,7 +38,9 @@ def is_channel_staff(channel_id: int, user_id: int) -> bool:
     return row.role in (ChannelMembership.Role.OWNER, ChannelMembership.Role.MODERATOR)
 
 
-def ban_user(channel_id: int, user_id: int, *, banned_by_id: int | None, hours: int, reason: str = "") -> ChannelChatBan:
+def ban_user(
+    channel_id: int, user_id: int, *, banned_by_id: int | None, hours: int, reason: str = ""
+) -> ChannelChatBan:
     hours = max(1, min(24 * 30, int(hours)))
     until = timezone.now() + timedelta(hours=hours)
     row, _ = ChannelChatBan.objects.update_or_create(

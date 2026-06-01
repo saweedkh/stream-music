@@ -85,6 +85,53 @@ type Props = {
 
 type AdminTab = "settings" | "invites" | "people";
 
+const EXPERIENCE_PRESET_KEYS = ["", "night_club", "study", "party", "radio"] as const;
+type ExperiencePresetKey = (typeof EXPERIENCE_PRESET_KEYS)[number];
+
+function applyExperiencePresetToForm(
+  preset: ExperiencePresetKey,
+  setters: {
+    setExpAccent: (v: string) => void;
+    setExpVeto: (v: string) => void;
+    setExpShuffleBias: (v: string) => void;
+    setExpRoomRules: (v: string) => void;
+    setExpChatSlow: (v: string) => void;
+    setExpSuggestions: (v: boolean) => void;
+    setExpListeningParty: (v: boolean) => void;
+    setExpRadio: (v: boolean) => void;
+    setExpQueueEndMode: (v: "loop" | "stop" | "repeat_one") => void;
+  },
+) {
+  if (!preset) return;
+  if (preset === "night_club") {
+    setters.setExpAccent("violet");
+    setters.setExpVeto("3");
+    setters.setExpShuffleBias("1");
+    setters.setExpRoomRules("Keep the energy up. Vote for the next banger.");
+    return;
+  }
+  if (preset === "study") {
+    setters.setExpAccent("sky");
+    setters.setExpChatSlow("30");
+    setters.setExpSuggestions(true);
+    setters.setExpRoomRules("Low chatter. Focus-friendly tracks only.");
+    return;
+  }
+  if (preset === "party") {
+    setters.setExpAccent("rose");
+    setters.setExpVeto("5");
+    setters.setExpListeningParty(false);
+    setters.setExpRoomRules("Party mode — reactions welcome!");
+    return;
+  }
+  if (preset === "radio") {
+    setters.setExpAccent("amber");
+    setters.setExpRadio(true);
+    setters.setExpQueueEndMode("loop");
+    setters.setExpSuggestions(true);
+  }
+}
+
 async function copyText(
   text: string,
   showToast: (m: string, t?: "success" | "error" | "info") => void,
@@ -205,6 +252,7 @@ export function ChannelAdminPanel({
   const [expQueueEndMode, setExpQueueEndMode] = useState<"loop" | "stop" | "repeat_one">("loop");
   const [expRoomRules, setExpRoomRules] = useState("");
   const [expScheduledStart, setExpScheduledStart] = useState("");
+  const [expPreset, setExpPreset] = useState<ExperiencePresetKey>("");
 
   const privateJoinUrl = inviteToken && typeof window !== "undefined" ? buildPrivateInviteJoinUrl(inviteToken) : null;
   const publicJoinUrl =
@@ -272,6 +320,10 @@ export function ChannelAdminPanel({
     setExpQueueEndMode(mode === "stop" || mode === "repeat_one" ? mode : "loop");
     setExpRoomRules(typeof raw.room_rules === "string" ? raw.room_rules : "");
     setExpScheduledStart(typeof raw.scheduled_start_at === "string" ? raw.scheduled_start_at : "");
+    const preset = raw.experience_preset;
+    setExpPreset(
+      preset === "night_club" || preset === "study" || preset === "party" || preset === "radio" ? preset : "",
+    );
   }, [initialExperience]);
 
   useEffect(() => {
@@ -406,6 +458,7 @@ export function ChannelAdminPanel({
           queue_end_mode: expQueueEndMode,
           room_rules: expRoomRules.trim() || undefined,
           scheduled_start_at: expScheduledStart.trim() ? expScheduledStart.trim() : null,
+          experience_preset: expPreset || null,
         },
       });
       showToast(t("room.admin.toast.experienceSaved"), "success");
@@ -642,6 +695,36 @@ export function ChannelAdminPanel({
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("room.admin.settings.experience.title")}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{t("room.admin.settings.experience.hint")}</p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor={`ch-exp-preset-${channelId}`}>{t("room.admin.settings.experiencePreset")}</Label>
+                  <Select
+                    id={`ch-exp-preset-${channelId}`}
+                    value={expPreset}
+                    onChange={(e) => {
+                      const key = e.target.value as ExperiencePresetKey;
+                      setExpPreset(key);
+                      applyExperiencePresetToForm(key, {
+                        setExpAccent,
+                        setExpVeto,
+                        setExpShuffleBias,
+                        setExpRoomRules,
+                        setExpChatSlow,
+                        setExpSuggestions,
+                        setExpListeningParty,
+                        setExpRadio,
+                        setExpQueueEndMode,
+                      });
+                    }}
+                    className="border-border bg-card/80"
+                    data-testid="channel-experience-preset"
+                  >
+                    <option value="">{t("room.admin.settings.experiencePreset.none")}</option>
+                    <option value="night_club">{t("room.admin.settings.experiencePreset.nightClub")}</option>
+                    <option value="study">{t("room.admin.settings.experiencePreset.study")}</option>
+                    <option value="party">{t("room.admin.settings.experiencePreset.party")}</option>
+                    <option value="radio">{t("room.admin.settings.experiencePreset.radio")}</option>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor={`ch-exp-accent-${channelId}`}>{t("room.admin.settings.accent")}</Label>
                   <Select

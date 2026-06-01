@@ -18,7 +18,9 @@ class PlaybackSession(models.Model):
 
 class PlaybackEvent(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="playback_events")
-    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="playback_events")
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="playback_events"
+    )
     track = models.ForeignKey(Track, on_delete=models.SET_NULL, null=True, blank=True, related_name="playback_events")
     event_type = models.CharField(max_length=32)
     source = models.CharField(max_length=32, blank=True, default="manual")

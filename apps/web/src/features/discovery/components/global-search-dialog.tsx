@@ -21,6 +21,7 @@ import {
   globalSearch,
   unfollowUser,
   type ChannelSummary,
+  type GlobalSearchUser,
   type PlaylistSummary,
   type TrackSummary,
 } from "@/lib/api";
@@ -40,7 +41,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
-  const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string }>>([]);
+  const [users, setUsers] = useState<GlobalSearchUser[]>([]);
   const [sharedPlaylists, setSharedPlaylists] = useState<
     Array<{ token: string; playlist_name: string; owner_username: string }>
   >([]);
