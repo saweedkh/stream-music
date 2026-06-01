@@ -5,6 +5,7 @@ export type DashboardTab =
   | "playlists"
   | "sharing"
   | "support"
+  | "support_staff"
   | "profile"
   | "security"
   | "notifications"
@@ -17,6 +18,7 @@ export const DASHBOARD_TABS: DashboardTab[] = [
   "playlists",
   "sharing",
   "support",
+  "support_staff",
   "profile",
   "security",
   "notifications",

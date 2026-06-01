@@ -52,6 +52,40 @@ Sync/history messages:
   - `channel` (serialized channel)
   - `playback` (serialized playback session)
 
+## Support WebSocket (`/ws/support/tickets/{ticket_id}`)
+
+Access: ticket requester or support staff. Internal messages are filtered for non-staff clients.
+
+Initial sync on connect:
+
+- `type: "SUPPORT_SYNC"` with `ticket_id`, `ticket`, `messages`
+
+Client actions (JSON):
+
+- `{ "action": "send", "body": "...", "is_internal": false }`
+- `{ "action": "read", "message_id": null | number }`
+- `{ "action": "patch_ticket", "status"?, "priority"?, "assigned_to_id"?, "category"? }` (staff only)
+- `{ "action": "history", "before"?: message_id, "limit"?: number }`
+
+Server events:
+
+- `type: "SUPPORT_EVENT"`, `event: "message"` with `message`, `ticket`
+- `type: "SUPPORT_EVENT"`, `event: "ticket"` with `ticket`
+- `type: "SUPPORT_HISTORY"` with `messages`
+- `type: "SUPPORT_ERROR"` with `code`
+
+## Support Staff Inbox WebSocket (`/ws/support/inbox`)
+
+Access: support staff only.
+
+Initial sync on connect:
+
+- `type: "SUPPORT_INBOX_SYNC"` with `stats`
+
+Live updates:
+
+- `type: "SUPPORT_INBOX"` with `ticket` (row snapshot for inbox list)
+
 Compatibility rules for all future phases:
 
 1. Existing keys must not be removed or renamed.

@@ -6,6 +6,7 @@ import {
   Compass,
   KeyRound,
   LayoutGrid,
+  Headphones,
   LifeBuoy,
   ListMusic,
   Music,
@@ -125,7 +126,12 @@ export type DashboardNavSection =
       items: AdminNavItem[];
     };
 
-export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[] {
+export function dashboardNavSections(isSuperuser: boolean, isSupportStaff = false): DashboardNavSection[] {
+  const helpItems: DashboardMainNavItem[] = [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }];
+  if (isSupportStaff) {
+    helpItems.push({ id: "support_staff", labelKey: "dashboard.tab.supportStaff", icon: Headphones });
+  }
+
   const sections: DashboardNavSection[] = [
     {
       id: "channels",
@@ -151,7 +157,7 @@ export function dashboardNavSections(isSuperuser: boolean): DashboardNavSection[
       id: "help",
       titleKey: "dashboard.sidebar.section.help",
       variant: "main",
-      items: [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }],
+      items: helpItems,
     },
     {
       id: "account",

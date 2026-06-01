@@ -19,7 +19,7 @@ import {
   type DashboardTab,
 } from "@/features/dashboard/model/dashboard-types";
 import { AdminPanelHub } from "@/features/dashboard/components/admin-panel-hub";
-import { SupportHub } from "@/features/support";
+import { SupportHub, SupportStaffHub, isSupportStaff } from "@/features/support";
 import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
 import { PlaylistSection } from "@/features/dashboard/components/playlist-section";
 import { TrackLibrarySection } from "@/features/dashboard/components/track-library-section";
@@ -165,6 +165,10 @@ export function DashboardWorkspace() {
     const resolved = dashboardTabFromSearch(searchParams);
     if (resolved === "admin" && currentUser && !currentUser.is_superuser) {
       navigateMainTab("channels");
+      return;
+    }
+    if (resolved === "support_staff" && currentUser && !isSupportStaff(currentUser)) {
+      navigateMainTab("support");
       return;
     }
     if (queryTab === "settings" || searchParams.get("section")) {
@@ -313,7 +317,7 @@ export function DashboardWorkspace() {
           "lg:min-h-0 lg:flex-1",
           activeTab === "sharing" &&
             "[&_.workspace-panel__body]:[-ms-overflow-style:none] [&_.workspace-panel__body]:[scrollbar-width:none] [&_.workspace-panel__body]:[&::-webkit-scrollbar]:hidden",
-          activeTab === "support" &&
+          (activeTab === "support" || activeTab === "support_staff") &&
             supportScreen === "chat" &&
             "[&_.workspace-panel__header]:hidden [&_.workspace-panel__body]:flex [&_.workspace-panel__body]:min-h-0 [&_.workspace-panel__body]:flex-1 [&_.workspace-panel__body]:overflow-hidden [&_.workspace-panel__body]:p-0 max-lg:[&_.workspace-panel__body]:overflow-visible",
         )}
@@ -365,6 +369,10 @@ export function DashboardWorkspace() {
         ) : null}
 
         {activeTab === "support" ? <SupportHub user={currentUser} onScreenChange={setSupportScreen} /> : null}
+
+        {activeTab === "support_staff" && isSupportStaff(currentUser) ? (
+          <SupportStaffHub onScreenChange={setSupportScreen} />
+        ) : null}
 
         {isAccountDashboardTab(activeTab) ? (
           <UserProfileHub

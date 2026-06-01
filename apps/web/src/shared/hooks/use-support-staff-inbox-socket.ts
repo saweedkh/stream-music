@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getWsBase } from "@/lib/api";
+import type { SupportSocketState } from "@/shared/hooks/use-support-ticket-socket";
 
 type Options = {
   enabled?: boolean;
@@ -9,7 +10,7 @@ type Options = {
 };
 
 export function useSupportStaffInboxSocket({ enabled = false, onMessage }: Options) {
-  const [connected, setConnected] = useState(false);
+  const [socketState, setSocketState] = useState<SupportSocketState>("closed");
   const onMessageRef = useRef(onMessage);
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export function useSupportStaffInboxSocket({ enabled = false, onMessage }: Optio
 
   useEffect(() => {
     if (!enabled) {
-      setConnected(false);
+      setSocketState("closed");
       return;
     }
 
@@ -29,10 +30,11 @@ export function useSupportStaffInboxSocket({ enabled = false, onMessage }: Optio
 
     const connect = () => {
       if (cancelled) return;
+      setSocketState(attempt === 0 ? "connecting" : "reconnecting");
       ws = new WebSocket(`${getWsBase()}/ws/support/inbox`);
       ws.onopen = () => {
         attempt = 0;
-        setConnected(true);
+        setSocketState("connected");
       };
       ws.onmessage = (event) => {
         try {
@@ -42,10 +44,17 @@ export function useSupportStaffInboxSocket({ enabled = false, onMessage }: Optio
         }
       };
       ws.onclose = (event) => {
-        setConnected(false);
-        if (cancelled || event.code === 4403 || event.code === 4401) return;
+        if (cancelled) {
+          setSocketState("closed");
+          return;
+        }
+        if (event.code === 4403 || event.code === 4401) {
+          setSocketState("closed");
+          return;
+        }
         const delay = Math.min(1000 * 2 ** attempt, 10000);
         attempt += 1;
+        setSocketState("reconnecting");
         timer = setTimeout(connect, delay);
       };
       ws.onerror = () => ws?.close();
@@ -57,9 +66,9 @@ export function useSupportStaffInboxSocket({ enabled = false, onMessage }: Optio
       cancelled = true;
       if (timer) clearTimeout(timer);
       ws?.close();
-      setConnected(false);
+      setSocketState("closed");
     };
   }, [enabled]);
 
-  return { connected };
+  return { connected: socketState === "connected", socketState };
 }

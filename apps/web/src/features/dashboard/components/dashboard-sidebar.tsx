@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Crown, LogIn, Radio } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
+import { isSupportStaff } from "@/features/support";
 import {
   type AdminSection,
   dashboardNavSections,
@@ -75,7 +76,7 @@ function defaultExpanded(
   return {
     channels: activeTab === "channels" || activeTab === "following" || Boolean(activePathname?.startsWith("/explore")),
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
-    help: activeTab === "support",
+    help: activeTab === "support" || activeTab === "support_staff",
     account: isAccountDashboardTab(activeTab),
     admin: activeTab === "admin",
   };
@@ -93,7 +94,7 @@ export function DashboardSidebar({
   className,
 }: DashboardSidebarProps) {
   const { t } = useTranslations();
-  const sections = dashboardNavSections(Boolean(user?.is_superuser));
+  const sections = dashboardNavSections(Boolean(user?.is_superuser), isSupportStaff(user));
 
   const [expanded, setExpanded] = useState<Record<CollapsibleSectionId, boolean>>(() =>
     defaultExpanded(activePathname, activeTab, activeAdminSection),
@@ -103,7 +104,7 @@ export function DashboardSidebar({
       const next = { ...prev };
       if (activeTab === "channels" || activePathname?.startsWith("/explore")) next.channels = true;
       if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
-      if (activeTab === "support") next.help = true;
+      if (activeTab === "support" || activeTab === "support_staff") next.help = true;
       if (isAccountDashboardTab(activeTab)) next.account = true;
       if (activeTab === "admin") next.admin = true;
       return next;

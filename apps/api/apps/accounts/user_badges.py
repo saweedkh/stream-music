@@ -146,6 +146,18 @@ def set_user_manual_badges(user_id: int, slugs: list[str], *, assigned_by_id: in
     return badges_for_user(user)
 
 
+def assign_badge_slug(user_id: int, slug: str, *, assigned_by_id: int | None = None) -> bool:
+    defn = UserBadgeDefinition.objects.filter(slug=slug, is_active=True).first()
+    if defn is None:
+        return False
+    UserBadgeAssignment.objects.get_or_create(
+        user_id=user_id,
+        badge_id=defn.id,
+        defaults={"assigned_by_id": assigned_by_id},
+    )
+    return True
+
+
 def badges_for_users(users: list) -> dict[int, list[dict]]:
     """Bulk-resolve badges for list endpoints."""
     if not users:

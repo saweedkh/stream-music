@@ -6,21 +6,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.user_badges import user_badge_flags
-from apps.social.services.avatar import avatar_url_for_user_id
+from apps.social.services.avatar import avatar_urls_for_user_ids
 
 
 class UsersListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        users = User.objects.exclude(id=request.user.id).order_by("username")[:100]
+        users = list(User.objects.exclude(id=request.user.id).order_by("username")[:100])
+        avatars = avatar_urls_for_user_ids([user.id for user in users])
         return Response(
             {
                 "results": [
                     {
                         "id": user.id,
                         "username": user.username,
-                        "avatar_url": avatar_url_for_user_id(user.id, request=request),
+                        "avatar_url": avatars.get(user.id),
                         **user_badge_flags(user),
                     }
                     for user in users

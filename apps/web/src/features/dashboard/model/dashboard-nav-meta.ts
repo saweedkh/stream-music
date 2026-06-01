@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bell, Crown, KeyRound, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, User } from "lucide-react";
+import { Bell, Crown, Headphones, KeyRound, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, User } from "lucide-react";
 import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -15,6 +15,7 @@ export const DASHBOARD_TAB_ICONS: Record<DashboardTab, LucideIcon> = {
   playlists: ListMusic,
   sharing: Share2,
   support: LifeBuoy,
+  support_staff: Headphones,
   profile: User,
   security: KeyRound,
   notifications: Bell,
@@ -45,6 +46,10 @@ export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
   support: {
     titleKey: "dashboard.page.support.title",
     descriptionKey: "dashboard.page.support.description",
+  },
+  support_staff: {
+    titleKey: "dashboard.page.supportStaff.title",
+    descriptionKey: "dashboard.page.supportStaff.description",
   },
   profile: {
     titleKey: "dashboard.page.profile.title",

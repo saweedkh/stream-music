@@ -13,6 +13,7 @@ import {
   Paperclip,
   X,
 } from "lucide-react";
+import { SupportSocketBadge } from "@/features/support/components/support-socket-badge";
 import type { useSupportPage } from "@/features/support/hooks/use-support-page";
 import {
   formatFileSize,
@@ -39,6 +40,7 @@ type ChatState = Pick<
   | "ticket"
   | "messages"
   | "loadingChat"
+  | "chatSocketState"
   | "compose"
   | "pendingFile"
   | "sending"
@@ -46,6 +48,7 @@ type ChatState = Pick<
   | "setPendingFile"
   | "sendReply"
   | "backToList"
+  | "patchTicket"
 >;
 
 type SupportTicketChatViewProps = {
@@ -72,7 +75,15 @@ function MessageAttachment({ message }: { message: SupportMessageRow }) {
   );
 }
 
-function TicketChatHeader({ ticket, onBack }: { ticket: SupportTicketRow; onBack: () => void }) {
+function TicketChatHeader({
+  ticket,
+  socketState,
+  onBack,
+}: {
+  ticket: SupportTicketRow;
+  socketState: ChatState["chatSocketState"];
+  onBack: () => void;
+}) {
   const { t } = useTranslations();
   const waitingStaff = ticket.status === "waiting_staff";
 
@@ -99,6 +110,7 @@ function TicketChatHeader({ ticket, onBack }: { ticket: SupportTicketRow; onBack
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="line-clamp-1 text-sm font-semibold tracking-tight text-foreground sm:text-base">{ticket.subject}</h2>
+          <SupportSocketBadge state={socketState} />
           <span className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
             {ticket.reference}
           </span>
@@ -145,6 +157,7 @@ export function SupportTicketChatView({ state }: SupportTicketChatViewProps) {
     ticket,
     messages,
     loadingChat,
+    chatSocketState,
     compose,
     pendingFile,
     sending,
@@ -152,6 +165,7 @@ export function SupportTicketChatView({ state }: SupportTicketChatViewProps) {
     setPendingFile,
     sendReply,
     backToList,
+    patchTicket,
   } = state;
 
   useEffect(() => {
@@ -167,6 +181,8 @@ export function SupportTicketChatView({ state }: SupportTicketChatViewProps) {
   }
 
   const closed = ticket.status === "closed";
+  const canClose = !closed && (ticket.status === "open" || ticket.status === "waiting_staff" || ticket.status === "in_progress" || ticket.status === "waiting_user");
+  const canResolve = canClose && ticket.status !== "resolved";
 
   function onPickFile(file: File | null) {
     if (!file) return;
@@ -207,9 +223,24 @@ export function SupportTicketChatView({ state }: SupportTicketChatViewProps) {
       <ChatPanel
         fullHeight
         scrollEndRef={messagesEndRef}
-        header={<TicketChatHeader ticket={ticket} onBack={backToList} />}
+        header={<TicketChatHeader ticket={ticket} socketState={chatSocketState} onBack={backToList} />}
         footer={
-          <ChatInputBar
+          <div className="space-y-2">
+            {canResolve || canClose ? (
+              <div className="flex flex-wrap gap-2 px-1">
+                {canResolve ? (
+                  <Button type="button" size="sm" variant="secondary" onClick={() => void patchTicket("status", "resolved")}>
+                    {t("support.markResolved")}
+                  </Button>
+                ) : null}
+                {canClose ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => void patchTicket("status", "closed")}>
+                    {t("support.closeTicket")}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <ChatInputBar
             value={compose}
             onChange={setCompose}
             onSend={() => void sendReply()}
@@ -265,6 +296,7 @@ export function SupportTicketChatView({ state }: SupportTicketChatViewProps) {
               }
             }}
           />
+          </div>
         }
       >
         {loadingChat ? (
