@@ -3,7 +3,13 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_DEPLOY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")/lib" && pwd)"
+# shellcheck source=lib/resolve-repo-root.sh
+source "${_DEPLOY_LIB}/resolve-repo-root.sh"
+ROOT="$(resolve_repo_root "${BASH_SOURCE[0]}")" || {
+  echo "[deploy] Could not find repo root (docker-compose.prod.yml). Run from stream-music/." >&2
+  exit 1
+}
 cd "$ROOT"
 
 ENV_MAIN="${ROOT}/.env.production"
@@ -157,6 +163,7 @@ docker compose \
   up -d --build --remove-orphans "$@"
 
 echo ""
+echo "[deploy] API code: live-mounted from ${ROOT}/apps/api (restart backend/celery after edits)."
 echo "[deploy] Running."
 if [[ -n "$SITE_DOMAIN" ]]; then
   echo "  HTTPS:  https://${SITE_DOMAIN}/  |  https://${SITE_DOMAIN}:8443/"

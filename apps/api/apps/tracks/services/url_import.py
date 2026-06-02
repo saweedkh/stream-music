@@ -212,10 +212,11 @@ def import_track_from_url(
     tags: list[str] | None = None,
 ) -> tuple[dict, int, bool]:
     """Download remote audio and create a Track. Returns (payload, status_code, is_duplicate)."""
-    if not (title or "").strip():
-        raise ValueError("title_required")
     if visibility not in {v for v, _ in Track.Visibility.choices}:
         raise ValueError("invalid_visibility")
+
+    if not (title or "").strip():
+        raise ValueError("title_required")
 
     body, filename, _content_type = _fetch_with_redirect_guard(url.strip())
     file_hash = hashlib.sha256(body).hexdigest()

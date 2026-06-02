@@ -146,11 +146,13 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(5
 
 CHUNK_UPLOAD_ROOT = os.getenv("CHUNK_UPLOAD_ROOT", os.path.join(MEDIA_ROOT, "chunk_uploads"))
 
-# External music URL import (YouTube via yt-dlp)
+# External music URL import (YouTube / SoundCloud / Spotify track via yt-dlp)
 EXTERNAL_IMPORT_ENABLED = os.getenv("EXTERNAL_IMPORT_ENABLED", "1") == "1"
 EXTERNAL_IMPORT_MAX_DURATION_SECONDS = int(os.getenv("EXTERNAL_IMPORT_MAX_DURATION_SECONDS", "600"))
 EXTERNAL_IMPORT_MAX_BYTES = int(os.getenv("EXTERNAL_IMPORT_MAX_BYTES", str(50 * 1024 * 1024)))
 EXTERNAL_IMPORT_RATE_PER_HOUR = int(os.getenv("EXTERNAL_IMPORT_RATE_PER_HOUR", "8"))
+# Optional HTTP(S) proxy for yt-dlp when YouTube/SoundCloud are blocked on the server (e.g. VPN).
+YTDLP_PROXY = os.getenv("YTDLP_PROXY", "").strip()
 TRACK_RETENTION_UNUSED_DAYS = int(os.getenv("TRACK_RETENTION_UNUSED_DAYS", "180"))
 CHUNK_UPLOAD_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_MAX_BYTES", str(500 * 1024 * 1024)))
 CHUNK_UPLOAD_CHUNK_MAX_BYTES = int(os.getenv("CHUNK_UPLOAD_CHUNK_MAX_BYTES", str(8 * 1024 * 1024)))

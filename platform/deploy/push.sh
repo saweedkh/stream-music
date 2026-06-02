@@ -2,7 +2,13 @@
 # Sync project to production server and run ./deploy/up.sh (safe: keeps Docker volumes).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_DEPLOY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")/lib" && pwd)"
+# shellcheck source=lib/resolve-repo-root.sh
+source "${_DEPLOY_LIB}/resolve-repo-root.sh"
+ROOT="$(resolve_repo_root "${BASH_SOURCE[0]}")" || {
+  echo "[push] Could not find repo root." >&2
+  exit 1
+}
 cd "$ROOT"
 
 SYNC_ENV="${ROOT}/deploy/sync.env"

@@ -208,21 +208,71 @@ export async function uploadTrackChunked(
   return track;
 }
 
-export async function importTrackFromUrl(payload: {
-  url: string;
-  title: string;
-  artist?: string;
-  album?: string;
-  genre?: string;
-  tags?: string[];
-  visibility: TrackSummary["visibility"];
-}): Promise<TrackSummary & { duplicate?: boolean }> {
+type StreamingImportPollBody =
+  | { status: "pending"; task_id: string }
+  | { status: "success"; task_id: string; duplicate?: boolean; track: TrackSummary }
+  | { status: "failed"; task_id: string; detail: string };
+
+const STREAMING_IMPORT_POLL_MS = 1500;
+const STREAMING_IMPORT_MAX_POLLS = 120;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+export async function pollStreamingImportTask(
+  taskId: string,
+  options?: { onProgress?: (percent: number) => void },
+): Promise<TrackSummary & { duplicate?: boolean }> {
+  for (let attempt = 0; attempt < STREAMING_IMPORT_MAX_POLLS; attempt += 1) {
+    const res = await fetch(`${getApiBase()}/api/tracks/import/${encodeURIComponent(taskId)}/status`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(await extractApiError(res, "import_failed"));
+    const body = (await res.json()) as StreamingImportPollBody;
+    if (body.status === "pending") {
+      const pct = Math.min(95, Math.round(12 + (attempt / STREAMING_IMPORT_MAX_POLLS) * 83));
+      options?.onProgress?.(pct);
+      await sleep(STREAMING_IMPORT_POLL_MS);
+      continue;
+    }
+    if (body.status === "failed") {
+      throw new Error(body.detail || "import_failed");
+    }
+    if (body.status === "success" && body.track) {
+      options?.onProgress?.(100);
+      return { ...body.track, duplicate: body.duplicate };
+    }
+  }
+  throw new Error("import_timeout");
+}
+
+export async function importTrackFromUrl(
+  payload: {
+    url: string;
+    title: string;
+    artist?: string;
+    album?: string;
+    genre?: string;
+    tags?: string[];
+    visibility: TrackSummary["visibility"];
+  },
+  options?: { onProgress?: (percent: number) => void },
+): Promise<TrackSummary & { duplicate?: boolean }> {
+  options?.onProgress?.(2);
   const res = await fetch(
     `${getApiBase()}/api/tracks/upload/from-url`,
     await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
   );
+  if (res.status === 202) {
+    const queued = (await res.json()) as { status: string; task_id: string };
+    if (!queued.task_id) throw new Error("import_failed");
+    options?.onProgress?.(8);
+    return pollStreamingImportTask(queued.task_id, options);
+  }
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot import track from URL"));
-  return (await res.json()) as TrackSummary & { duplicate?: boolean };
+  throw new Error("import_failed");
 }
 
 export async function getChunkUploadStatus(uploadId: string) {
@@ -272,15 +322,17 @@ export async function getTrackFacets(): Promise<TrackFacets> {
 
 export async function importTrackFromExternalUrl(
   url: string,
-  options?: { async?: boolean },
-): Promise<TrackSummary | { ok: boolean; status: string }> {
+  options?: { onProgress?: (percent: number) => void },
+): Promise<TrackSummary & { duplicate?: boolean }> {
   const res = await fetch(
     `${getApiBase()}/api/tracks/import-external`,
-    await withAuthHeaders({
-      method: "POST",
-      body: JSON.stringify({ url, async: options?.async ?? false }),
-    }),
+    await withAuthHeaders({ method: "POST", body: JSON.stringify({ url }) }),
   );
+  if (res.status === 202) {
+    const queued = (await res.json()) as { status: string; task_id: string };
+    if (!queued.task_id) throw new Error("import_failed");
+    return pollStreamingImportTask(queued.task_id, options);
+  }
   if (!res.ok) throw new Error(await extractApiError(res, "Import failed"));
-  return (await res.json()) as TrackSummary | { ok: boolean; status: string };
+  return (await res.json()) as TrackSummary & { duplicate?: boolean };
 }

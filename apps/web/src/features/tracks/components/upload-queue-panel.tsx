@@ -20,25 +20,20 @@ function ItemProgressBar({ item }: { item: UploadQueueItem }) {
 
   if (item.status !== "uploading") return null;
 
-  if (item.kind === "url") {
-    return (
-      <div className="space-y-1">
-        <p className="text-[11px] text-muted-foreground">{t("upload.studio.urlFetching")}</p>
-        <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="absolute inset-y-0 start-0 h-full w-2/5 animate-upload-slide rounded-full bg-brand" />
-        </div>
-      </div>
-    );
-  }
+  const label = item.kind === "url" ? t("upload.studio.urlFetching") : t("upload.studio.fileUploading");
+  const pct = Math.min(100, Math.max(0, Math.round(item.progress)));
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{t("upload.studio.fileUploading")}</span>
-        <span className="tabular-nums font-medium text-foreground">{item.progress}%</span>
+        <span>{label}</span>
+        <span className="tabular-nums font-medium text-foreground">{pct}%</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-brand transition-[width] duration-200 ease-out" style={{ width: `${item.progress}%` }} />
+        <div
+          className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -130,7 +125,7 @@ export function computeOverallUploadProgress(items: UploadQueueItem[]): number {
   let sum = 0;
   for (const item of items) {
     if (item.status === "done" || item.status === "duplicate") sum += 100;
-    else if (item.status === "uploading") sum += item.kind === "url" ? 35 : item.progress;
+    else if (item.status === "uploading") sum += item.progress;
     else if (item.status === "failed") sum += 100;
   }
   return Math.min(100, Math.round(sum / items.length));

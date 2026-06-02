@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { importTrackFromUrl, uploadTrackChunked, type TrackSummary } from "@/lib/api";
 import { parseAudioFileMetadata, type ParsedAudioMeta } from "@/lib/audio-metadata";
+import {
+  fetchDirectAudioUrlAsFile,
+  isLikelyDirectAudioUrl,
+} from "@/features/tracks/model/client-url-import";
 import { uploadTrackResumable } from "@/lib/resumable-upload";
 import {
   deriveTitleFromFileName,
@@ -45,17 +49,44 @@ export function useTrackUploadQueue({ onItemComplete, onItemFailed, onBatchSettl
 
   const uploadOne = useCallback(
     async (item: UploadQueueItem) => {
-      updateItem(item.id, { status: "uploading", progress: 0, error: undefined });
+      updateItem(item.id, { status: "uploading", progress: 1, error: undefined });
       try {
         if (item.kind === "url" && item.url) {
-          const track = await importTrackFromUrl({
-            url: item.url,
-            title: item.title,
-            visibility: item.visibility,
-            artist: item.artist,
-            album: item.album,
-            genre: item.genre,
-          });
+          if (isLikelyDirectAudioUrl(item.url)) {
+            try {
+              const file = await fetchDirectAudioUrlAsFile(item.url, {
+                onProgress: (p) => updateItem(item.id, { progress: p }),
+              });
+              const track = await uploadTrackResumable(
+                uploadTrackChunked,
+                {
+                  title: item.title,
+                  artist: item.artist,
+                  album: item.album,
+                  genre: item.genre,
+                  visibility: item.visibility,
+                  file,
+                },
+                { onProgress: (p) => updateItem(item.id, { progress: p }) },
+              );
+              updateItem(item.id, { status: "done", progress: 100, trackId: track.id });
+              onItemComplete?.({ ...item, status: "done", progress: 100, trackId: track.id }, track);
+              return;
+            } catch {
+              /* CORS or network — fall back to server import */
+            }
+          }
+          const track = await importTrackFromUrl(
+            {
+              url: item.url,
+              title: item.title,
+              visibility: item.visibility,
+              artist: item.artist,
+              album: item.album,
+              genre: item.genre,
+            },
+            { onProgress: (p) => updateItem(item.id, { progress: p }) },
+          );
           const status = track.duplicate ? "duplicate" : "done";
           updateItem(item.id, { status, progress: 100, trackId: track.id });
           onItemComplete?.({ ...item, status, progress: 100, trackId: track.id }, track);
@@ -77,8 +108,10 @@ export function useTrackUploadQueue({ onItemComplete, onItemFailed, onBatchSettl
         updateItem(item.id, { status: "done", progress: 100, trackId: track.id });
         onItemComplete?.({ ...item, status: "done", progress: 100, trackId: track.id }, track);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "upload_failed";
-        updateItem(item.id, { status: "failed", error: message });
+        const raw = error instanceof Error ? error.message : "import_failed";
+        const { localizeMessage } = await import("@/lib/i18n/localize-message");
+        const message = localizeMessage(raw);
+        updateItem(item.id, { status: "failed", error: message, progress: 0 });
         onItemFailed?.(item, message);
       }
     },

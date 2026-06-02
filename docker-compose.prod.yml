@@ -35,6 +35,8 @@ services:
       MEDIA_ROOT: /media
       DJANGO_SETTINGS_MODULE: config.settings
     volumes:
+      # Live API source (same as dev compose) — pip/ffmpeg stay in the image; Python code from host.
+      - ./apps/api:/app
       - media_data:/media
     command: >
       sh -c "python manage.py migrate --noinput &&
@@ -59,6 +61,7 @@ services:
       MEDIA_ROOT: /media
       DJANGO_SETTINGS_MODULE: config.settings
     volumes:
+      - ./apps/api:/app
       - media_data:/media
     command: celery -A config worker -l info --concurrency=2
     depends_on:
@@ -80,6 +83,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MEDIA_ROOT: /media
       DJANGO_SETTINGS_MODULE: config.settings
+    volumes:
+      - ./apps/api:/app
     command: celery -A config beat -l info
     depends_on:
       postgres:

@@ -8,8 +8,8 @@ from rest_framework.views import APIView
 
 from apps.tracks.chunk_upload import append_chunk, cleanup_files, finalize_path, get_session, init_session
 from apps.tracks.models import Track
-from apps.tracks.services.url_import import import_track_from_url
-from apps.tracks.tracks.track_serializers import TrackSerializer
+from apps.tracks.services.external_audio_import import is_streaming_platform_url
+from apps.tracks.tasks import import_direct_url_track_task, import_streaming_track_task
 
 
 class TrackUploadFromUrlView(APIView):
@@ -28,22 +28,29 @@ class TrackUploadFromUrlView(APIView):
         tags: list[str] = []
         if isinstance(raw_tags, list):
             tags = [str(t).strip() for t in raw_tags if str(t).strip()][:20]
-        try:
-            payload, code, duplicate = import_track_from_url(
-                user=request.user,
-                url=url,
-                title=title,
-                visibility=visibility,
-                artist=artist,
-                album=album,
-                genre=genre,
-                tags=tags,
+
+        task_kwargs = {
+            "title": title,
+            "visibility": visibility,
+            "artist": artist,
+            "album": album,
+            "genre": genre,
+            "tags": tags,
+        }
+        if is_streaming_platform_url(url):
+            async_result = import_streaming_track_task.delay(
+                request.user.id, url, **task_kwargs
             )
-        except ValueError as exc:
-            detail = str(exc) or "import_failed"
-            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
-        body = {**payload, "duplicate": duplicate}
-        return Response(body, status=code)
+        else:
+            if not title:
+                return Response({"detail": "title_required"}, status=status.HTTP_400_BAD_REQUEST)
+            async_result = import_direct_url_track_task.delay(
+                request.user.id, url, **task_kwargs
+            )
+        return Response(
+            {"status": "pending", "task_id": async_result.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class TrackUploadInitView(APIView):

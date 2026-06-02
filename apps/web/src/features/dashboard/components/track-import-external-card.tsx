@@ -19,15 +19,13 @@ export function TrackImportExternalCard() {
     if (!url.trim()) return;
     setBusy(true);
     try {
-      const result = await importTrackFromExternalUrl(url.trim());
-      if ("status" in result && result.status === "queued") {
-        showToast(t("tracks.importQueued"), "success");
-      } else {
-        showToast(t("tracks.importSuccess"), "success");
-      }
+      await importTrackFromExternalUrl(url.trim());
+      showToast(t("tracks.importSuccess"), "success");
       setUrl("");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t("tracks.importFailed"), "error");
+      const raw = e instanceof Error ? e.message : "import_failed";
+      const { localizeMessage } = await import("@/lib/i18n/localize-message");
+      showToast(localizeMessage(raw) || t("tracks.importFailed"), "error");
     } finally {
       setBusy(false);
     }

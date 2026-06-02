@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Check,
   CloudUpload,
   Link2,
   Loader2,
@@ -228,9 +227,16 @@ function UploadStudioForm({
             ))}
           </ul>
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button type="button" className="flex-1 gap-2 sm:flex-none" onClick={onConfirmPreview}>
-              <Check className="h-4 w-4" aria-hidden />
-              {t("upload.studio.confirmUpload", { count: String(previewItems.length) })}
+            <Button
+              type="button"
+              className="flex-1 gap-2 sm:flex-none"
+              disabled={isRunning}
+              onClick={onConfirmPreview}
+            >
+              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Upload className="h-4 w-4" aria-hidden />}
+              {isRunning
+                ? t("upload.studio.confirmUploadInProgress")
+                : t("upload.studio.confirmUpload", { count: String(previewItems.length) })}
             </Button>
             <Button type="button" variant="outline" onClick={onClearPreview}>
               {t("upload.studio.cancelPreview")}
@@ -287,8 +293,13 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
   const [urlTitle, setUrlTitle] = useState("");
 
   const queue = useTrackUploadQueue({
-    onItemComplete: (item) => {
-      if (item.status === "duplicate") showToast(t("upload.studio.duplicate"), "info");
+    onItemComplete: (item, track) => {
+      if (item.status === "duplicate") {
+        showToast(t("upload.studio.duplicate"), "info");
+      } else if (item.kind === "url") {
+        showToast(t("upload.studio.urlImportSuccess"), "success");
+        onUploadComplete?.();
+      }
     },
     onItemFailed: (_item, message) => {
       showToast(message, "error");
@@ -371,7 +382,6 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
     );
     setPreviewItems([]);
     if (!isLgUp) setSheetOpen(true);
-    showToast(t("upload.studio.started", { count: String(count) }), "success");
   };
 
   const formProps: UploadStudioFormProps = {

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.tracks.tracks.import_external.import_external_api import TrackImportExternalView
+from apps.tracks.tracks.import_status.import_status_api import TrackImportStatusView
 from apps.tracks.tracks.list_create_api import TrackListCreateView
 from apps.tracks.tracks.track_id.favorite.favorite_api import TrackFavoriteView
 from apps.tracks.tracks.track_id.retrieve_update_destroy_api import TrackRetrieveUpdateDestroyView
@@ -16,6 +17,7 @@ from apps.tracks.tracks.upload.upload_api import (
 urlpatterns = [
     path("tracks/", TrackListCreateView.as_view()),
     path("tracks/import-external", TrackImportExternalView.as_view()),
+    path("tracks/import/<str:task_id>/status", TrackImportStatusView.as_view()),
     path("tracks/<int:track_id>/", TrackRetrieveUpdateDestroyView.as_view()),
     path("tracks/<int:track_id>/favorite/", TrackFavoriteView.as_view()),
     path("tracks/upload/init", TrackUploadInitView.as_view()),

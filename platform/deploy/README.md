@@ -28,6 +28,14 @@ cp deploy/env.production.example .env.production
 ./deploy/up.sh
 ```
 
+**کد بک‌اند:** `apps/api` روی `backend` و `celery-*` **mount** می‌شود (مثل `docker-compose.yml` dev). بعد از تغییر Python فقط ری‌استارت کنید:
+
+```bash
+docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml restart backend celery-worker celery-beat
+```
+
+فرانت هنوز داخل image ساخته می‌شود — برای UI باید `./deploy/up.sh` (build frontend) بزنید.
+
 ## TLS (nginx + Certbot روی host)
 
 1. گواهی را روی سرور بگیرید (مثلاً `certbot certonly` → `/etc/letsencrypt/live/saweedkh.ir/`).

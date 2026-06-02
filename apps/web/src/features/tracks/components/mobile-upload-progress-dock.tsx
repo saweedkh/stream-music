@@ -40,9 +40,8 @@ export function MobileUploadProgressDock({
 
   const active = hasActiveUploads(items, isRunning);
   const show = mounted && active && !sheetOpen;
-  const current = items.find((i) => i.status === "uploading");
+  const current = items.find((i) => i.status === "uploading") ?? items.find((i) => i.status === "queued");
   const overall = computeOverallUploadProgress(items);
-  const indeterminate = Boolean(current?.kind === "url" && current.status === "uploading");
 
   if (!show) return null;
 
@@ -65,9 +64,7 @@ export function MobileUploadProgressDock({
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-sm font-semibold">{current?.title ?? t("upload.studio.mobileDockTitle")}</p>
-            {!indeterminate ? (
-              <span className="shrink-0 text-xs tabular-nums font-medium text-muted-foreground">{overall}%</span>
-            ) : null}
+            <span className="shrink-0 text-xs tabular-nums font-medium text-muted-foreground">{overall}%</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
             {t("upload.studio.overallProgress", {
@@ -75,15 +72,11 @@ export function MobileUploadProgressDock({
               total: String(stats.total),
             })}
           </p>
-          <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
-            {indeterminate ? (
-              <div className="absolute inset-y-0 start-0 h-full w-2/5 animate-upload-slide rounded-full bg-brand" />
-            ) : (
-              <div
-                className="h-full rounded-full bg-brand transition-[width] duration-200 ease-out"
-                style={{ width: `${overall}%` }}
-              />
-            )}
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
+              style={{ width: `${overall}%` }}
+            />
           </div>
         </div>
         <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
