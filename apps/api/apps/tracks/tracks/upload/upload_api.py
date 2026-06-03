@@ -10,6 +10,7 @@ from apps.tracks.chunk_upload import append_chunk, cleanup_files, finalize_path,
 from apps.tracks.models import Track
 from apps.tracks.services.external_audio_import import is_streaming_platform_url
 from apps.tracks.tasks import import_direct_url_track_task, import_streaming_track_task
+from apps.tracks.tracks.track_serializers import TrackSerializer
 
 
 class TrackUploadFromUrlView(APIView):
