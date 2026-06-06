@@ -11,14 +11,12 @@ import { ChannelManagementSection } from "@/features/dashboard/components/channe
 import { FollowingChannelsSection } from "@/features/dashboard/components/following-channels-section";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
 import { DashboardPanelShell } from "@/features/dashboard/components/dashboard-panel-shell";
-import { adminSectionFromSearch, dashboardTabFromSearch } from "@/features/dashboard/model/dashboard-nav-config";
-import type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
+import { adminSectionFromSearch, adminSectionHref, dashboardTabFromSearch } from "@/features/dashboard/model/dashboard-nav-config";
 import {
   isAccountDashboardTab,
   type AccountDashboardTab,
   type DashboardTab,
 } from "@/features/dashboard/model/dashboard-types";
-import { AdminPanelHub } from "@/features/dashboard/components/admin-panel-hub";
 import { SupportHub, SupportStaffHub, isSupportStaff } from "@/features/support";
 import { UserProfileHub } from "@/features/dashboard/components/user-profile-hub";
 import { PlaylistSection } from "@/features/dashboard/components/playlist-section";
@@ -51,7 +49,6 @@ export function DashboardWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const adminSection = adminSectionFromSearch(searchParams);
   const tabFromUrl = dashboardTabFromSearch(searchParams);
 
   const navigateDashboard = useCallback(
@@ -63,7 +60,7 @@ export function DashboardWorkspace() {
   );
 
   const navigateMainTab = useCallback(
-    (tab: Exclude<DashboardTab, "admin">) => {
+    (tab: DashboardTab) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", tab);
       params.delete("section");
@@ -73,17 +70,11 @@ export function DashboardWorkspace() {
     [navigateDashboard, searchParams],
   );
 
-  const navigateAdminSection = useCallback(
-    (section: AdminSection) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "admin");
-      if (section === "overview") params.delete("adminSection");
-      else params.set("adminSection", section);
-      params.delete("section");
-      navigateDashboard(params);
-    },
-    [navigateDashboard, searchParams],
-  );
+  useEffect(() => {
+    if (searchParams.get("tab") !== "admin") return;
+    const section = adminSectionFromSearch(searchParams);
+    router.replace(adminSectionHref(section));
+  }, [router, searchParams]);
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
@@ -163,10 +154,6 @@ export function DashboardWorkspace() {
       return;
     }
     const resolved = dashboardTabFromSearch(searchParams);
-    if (resolved === "admin" && currentUser && !currentUser.is_superuser) {
-      navigateMainTab("channels");
-      return;
-    }
     if (resolved === "support_staff" && currentUser && !isSupportStaff(currentUser)) {
       navigateMainTab("support");
       return;
@@ -209,15 +196,9 @@ export function DashboardWorkspace() {
 
   if (isLoading) {
     return (
-      <DashboardShell
-        activeTab={activeTab}
-        activeAdminSection={adminSection}
-        onSelectMainTab={navigateMainTab}
-        onSelectAdminSection={navigateAdminSection}
-      >
+      <DashboardShell activeTab={activeTab} onSelectMainTab={navigateMainTab}>
         <DashboardPanelShell
           tab={activeTab}
-          adminSection={activeTab === "admin" ? adminSection : undefined}
           className={cn(
           "lg:min-h-0 lg:flex-1",
           activeTab === "sharing" &&
@@ -304,15 +285,9 @@ export function DashboardWorkspace() {
   ) : null;
 
   return (
-      <DashboardShell
-        activeTab={activeTab}
-        activeAdminSection={adminSection}
-        onSelectMainTab={navigateMainTab}
-        onSelectAdminSection={navigateAdminSection}
-      >
+      <DashboardShell activeTab={activeTab} onSelectMainTab={navigateMainTab}>
         <DashboardPanelShell
           tab={activeTab}
-          adminSection={activeTab === "admin" ? adminSection : undefined}
         className={cn(
           "lg:min-h-0 lg:flex-1",
           activeTab === "sharing" &&
@@ -381,10 +356,6 @@ export function DashboardWorkspace() {
             trackCount={tracks.length}
             playlistCount={playlists.length}
           />
-        ) : null}
-
-        {activeTab === "admin" && currentUser?.is_superuser ? (
-          <AdminPanelHub activeSection={adminSection} />
         ) : null}
       </DashboardPanelShell>
     </DashboardShell>

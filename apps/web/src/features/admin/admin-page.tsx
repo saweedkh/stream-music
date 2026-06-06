@@ -14,8 +14,8 @@ import {
   AdminSystemSection,
   AdminUsersSection,
 } from "@/features/admin/components/admin-management-sections";
-import type { AdminSection } from "@/features/dashboard/model/dashboard-nav-config";
-import { adminSectionMeta } from "@/features/dashboard/model/dashboard-nav-config";
+import type { AdminSection } from "@/features/admin/model/admin-nav";
+import { adminSectionMeta } from "@/features/admin/model/admin-nav";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { cn } from "@/lib/utils";
 

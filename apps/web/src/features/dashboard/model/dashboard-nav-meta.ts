@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bell, Crown, Headphones, KeyRound, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, User } from "lucide-react";
+import { Bell, Headphones, KeyRound, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, User } from "lucide-react";
 import type { DashboardTab } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
@@ -19,7 +19,6 @@ export const DASHBOARD_TAB_ICONS: Record<DashboardTab, LucideIcon> = {
   profile: User,
   security: KeyRound,
   notifications: Bell,
-  admin: Crown,
 };
 
 export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
@@ -62,9 +61,5 @@ export const DASHBOARD_TAB_META: Record<DashboardTab, DashboardTabMeta> = {
   notifications: {
     titleKey: "dashboard.page.notifications.title",
     descriptionKey: "dashboard.page.notifications.description",
-  },
-  admin: {
-    titleKey: "dashboard.page.admin.title",
-    descriptionKey: "dashboard.page.admin.description",
   },
 };

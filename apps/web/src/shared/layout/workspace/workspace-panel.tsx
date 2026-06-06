@@ -4,21 +4,13 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Compass } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
-import {
-  ADMIN_NAV,
-  DASHBOARD_TAB_ICONS,
-  DASHBOARD_TAB_META,
-  adminSectionMeta,
-  type AdminSection,
-  type DashboardTab,
-} from "@/features/dashboard";
+import { DASHBOARD_TAB_ICONS, DASHBOARD_TAB_META, type DashboardTab } from "@/features/dashboard";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { hubPanelRoot, panelLgSurface, panelMobileFlat } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 export type WorkspacePanelProps = {
   tab: DashboardTab;
-  adminSection?: AdminSection;
   children: ReactNode;
   badge?: ReactNode;
   className?: string;
@@ -37,7 +29,6 @@ export type WorkspacePanelProps = {
  */
 export function WorkspacePanel({
   tab,
-  adminSection,
   children,
   badge,
   className,
@@ -48,23 +39,12 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const { t } = useTranslations();
 
-  const adminItem = tab === "admin" && adminSection ? ADMIN_NAV.find((n) => n.id === adminSection) : null;
   const headerIconFromKey: LucideIcon | undefined = headerIconKey === "compass" ? Compass : undefined;
-  const Icon = headerIconFromKey ?? adminItem?.icon ?? DASHBOARD_TAB_ICONS[tab];
+  const Icon = headerIconFromKey ?? DASHBOARD_TAB_ICONS[tab];
 
-  const titleKey =
-    headerTitleKey ??
-    (tab === "admin" && adminSection
-      ? adminSectionMeta(adminSection).titleKey
-      : DASHBOARD_TAB_META[tab].titleKey);
+  const titleKey = headerTitleKey ?? DASHBOARD_TAB_META[tab].titleKey;
+  const descriptionKey = headerDescriptionKey ?? DASHBOARD_TAB_META[tab].descriptionKey;
 
-  const descriptionKey =
-    headerDescriptionKey ??
-    (tab === "admin" && adminSection
-      ? adminSectionMeta(adminSection).descriptionKey
-      : DASHBOARD_TAB_META[tab].descriptionKey);
-
-  const isAdminTab = tab === "admin";
   const isSecurityTab = tab === "security";
 
   return (
@@ -84,7 +64,7 @@ export function WorkspacePanel({
           flush && "max-lg:hidden",
         )}
       >
-        <WorkspacePanelIcon icon={Icon} variant={isAdminTab ? "amber" : isSecurityTab ? "emerald" : "brand"} />
+        <WorkspacePanelIcon icon={Icon} variant={isSecurityTab ? "emerald" : "brand"} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">{t(titleKey)}</h2>

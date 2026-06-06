@@ -8,8 +8,7 @@ export type DashboardTab =
   | "support_staff"
   | "profile"
   | "security"
-  | "notifications"
-  | "admin";
+  | "notifications";
 
 export const DASHBOARD_TABS: DashboardTab[] = [
   "channels",
@@ -22,7 +21,6 @@ export const DASHBOARD_TABS: DashboardTab[] = [
   "profile",
   "security",
   "notifications",
-  "admin",
 ];
 
 export const ACCOUNT_DASHBOARD_TABS = ["profile", "security", "notifications"] as const;

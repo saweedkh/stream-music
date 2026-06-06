@@ -9,7 +9,6 @@ import {
   DashboardMobileHeader,
   DashboardSidebar,
   JoinChannelDialog,
-  type AdminSection,
   type DashboardTab,
 } from "@/features/dashboard";
 import { getMe, type AuthUser } from "@/lib/api";
@@ -20,31 +19,18 @@ import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
   activeTab: DashboardTab;
-  activeAdminSection: AdminSection;
-  onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => void;
-  onSelectAdminSection: (section: AdminSection) => void;
+  onSelectMainTab: (tab: DashboardTab) => void;
   children: ReactNode;
 };
 
-export function AppNavLayout({
-  activeTab,
-  activeAdminSection,
-  onSelectMainTab,
-  onSelectAdminSection,
-  children,
-}: AppNavLayoutProps) {
+export function AppNavLayout({ activeTab, onSelectMainTab, children }: AppNavLayoutProps) {
   const pathname = usePathname();
   const { t, dir } = useTranslations();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  const contentKey =
-    pathname?.startsWith("/explore")
-      ? "explore"
-      : activeTab === "admin"
-        ? `admin-${activeAdminSection}`
-        : activeTab;
+  const contentKey = pathname?.startsWith("/explore") ? "explore" : activeTab;
 
   useEffect(() => {
     getMe()
@@ -73,13 +59,8 @@ export function AppNavLayout({
   const sidebarProps = {
     activePathname: pathname,
     activeTab,
-    activeAdminSection,
-    onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => {
+    onSelectMainTab: (tab: DashboardTab) => {
       onSelectMainTab(tab);
-      setMobileNavOpen(false);
-    },
-    onSelectAdminSection: (section: AdminSection) => {
-      onSelectAdminSection(section);
       setMobileNavOpen(false);
     },
     onJoinChannelClick: openJoinDialog,
@@ -97,10 +78,7 @@ export function AppNavLayout({
         <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent
-            side={dir === "rtl" ? "right" : "left"}
-            className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0"
-          >
+          <SheetContent side={dir === "rtl" ? "right" : "left"} className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
             <SheetTitle className="sr-only">{t("dashboard.navTitle")}</SheetTitle>
             <DashboardSidebar {...sidebarProps} className="h-full w-full border-0 bg-transparent" />
           </SheetContent>

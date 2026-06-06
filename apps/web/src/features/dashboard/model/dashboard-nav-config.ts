@@ -1,23 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  Activity,
-  Award,
-  Bell,
-  Compass,
-  Gift,
-  KeyRound,
-  LayoutGrid,
-  Headphones,
-  LifeBuoy,
-  Link2,
-  ListMusic,
-  Music,
-  Radio,
-  Server,
-  Share2,
-  User,
-  Users,
-} from "lucide-react";
+import { Bell, Compass, Headphones, KeyRound, LayoutGrid, LifeBuoy, ListMusic, Music, Radio, Share2, User } from "lucide-react";
 import {
   ACCOUNT_DASHBOARD_TABS,
   isAccountDashboardTab,
@@ -27,21 +9,21 @@ import {
 } from "@/features/dashboard/model/dashboard-types";
 import type { MessageKey } from "@/lib/i18n/messages";
 
+export type {
+  AdminNavItem,
+  AdminSection,
+} from "@/features/admin/model/admin-nav";
+export {
+  ADMIN_NAV,
+  ADMIN_SECTIONS,
+  adminSectionFromSearch,
+  adminSectionHref,
+  adminSectionMeta,
+  isAdminSection,
+} from "@/features/admin/model/admin-nav";
+
 export const PROFILE_SECTIONS = ACCOUNT_DASHBOARD_TABS;
 export type ProfileSection = AccountDashboardTab;
-
-export const ADMIN_SECTIONS = [
-  "overview",
-  "users",
-  "badges",
-  "channels",
-  "tracks",
-  "playlists",
-  "imports",
-  "premium",
-  "system",
-] as const;
-export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
 export function isProfileSection(value: string | null): value is ProfileSection {
   return isAccountDashboardTab(value);
@@ -55,27 +37,13 @@ export function dashboardTabFromSearch(params: URLSearchParams): DashboardTab {
     if (section === "security" || section === "notifications") return section;
     return "profile";
   }
+  if (tab === "admin") return "channels";
   if (isDashboardTab(tab)) return tab;
   return "channels";
 }
 
-export function adminSectionFromSearch(params: URLSearchParams): AdminSection {
-  const raw = params.get("adminSection");
-  return isAdminSection(raw) ? raw : "overview";
-}
-
-export function isAdminSection(value: string | null): value is AdminSection {
-  return value !== null && (ADMIN_SECTIONS as readonly string[]).includes(value);
-}
-
 export type AccountNavItem = {
   id: AccountDashboardTab;
-  labelKey: MessageKey;
-  icon: LucideIcon;
-};
-
-export type AdminNavItem = {
-  id: AdminSection;
   labelKey: MessageKey;
   icon: LucideIcon;
 };
@@ -89,19 +57,7 @@ export const ACCOUNT_NAV: AccountNavItem[] = [
 /** @deprecated Use ACCOUNT_NAV */
 export const PROFILE_NAV = ACCOUNT_NAV;
 
-export const ADMIN_NAV: AdminNavItem[] = [
-  { id: "overview", labelKey: "admin.nav.overview", icon: Activity },
-  { id: "users", labelKey: "admin.nav.users", icon: Users },
-  { id: "badges", labelKey: "admin.nav.badges", icon: Award },
-  { id: "channels", labelKey: "admin.nav.channels", icon: LayoutGrid },
-  { id: "tracks", labelKey: "admin.nav.tracks", icon: Music },
-  { id: "playlists", labelKey: "admin.nav.playlists", icon: ListMusic },
-  { id: "imports", labelKey: "admin.nav.imports", icon: Link2 },
-  { id: "premium", labelKey: "admin.nav.premium", icon: Gift },
-  { id: "system", labelKey: "admin.nav.system", icon: Server },
-];
-
-export type DashboardMainTab = Exclude<DashboardTab, AccountDashboardTab | "admin">;
+export type DashboardMainTab = Exclude<DashboardTab, AccountDashboardTab>;
 
 export type DashboardMainNavItem = {
   id: DashboardMainTab;
@@ -134,21 +90,15 @@ export type DashboardNavSection =
       titleKey: MessageKey;
       variant: "account";
       items: AccountNavItem[];
-    }
-  | {
-      id: "admin";
-      titleKey: MessageKey;
-      variant: "admin";
-      items: AdminNavItem[];
     };
 
-export function dashboardNavSections(isSuperuser: boolean, isSupportStaff = false): DashboardNavSection[] {
+export function dashboardNavSections(_isSuperuser: boolean, isSupportStaff = false): DashboardNavSection[] {
   const helpItems: DashboardMainNavItem[] = [{ id: "support", labelKey: "dashboard.tab.support", icon: LifeBuoy }];
   if (isSupportStaff) {
     helpItems.push({ id: "support_staff", labelKey: "dashboard.tab.supportStaff", icon: Headphones });
   }
 
-  const sections: DashboardNavSection[] = [
+  return [
     {
       id: "channels",
       titleKey: "dashboard.sidebar.section.channels",
@@ -182,30 +132,4 @@ export function dashboardNavSections(isSuperuser: boolean, isSupportStaff = fals
       items: ACCOUNT_NAV,
     },
   ];
-
-  if (isSuperuser) {
-    sections.push({
-      id: "admin",
-      titleKey: "dashboard.sidebar.section.admin",
-      variant: "admin",
-      items: ADMIN_NAV,
-    });
-  }
-
-  return sections;
-}
-
-export function adminSectionMeta(section: AdminSection): { titleKey: MessageKey; descriptionKey?: MessageKey } {
-  const map: Record<AdminSection, { titleKey: MessageKey; descriptionKey?: MessageKey }> = {
-    overview: { titleKey: "admin.overviewTitle", descriptionKey: "admin.overviewDescription" },
-    users: { titleKey: "admin.usersTitle", descriptionKey: "admin.usersDescription" },
-    badges: { titleKey: "admin.badgesTitle", descriptionKey: "admin.badgesDescription" },
-    channels: { titleKey: "admin.channelsTitle", descriptionKey: "admin.channelsDescription" },
-    tracks: { titleKey: "admin.tracksTitle", descriptionKey: "admin.tracksDescription" },
-    playlists: { titleKey: "admin.playlistsTitle", descriptionKey: "admin.playlistsDescription" },
-    imports: { titleKey: "admin.importsTitle", descriptionKey: "admin.importsDescription" },
-    premium: { titleKey: "admin.premiumTitle", descriptionKey: "admin.premiumDescription" },
-    system: { titleKey: "admin.systemTitle", descriptionKey: "admin.systemDescription" },
-  };
-  return map[section];
 }

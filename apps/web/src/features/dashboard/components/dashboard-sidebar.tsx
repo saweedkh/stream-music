@@ -7,7 +7,6 @@ import { useTranslations } from "@/shared/providers/locale-provider";
 import { DashboardAccountSection } from "@/features/dashboard/components/dashboard-account-section";
 import { isSupportStaff } from "@/features/support";
 import {
-  type AdminSection,
   dashboardNavSections,
   isDashboardRouteNavItem,
   type DashboardNavSection,
@@ -19,7 +18,7 @@ import { Separator } from "@/shared/ui/separator";
 import type { AuthUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type CollapsibleSectionId = "channels" | "library" | "help" | "account" | "admin";
+type CollapsibleSectionId = "channels" | "library" | "help" | "account";
 
 function SectionDivider() {
   return (
@@ -32,9 +31,7 @@ function SectionDivider() {
 type DashboardSidebarProps = {
   activePathname?: string | null;
   activeTab: DashboardTab;
-  activeAdminSection: AdminSection;
-  onSelectMainTab: (tab: Exclude<DashboardTab, "admin">) => void;
-  onSelectAdminSection: (section: AdminSection) => void;
+  onSelectMainTab: (tab: DashboardTab) => void;
   onJoinChannelClick?: () => void;
   user: AuthUser | null;
   onSidebarAction?: () => void;
@@ -52,7 +49,6 @@ function sectionHasActive(
   section: DashboardNavSection,
   activePathname: string | null | undefined,
   activeTab: DashboardTab,
-  activeAdminSection: AdminSection,
 ): boolean {
   if (section.variant === "main") {
     const routeActive = mainSectionRouteActive(section, activePathname);
@@ -62,32 +58,22 @@ function sectionHasActive(
         : !routeActive && item.id === activeTab,
     );
   }
-  if (section.variant === "account") {
-    return isAccountDashboardTab(activeTab);
-  }
-  return activeTab === "admin" && section.items.some((item) => item.id === activeAdminSection);
+  return isAccountDashboardTab(activeTab);
 }
 
-function defaultExpanded(
-  activePathname: string | null | undefined,
-  activeTab: DashboardTab,
-  activeAdminSection: AdminSection,
-): Record<CollapsibleSectionId, boolean> {
+function defaultExpanded(activePathname: string | null | undefined, activeTab: DashboardTab): Record<CollapsibleSectionId, boolean> {
   return {
     channels: activeTab === "channels" || activeTab === "following" || Boolean(activePathname?.startsWith("/explore")),
     library: activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing",
     help: activeTab === "support" || activeTab === "support_staff",
     account: isAccountDashboardTab(activeTab),
-    admin: activeTab === "admin",
   };
 }
 
 export function DashboardSidebar({
   activePathname,
   activeTab,
-  activeAdminSection,
   onSelectMainTab,
-  onSelectAdminSection,
   onJoinChannelClick,
   user,
   onSidebarAction,
@@ -97,76 +83,39 @@ export function DashboardSidebar({
   const sections = dashboardNavSections(Boolean(user?.is_superuser), isSupportStaff(user));
 
   const [expanded, setExpanded] = useState<Record<CollapsibleSectionId, boolean>>(() =>
-    defaultExpanded(activePathname, activeTab, activeAdminSection),
+    defaultExpanded(activePathname, activeTab),
   );
+
   useEffect(() => {
-    setExpanded((prev) => {
-      const next = { ...prev };
-      if (activeTab === "channels" || activePathname?.startsWith("/explore")) next.channels = true;
-      if (activeTab === "tracks" || activeTab === "playlists" || activeTab === "sharing") next.library = true;
-      if (activeTab === "support" || activeTab === "support_staff") next.help = true;
-      if (isAccountDashboardTab(activeTab)) next.account = true;
-      if (activeTab === "admin") next.admin = true;
-      return next;
-    });
+    setExpanded(defaultExpanded(activePathname, activeTab));
   }, [activePathname, activeTab]);
 
   function toggleSection(id: CollapsibleSectionId) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function handleMainTab(tab: Exclude<DashboardTab, "admin">) {
+  function handleMainTab(tab: DashboardTab) {
     onSelectMainTab(tab);
-    onSidebarAction?.();
-  }
-
-  function handleAdmin(section: AdminSection) {
-    onSelectAdminSection(section);
     onSidebarAction?.();
   }
 
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 w-[18rem] shrink-0 flex-col bg-gradient-to-b from-card/50 to-card/20 backdrop-blur-xl lg:border-e lg:border-border/60",
+        "flex h-full min-h-0 w-[min(100%,19rem)] flex-col border-e border-border/60 bg-card/95 backdrop-blur-sm",
         className,
       )}
     >
-      <div className="shrink-0 px-4 pb-3 pt-5">
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href="/dashboard"
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 transition-opacity hover:opacity-90"
-            onClick={onSidebarAction}
-          >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center text-brand">
-              <Radio className="h-6 w-6" aria-hidden />
-            </span>
-            <span className="min-w-0 font-display text-lg font-semibold leading-tight tracking-tight">
-              <span className="text-gradient-brand">Beat</span>{" "}
-              <span className="text-foreground">Room</span>
-            </span>
-          </Link>
-          {user ? (
-            <NotificationCenter
-              triggerClassName="h-11 w-11 shrink-0 rounded-xl hover:bg-muted/40"
-              iconClassName="h-5 w-5"
-            />
-          ) : null}
-        </div>
-        <div className="mt-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {t("dashboard.workspace")}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("dashboard.subtitle")}</p>
-        </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <Link href="/dashboard" className="font-display text-lg font-semibold tracking-tight text-foreground" onClick={onSidebarAction}>
+          Stream Music
+        </Link>
+        <NotificationCenter />
+      </div>
 
-        <Button
-          type="button"
-          className="mt-3 h-10 w-full gap-2 bg-brand text-brand-foreground shadow-md shadow-brand/15 hover:bg-brand-strong"
-          onClick={onJoinChannelClick}
-        >
-          <LogIn className="h-4 w-4" aria-hidden />
+      <div className="shrink-0 px-3 pt-3">
+        <Button type="button" className="w-full gap-2 bg-brand text-brand-foreground shadow-md shadow-brand/20" onClick={onJoinChannelClick}>
+          <Radio className="h-4 w-4" aria-hidden />
           {t("dashboard.joinChannel")}
         </Button>
       </div>
@@ -182,30 +131,18 @@ export function DashboardSidebar({
 
         {sections.map((section, sectionIndex) => {
           const isOpen = expanded[section.id];
-          const hasActive = sectionHasActive(section, activePathname, activeTab, activeAdminSection);
-          const isAdminSection = section.variant === "admin";
+          const hasActive = sectionHasActive(section, activePathname, activeTab);
 
           return (
             <div key={section.id} className={sectionIndex > 0 ? "mt-1" : ""}>
               {sectionIndex > 0 ? <SectionDivider /> : null}
-
-              {isAdminSection ? (
-                <div className="mb-1 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
-                  <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-                  <p className="truncate text-xs font-semibold text-foreground">{t("admin.panelTitle")}</p>
-                </div>
-              ) : null}
 
               <button
                 type="button"
                 onClick={() => toggleSection(section.id)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
-                  hasActive
-                    ? isAdminSection
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-brand"
-                    : "text-muted-foreground/90 hover:text-foreground",
+                  hasActive ? "text-brand" : "text-muted-foreground/90 hover:text-foreground",
                 )}
                 aria-expanded={isOpen}
               >
@@ -235,41 +172,17 @@ export function DashboardSidebar({
                         return (
                           <li key={item.id}>
                             {isRoute ? (
-                              <Link
-                                href={item.href}
-                                onClick={onSidebarAction}
-                                className={rowClass}
-                                aria-current={isActive ? "page" : undefined}
-                              >
-                                {isActive ? (
-                                  <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
-                                ) : null}
-                                <span
-                                  className={cn(
-                                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
-                                    isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
-                                  )}
-                                >
+                              <Link href={item.href} onClick={onSidebarAction} className={rowClass} aria-current={isActive ? "page" : undefined}>
+                                {isActive ? <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden /> : null}
+                                <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground")}>
                                   <Icon className="h-4 w-4" aria-hidden />
                                 </span>
                                 <span className="truncate">{t(item.labelKey)}</span>
                               </Link>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleMainTab(item.id)}
-                                className={rowClass}
-                                aria-current={isActive ? "page" : undefined}
-                              >
-                                {isActive ? (
-                                  <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
-                                ) : null}
-                                <span
-                                  className={cn(
-                                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
-                                    isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
-                                  )}
-                                >
+                              <button type="button" onClick={() => handleMainTab(item.id)} className={rowClass} aria-current={isActive ? "page" : undefined}>
+                                {isActive ? <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden /> : null}
+                                <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground")}>
                                   <Icon className="h-4 w-4" aria-hidden />
                                 </span>
                                 <span className="truncate">{t(item.labelKey)}</span>
@@ -291,61 +204,12 @@ export function DashboardSidebar({
                               onClick={() => handleMainTab(item.id)}
                               className={cn(
                                 "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                                isActive
-                                  ? "bg-brand/12 text-brand shadow-sm shadow-brand/5"
-                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                                isActive ? "bg-brand/12 text-brand shadow-sm shadow-brand/5" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
                               )}
                               aria-current={isActive ? "page" : undefined}
                             >
-                              {isActive ? (
-                                <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden />
-                              ) : null}
-                              <span
-                                className={cn(
-                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
-                                  isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground",
-                                )}
-                              >
-                                <Icon className="h-4 w-4" aria-hidden />
-                              </span>
-                              <span className="truncate">{t(item.labelKey)}</span>
-                            </button>
-                          </li>
-                        );
-                      })
-                    : null}
-
-                  {section.variant === "admin"
-                    ? section.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === "admin" && activeAdminSection === item.id;
-                        return (
-                          <li key={item.id}>
-                            <button
-                              type="button"
-                              onClick={() => handleAdmin(item.id)}
-                              className={cn(
-                                "relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                                isActive
-                                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-100"
-                                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                              )}
-                              aria-current={isActive ? "page" : undefined}
-                            >
-                              {isActive ? (
-                                <span
-                                  className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-amber-500"
-                                  aria-hidden
-                                />
-                              ) : null}
-                              <span
-                                className={cn(
-                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
-                                  isActive
-                                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                                    : "bg-muted/30 text-muted-foreground",
-                                )}
-                              >
+                              {isActive ? <span className="absolute inset-y-1.5 start-0 w-0.5 rounded-full bg-brand" aria-hidden /> : null}
+                              <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", isActive ? "bg-brand/15 text-brand" : "bg-muted/30 text-muted-foreground")}>
                                 <Icon className="h-4 w-4" aria-hidden />
                               </span>
                               <span className="truncate">{t(item.labelKey)}</span>
@@ -359,6 +223,33 @@ export function DashboardSidebar({
             </div>
           );
         })}
+
+        {user?.is_superuser ? (
+          <div className="mt-3 px-1">
+            <SectionDivider />
+            <Link
+              href="/admin"
+              onClick={onSidebarAction}
+              className="mt-2 flex items-center gap-3 rounded-xl border border-amber-500/25 bg-gradient-to-r from-amber-500/10 to-amber-500/5 px-3 py-2.5 text-sm font-medium text-amber-900 transition-colors hover:from-amber-500/15 dark:text-amber-100"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                <Crown className="h-4 w-4" aria-hidden />
+              </span>
+              <span>{t("admin.openPortal")}</span>
+            </Link>
+          </div>
+        ) : null}
+
+        {!user ? (
+          <div className="mt-4 px-1">
+            <Link href="/login" onClick={onSidebarAction}>
+              <Button variant="outline" className="w-full gap-2">
+                <LogIn className="h-4 w-4" aria-hidden />
+                {t("nav.login")}
+              </Button>
+            </Link>
+          </div>
+        ) : null}
       </nav>
 
       <div className="shrink-0 border-t border-border/60 bg-gradient-to-t from-card/30 to-transparent px-4 py-3">
