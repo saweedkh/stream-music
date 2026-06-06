@@ -1,5 +1,15 @@
 import { getApiBase, withAuthHeaders, extractApiError } from "./client";
-import type { AdminOverview, AdminUserRow, AdminBadgeDefinition, AdminChannelRow } from "./types";
+import type {
+  AdminOverview,
+  AdminUserRow,
+  AdminBadgeDefinition,
+  AdminChannelRow,
+  AdminTrackRow,
+  AdminPlaylistRow,
+  AdminTrackImportRow,
+  AdminPremiumCodeRow,
+  Paginated,
+} from "./types";
 
 export async function getAdminOverview(): Promise<AdminOverview> {
   const res = await fetch(`${getApiBase()}/api/admin/overview`, { credentials: "include", cache: "no-store" });
@@ -118,4 +128,78 @@ export async function getAdminHealth() {
   const res = await fetch(`${getApiBase()}/api/admin/health`, { credentials: "include", cache: "no-store" });
   if (!res.ok) throw new Error(await extractApiError(res, "Cannot load health"));
   return (await res.json()) as AdminSystemHealth;
+}
+
+function adminListUrl(path: string, options?: { search?: string; limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (options?.search?.trim()) params.set("search", options.search.trim());
+  if (options?.limit != null) params.set("limit", String(options.limit));
+  if (options?.offset != null) params.set("offset", String(options.offset));
+  const qs = params.toString();
+  return `${getApiBase()}${path}${qs ? `?${qs}` : ""}`;
+}
+
+export async function listAdminTracks(options?: { search?: string; limit?: number; offset?: number }) {
+  const res = await fetch(adminListUrl("/api/admin/tracks", options), { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load tracks"));
+  return (await res.json()) as Paginated<AdminTrackRow>;
+}
+
+export async function deleteAdminTrack(trackId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/tracks/${trackId}`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete track"));
+}
+
+export async function listAdminPlaylists(options?: { search?: string; limit?: number; offset?: number }) {
+  const res = await fetch(adminListUrl("/api/admin/playlists", options), { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load playlists"));
+  return (await res.json()) as Paginated<AdminPlaylistRow>;
+}
+
+export async function deleteAdminPlaylist(playlistId: number) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/playlists/${playlistId}`,
+    await withAuthHeaders({ method: "DELETE" }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot delete playlist"));
+}
+
+export async function listAdminTrackImports(options?: { search?: string; limit?: number; offset?: number }) {
+  const res = await fetch(adminListUrl("/api/admin/track-imports", options), {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load imports"));
+  return (await res.json()) as Paginated<AdminTrackImportRow>;
+}
+
+export async function listAdminPremiumCodes() {
+  const res = await fetch(`${getApiBase()}/api/admin/premium-codes`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot load premium codes"));
+  return (await res.json()) as { results: AdminPremiumCodeRow[] };
+}
+
+export async function createAdminPremiumCode(payload: {
+  max_uses?: number;
+  expires_in_days?: number;
+  note?: string;
+}) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/premium-codes`,
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot create code"));
+  return (await res.json()) as AdminPremiumCodeRow & { code: string };
+}
+
+export async function patchAdminPremiumCode(codeId: number, payload: { is_active?: boolean }) {
+  const res = await fetch(
+    `${getApiBase()}/api/admin/premium-codes/${codeId}`,
+    await withAuthHeaders({ method: "PATCH", body: JSON.stringify(payload) }),
+  );
+  if (!res.ok) throw new Error(await extractApiError(res, "Cannot update code"));
+  return (await res.json()) as AdminPremiumCodeRow;
 }

@@ -54,3 +54,26 @@ class AdminPremiumCodesView(APIView):
             {"id": row.id, "code": row.code, "max_uses": row.max_uses, "expires_at": expires_at},
             status=status.HTTP_201_CREATED,
         )
+
+
+class AdminPremiumCodeDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
+
+    def patch(self, request, code_id: int):
+        row = PremiumInviteCode.objects.filter(id=code_id).first()
+        if row is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if "is_active" in request.data:
+            row.is_active = bool(request.data["is_active"])
+            row.save(update_fields=["is_active"])
+        return Response(
+            {
+                "id": row.id,
+                "code": row.code,
+                "max_uses": row.max_uses,
+                "use_count": row.use_count,
+                "is_active": row.is_active,
+                "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+                "note": row.note,
+            }
+        )

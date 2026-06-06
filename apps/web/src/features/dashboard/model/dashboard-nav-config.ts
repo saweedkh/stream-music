@@ -4,10 +4,12 @@ import {
   Award,
   Bell,
   Compass,
+  Gift,
   KeyRound,
   LayoutGrid,
   Headphones,
   LifeBuoy,
+  Link2,
   ListMusic,
   Music,
   Radio,
@@ -28,7 +30,17 @@ import type { MessageKey } from "@/lib/i18n/messages";
 export const PROFILE_SECTIONS = ACCOUNT_DASHBOARD_TABS;
 export type ProfileSection = AccountDashboardTab;
 
-export const ADMIN_SECTIONS = ["overview", "users", "badges", "channels", "system"] as const;
+export const ADMIN_SECTIONS = [
+  "overview",
+  "users",
+  "badges",
+  "channels",
+  "tracks",
+  "playlists",
+  "imports",
+  "premium",
+  "system",
+] as const;
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
 export function isProfileSection(value: string | null): value is ProfileSection {
@@ -82,6 +94,10 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: "users", labelKey: "admin.nav.users", icon: Users },
   { id: "badges", labelKey: "admin.nav.badges", icon: Award },
   { id: "channels", labelKey: "admin.nav.channels", icon: LayoutGrid },
+  { id: "tracks", labelKey: "admin.nav.tracks", icon: Music },
+  { id: "playlists", labelKey: "admin.nav.playlists", icon: ListMusic },
+  { id: "imports", labelKey: "admin.nav.imports", icon: Link2 },
+  { id: "premium", labelKey: "admin.nav.premium", icon: Gift },
   { id: "system", labelKey: "admin.nav.system", icon: Server },
 ];
 
@@ -182,9 +198,13 @@ export function dashboardNavSections(isSuperuser: boolean, isSupportStaff = fals
 export function adminSectionMeta(section: AdminSection): { titleKey: MessageKey; descriptionKey?: MessageKey } {
   const map: Record<AdminSection, { titleKey: MessageKey; descriptionKey?: MessageKey }> = {
     overview: { titleKey: "admin.overviewTitle", descriptionKey: "admin.overviewDescription" },
-    users: { titleKey: "admin.usersTitle" },
+    users: { titleKey: "admin.usersTitle", descriptionKey: "admin.usersDescription" },
     badges: { titleKey: "admin.badgesTitle", descriptionKey: "admin.badgesDescription" },
-    channels: { titleKey: "admin.channelsTitle" },
+    channels: { titleKey: "admin.channelsTitle", descriptionKey: "admin.channelsDescription" },
+    tracks: { titleKey: "admin.tracksTitle", descriptionKey: "admin.tracksDescription" },
+    playlists: { titleKey: "admin.playlistsTitle", descriptionKey: "admin.playlistsDescription" },
+    imports: { titleKey: "admin.importsTitle", descriptionKey: "admin.importsDescription" },
+    premium: { titleKey: "admin.premiumTitle", descriptionKey: "admin.premiumDescription" },
     system: { titleKey: "admin.systemTitle", descriptionKey: "admin.systemDescription" },
   };
   return map[section];
