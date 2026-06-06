@@ -34,18 +34,83 @@ jobs:
 
       - name: Deploy via rsync
         run: |
-          rsync -azP --delete \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='__pycache__' \
-            --exclude='.next' \
-            --exclude='media' \
-            --exclude='backups' \
-            --exclude='*.pyc' \
-            --exclude='.env.production' \
-            --exclude='deploy/sync.env' \
-            -e "ssh -p ${{ vars.SSH_PORT || 22 }}" \
-            ./ ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH || '/root/stream-music' }}/
+          RSYNC_SSH="ssh -p ${{ vars.SSH_PORT || 22 }}"
+          REMOTE_PATH="${{ vars.DEPLOY_PATH || '/root/stream-music' }}"
+          ssh -p ${{ vars.SSH_PORT || 22 }} ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }} bash -c '
+            set -euo pipefail
+            root="$1"
+            for name in deploy infra scripts; do
+              path="${root}/${name}"
+              if [[ -L "$path" ]]; then
+                target="$(readlink "$path")"
+                [[ "$target" != /* ]] && target="${root}/${target}"
+                rm "$path"
+                if [[ -d "$target" && "$target" != "$path" ]]; then
+                  mv "$target" "$path"
+                else
+                  mkdir -p "$path"
+                fi
+              elif [[ -f "$path" ]]; then
+                rm -f "$path"
+                mkdir -p "$path"
+              else
+                mkdir -p "$path"
+              fi
+            done
+          ' _ "${REMOTE_PATH}" < /dev/null
+          RSYNC_OPTS=(
+            -azP --delete
+            --exclude='.git'
+            --exclude='node_modules'
+            --exclude='__pycache__'
+            --exclude='.next'
+            --exclude='media'
+            --exclude='backups'
+            --exclude='*.pyc'
+            --exclude='.env.production'
+            --exclude='deploy'
+            --exclude='infra'
+            --exclude='scripts'
+          )
+          rsync "${RSYNC_OPTS[@]}" -e "$RSYNC_SSH" ./ \
+            ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH || '/root/stream-music' }}/
+          ssh -p ${{ vars.SSH_PORT || 22 }} ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }} bash -c '
+            set -euo pipefail
+            root="$1"
+            for name in deploy infra scripts; do
+              path="${root}/${name}"
+              if [[ -L "$path" ]]; then
+                target="$(readlink "$path")"
+                [[ "$target" != /* ]] && target="${root}/${target}"
+                rm "$path"
+                if [[ -d "$target" && "$target" != "$path" ]]; then
+                  mv "$target" "$path"
+                else
+                  mkdir -p "$path"
+                fi
+              elif [[ -f "$path" ]]; then
+                rm -f "$path"
+                mkdir -p "$path"
+              else
+                mkdir -p "$path"
+              fi
+            done
+          ' _ "${REMOTE_PATH}" < /dev/null
+          for pair in deploy:platform/deploy infra:platform/infra scripts:platform/scripts; do
+            remote_name="${pair%%:*}"
+            local_dir="${pair##*:}"
+            rsync_args=("${RSYNC_OPTS[@]}")
+            if [[ "$remote_name" == deploy ]]; then
+              rsync_args+=(
+                --exclude='sync.env'
+                --exclude='.env.generated'
+                --exclude='.env.runtime.merged'
+                --exclude='nginx.generated.conf'
+              )
+            fi
+            rsync "${rsync_args[@]}" -e "$RSYNC_SSH" "./${local_dir}/" \
+              ${{ vars.DEPLOY_USER || 'root' }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH || '/root/stream-music' }}/"${remote_name}"/
+          done
 
       - name: Run deployment
         run: |

@@ -163,12 +163,26 @@ docker compose \
   ${USE_VPS_COMPOSE:+ -f "${ROOT}/docker-compose.prod.vps.yml"} \
   up -d --build --remove-orphans "$@"
 
+COMPOSE=(docker compose --env-file "$ENV_MERGED" -f "${ROOT}/docker-compose.prod.yml")
+if [[ "${USE_VPS_COMPOSE:-0}" == "1" ]]; then
+  COMPOSE+=(-f "${ROOT}/docker-compose.prod.vps.yml")
+fi
+
 echo "[deploy] Waiting for backend health…"
-docker compose \
-  --env-file "$ENV_MERGED" \
-  -f "${ROOT}/docker-compose.prod.yml" \
-  ${USE_VPS_COMPOSE:+ -f "${ROOT}/docker-compose.prod.vps.yml"} \
-  wait backend --timeout 180 2>/dev/null || true
+if ! "${COMPOSE[@]}" wait backend --timeout 240 2>/dev/null; then
+  echo "[deploy] WARN: backend did not become healthy within 240s" >&2
+  echo "[deploy] Backend logs (last 100 lines):" >&2
+  "${COMPOSE[@]}" logs backend --tail 100 >&2 || true
+  echo "[deploy] Health probe (inside container):" >&2
+  "${COMPOSE[@]}" exec -T backend python -c \
+    "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5); print(r.status, r.read().decode())" \
+    2>&1 >&2 || true
+  echo "[deploy] Common causes:" >&2
+  echo "[deploy]   • migrate error — see logs above" >&2
+  echo "[deploy]   • POSTGRES_PASSWORD changed but postgres volume still has the old password" >&2
+  echo "[deploy]     Fix: ALTER USER on postgres, or remove volume stream-music_postgres_data (data loss)" >&2
+  echo "[deploy]   • /api/health returns 503 when db or redis is down — check POSTGRES_* and REDIS_URL" >&2
+fi
 
 SMOKE="${ROOT}/deploy/smoke.sh"
 if [[ -x "$SMOKE" ]]; then

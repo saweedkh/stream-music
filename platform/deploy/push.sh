@@ -65,6 +65,7 @@ REMOTE_USER="${REMOTE_USER:?Set REMOTE_USER in deploy/sync.env}"
 REMOTE_PATH="${REMOTE_PATH:-}"
 SSH_PORT="${SSH_PORT:-22}"
 SSH_PASSWORD="${SSH_PASSWORD:-}"
+SSH_IDENTITY_FILE="${SSH_IDENTITY_FILE:-}"
 
 if ! command -v rsync >/dev/null 2>&1; then
   echo "[push] rsync is required" >&2
@@ -76,6 +77,9 @@ SSH_BASE_OPTS=(
   -o "ConnectTimeout=15"
   -p "$SSH_PORT"
 )
+if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+  SSH_BASE_OPTS+=(-i "$SSH_IDENTITY_FILE")
+fi
 
 USE_SSHPASS=0
 if [[ -n "$SSH_PASSWORD" ]]; then
@@ -168,20 +172,62 @@ RSYNC_EXCLUDES=(
   --exclude 'venv/'
   --exclude '.env'
   --exclude '.env.production'
-  --exclude 'deploy/sync.env'
-  --exclude 'deploy/.env.generated'
-  --exclude 'deploy/.env.runtime.merged'
-  --exclude 'deploy/nginx.generated.conf'
   --exclude 'media/'
   --exclude '.DS_Store'
   --exclude '.cursor/'
   --exclude 'infra/nginx/ssl/*.crt'
   --exclude 'infra/nginx/ssl/*.key'
+  # Root symlinks (deploy→platform/deploy, …) — exclude name entirely; synced below as dirs.
+  --exclude 'deploy'
+  --exclude 'infra'
+  --exclude 'scripts'
 )
+
+DEPLOY_RSYNC_EXCLUDES=(
+  --exclude 'sync.env'
+  --exclude '.env.generated'
+  --exclude '.env.runtime.merged'
+  --exclude 'nginx.generated.conf'
+)
+
+ensure_remote_dir() {
+  local name="$1"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return 0
+  fi
+  ssh_cmd "bash -s" "$REMOTE_PATH" "$name" <<'REMOTE'
+set -euo pipefail
+root="$1"
+name="$2"
+path="${root}/${name}"
+if [[ -L "$path" ]]; then
+  target="$(readlink "$path")"
+  if [[ "$target" != /* ]]; then
+    target="${root}/${target}"
+  fi
+  rm "$path"
+  if [[ -d "$target" && "$target" != "$path" ]]; then
+    mv "$target" "$path"
+  else
+    mkdir -p "$path"
+  fi
+elif [[ -f "$path" ]]; then
+  rm -f "$path"
+  mkdir -p "$path"
+else
+  mkdir -p "$path"
+fi
+REMOTE
+}
 
 echo "[push] Target: ${REMOTE}"
 echo "[push] Testing SSH…"
 ssh_cmd "test -d $(printf '%q' "$REMOTE_PATH") || mkdir -p $(printf '%q' "$REMOTE_PATH")"
+
+for remote_name in deploy infra scripts; do
+  echo "[push] Ensuring remote ${remote_name}/ is a directory…"
+  ensure_remote_dir "$remote_name"
+done
 
 RSYNC_OPTS=(
   -az
@@ -200,10 +246,35 @@ rsync "${RSYNC_OPTS[@]}" \
   "${ROOT}/" \
   "$REMOTE"
 
+for remote_name in deploy infra scripts; do
+  echo "[push] Ensuring remote ${remote_name}/ is a directory…"
+  ensure_remote_dir "$remote_name"
+done
+
+# Sync platform/* paths into server dirs (avoid replacing deploy/ with a symlink).
+for pair in deploy:platform/deploy infra:platform/infra scripts:platform/scripts; do
+  remote_name="${pair%%:*}"
+  local_dir="${pair##*:}"
+  echo "[push] Syncing ${local_dir}/ → ${remote_name}/"
+  rsync_args=("${RSYNC_OPTS[@]}")
+  if [[ "$remote_name" == deploy ]]; then
+    rsync_args+=("${DEPLOY_RSYNC_EXCLUDES[@]}")
+  fi
+  # shellcheck disable=SC2046
+  rsync "${rsync_args[@]}" \
+    -e "$(rsync_rsh)" \
+    "${ROOT}/${local_dir}/" \
+    "${REMOTE}${remote_name}/"
+done
+
 if [[ "$WITH_ENV" -eq 1 ]]; then
   echo "[push] Uploading .env.production…"
+  env_rsync_opts=(-az --human-readable)
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    env_rsync_opts+=(--dry-run)
+  fi
   # shellcheck disable=SC2046
-  rsync "${RSYNC_OPTS[@]}" \
+  rsync "${env_rsync_opts[@]}" \
     -e "$(rsync_rsh)" \
     "${ROOT}/.env.production" \
     "${REMOTE}.env.production"

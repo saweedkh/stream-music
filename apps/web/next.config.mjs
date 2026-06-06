@@ -1,10 +1,16 @@
 /** @type {import('next').NextConfig} */
 const devRemoteOrigin = process.env.DEV_REMOTE_ORIGIN?.replace(/\/$/, "") ?? "";
+const isDockerBuild = process.env.DOCKER_BUILD === "1";
 
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["vaul", "music-metadata-browser", "html5-qrcode"],
   output: "standalone",
+  eslint: {
+    // Lint in CI/dev; skip during Docker prod build to cut memory on small VPS.
+    ignoreDuringBuilds: isDockerBuild,
+  },
+  ...(isDockerBuild ? { experimental: { cpus: 1 } } : {}),
   async rewrites() {
     const rewrites = [{ source: "/favicon.ico", destination: "/icon.svg" }];
     const apiUpstream =

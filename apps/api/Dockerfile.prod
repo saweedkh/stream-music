@@ -5,9 +5,25 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Iran-accessible apt mirrors (bookworm main). Tried in order until ffmpeg installs.
+ARG DEBIAN_MIRROR=
+RUN set -eux; \
+  rm -f /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list; \
+  mirrors=""; \
+  if [ -n "${DEBIAN_MIRROR}" ]; then mirrors="${DEBIAN_MIRROR}"; fi; \
+  mirrors="${mirrors} http://repo.iut.ac.ir/debian http://mirror.shatel.ir/debian http://mirror.arvancloud.ir/debian"; \
+  for mirror in ${mirrors}; do \
+    echo "Trying apt mirror: ${mirror}"; \
+    printf 'deb %s bookworm main\n' "${mirror}" > /etc/apt/sources.list; \
+    rm -rf /var/lib/apt/lists/*; \
+    if apt-get update && apt-get install -y --no-install-recommends ffmpeg; then \
+      rm -rf /var/lib/apt/lists/*; \
+      echo "Installed ffmpeg via ${mirror}"; \
+      exit 0; \
+    fi; \
+  done; \
+  echo "All apt mirrors failed to install ffmpeg" >&2; \
+  exit 1
 
 COPY requirements.txt /app/requirements.txt
 # Use devneeds PyPI mirror (default in requirements.txt); override with build-arg on other networks.

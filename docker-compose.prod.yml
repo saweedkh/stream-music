@@ -30,6 +30,8 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile.prod
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-http://repo.iut.ac.ir/debian}
     restart: unless-stopped
     env_file:
       - deploy/.env.runtime.merged
@@ -58,14 +60,16 @@ services:
           "python -c \"import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); exit(0 if r.status==200 else 1)\"",
         ]
       interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 45s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
 
   celery-worker:
     build:
       context: ./apps/api
       dockerfile: Dockerfile.prod
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-http://repo.iut.ac.ir/debian}
     restart: unless-stopped
     env_file:
       - deploy/.env.runtime.merged
@@ -97,6 +101,8 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile.prod
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-http://repo.iut.ac.ir/debian}
     restart: unless-stopped
     env_file:
       - deploy/.env.runtime.merged
@@ -121,6 +127,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY:-BD-yFmmlVLYRgW8U60CnOFCIHQ1YlBw2G7t-obUl4TnG5wttznz5jpmEZT9lx_aA4To7AcniJ7JSLtPZdBZyfD0}
+        NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-2048}
     restart: unless-stopped
     environment:
       NODE_ENV: production
