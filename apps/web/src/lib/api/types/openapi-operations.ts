@@ -1,5 +1,13 @@
 /** Auto-generated operation keys (METHOD path) — do not edit by hand. */
 export const OPENAPI_OPERATIONS = {
+  "GET /admin/playlists": "GET /admin/playlists",
+  "DELETE /admin/playlists/{playlist_id}": "DELETE /admin/playlists/{playlist_id}",
+  "GET /admin/premium-codes": "GET /admin/premium-codes",
+  "POST /admin/premium-codes": "POST /admin/premium-codes",
+  "PATCH /admin/premium-codes/{code_id}": "PATCH /admin/premium-codes/{code_id}",
+  "GET /admin/track-imports": "GET /admin/track-imports",
+  "GET /admin/tracks": "GET /admin/tracks",
+  "DELETE /admin/tracks/{track_id}": "DELETE /admin/tracks/{track_id}",
   "POST /auth/login": "POST /auth/login",
   "GET /auth/me": "GET /auth/me",
   "POST /auth/register": "POST /auth/register",
@@ -18,6 +26,9 @@ export const OPENAPI_OPERATIONS = {
   "GET /health": "GET /health",
   "GET /metrics": "GET /metrics",
   "GET /time": "GET /time",
+  "POST /tracks/import-external": "POST /tracks/import-external",
+  "GET /tracks/import/{task_id}/status": "GET /tracks/import/{task_id}/status",
+  "POST /tracks/upload/from-url": "POST /tracks/upload/from-url",
   "POST /tracks/upload/init": "POST /tracks/upload/init",
   "PUT /tracks/upload/{upload_id}/chunk": "PUT /tracks/upload/{upload_id}/chunk",
   "POST /tracks/upload/{upload_id}/finalize": "POST /tracks/upload/{upload_id}/finalize",

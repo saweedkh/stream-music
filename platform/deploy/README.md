@@ -37,6 +37,12 @@ SMOKE_BASE_URL=http://127.0.0.1:8080 ./deploy/smoke.sh
 
 **Healthcheck:** در `docker-compose.prod.yml` برای `postgres`، `redis`، `backend` و `celery-worker` تعریف شده — `docker compose ps` باید `healthy` نشان دهد.
 
+**VPS (بدون mount زنده):** `USE_VPS_COMPOSE=1 ./deploy/up.sh` — کد API فقط داخل image.
+
+**YTDLP_PROXY:** برای import از YouTube/Spotify روی شبکهٔ فیلترشده در `.env.production` تنظیم کنید (جزئیات در `docs/production-deployment.md`).
+
+**مانیتورینگ:** `deploy/alert-health.sh` برای cron؛ `scripts/restore-backup.sh` برای بازیابی بکاپ.
+
 **کد بک‌اند:** `apps/api` روی `backend` و `celery-*` **mount** می‌شود (مثل `docker-compose.yml` dev). بعد از تغییر Python فقط ری‌استارت کنید:
 
 ```bash

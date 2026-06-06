@@ -16,6 +16,8 @@ _LIMITS: dict[str, tuple[int, int]] = {
     "/api/auth/login": (20, 60),
     "/api/auth/register": (10, 60),
     "/api/tracks/upload/init": (30, 60),
+    "/api/tracks/upload/from-url": (15, 3600),
+    "/api/tracks/import-external": (15, 3600),
 }
 
 _redis_client = None
@@ -49,6 +51,9 @@ def _get_redis():
 
 
 def _client_key(request) -> str:
+    user = getattr(request, "user", None)
+    if user is not None and getattr(user, "is_authenticated", False):
+        return f"user:{user.id}"
     xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if xff:
         return xff.split(",")[0].strip()

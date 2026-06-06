@@ -2,6 +2,7 @@
 
 import { AlertCircle, CheckCircle2, Copy, Loader2, Music2, RefreshCw, X } from "lucide-react";
 import type { UploadQueueItem } from "@/features/tracks/model/upload-types";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { formatFileSize } from "@/features/tracks/model/upload-types";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { Button } from "@/shared/ui/button";
@@ -15,13 +16,34 @@ function QueueStatusIcon({ status }: { status: string }) {
   return <Music2 className="h-4 w-4 text-muted-foreground" aria-hidden />;
 }
 
+function urlImportProgressLabel(item: UploadQueueItem, t: (key: MessageKey) => string): string {
+  if (item.kind !== "url") return t("upload.studio.fileUploading");
+  if (item.status === "queued") return t("upload.studio.statusQueued");
+  const pct = item.progress;
+  if (pct < 12) return t("upload.studio.urlImportQueued");
+  if (pct < 92) return t("upload.studio.urlImportDownloading");
+  return t("upload.studio.urlImportSaving");
+}
+
+function statusBadgeLabel(status: string, t: (key: MessageKey) => string): string | null {
+  if (status === "queued") return t("upload.studio.statusQueued");
+  if (status === "done" || status === "duplicate") return t("upload.studio.statusDone");
+  if (status === "failed") return t("upload.studio.statusFailed");
+  return null;
+}
+
 function ItemProgressBar({ item }: { item: UploadQueueItem }) {
   const { t } = useTranslations();
 
-  if (item.status !== "uploading") return null;
+  if (item.status !== "uploading" && item.status !== "queued") return null;
 
-  const label = item.kind === "url" ? t("upload.studio.urlFetching") : t("upload.studio.fileUploading");
-  const pct = Math.min(100, Math.max(0, Math.round(item.progress)));
+  const label =
+    item.status === "queued"
+      ? item.kind === "url"
+        ? t("upload.studio.statusQueued")
+        : t("upload.studio.fileUploading")
+      : urlImportProgressLabel(item, t);
+  const pct = item.status === "queued" ? 0 : Math.min(100, Math.max(0, Math.round(item.progress)));
 
   return (
     <div className="space-y-1">
@@ -88,7 +110,14 @@ export function UploadQueuePanel({
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      {statusBadgeLabel(item.status, t) ? (
+                        <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {statusBadgeLabel(item.status, t)}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="truncate text-[11px] text-muted-foreground">
                       {item.kind === "file" && item.file ? formatFileSize(item.file.size) : item.url}
                     </p>
@@ -107,7 +136,17 @@ export function UploadQueuePanel({
                   </div>
                 </div>
                 <ItemProgressBar item={item} />
-                {item.error ? <p className="text-[11px] text-rose-500">{item.error}</p> : null}
+                {item.error ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-rose-500">{item.error}</p>
+                    {item.kind === "url" &&
+                    (item.error.includes("download") ||
+                      item.error.includes("دانلود") ||
+                      item.error.includes("YTDLP")) ? (
+                      <p className="text-[11px] text-muted-foreground">{t("upload.studio.urlImportFailProxyHint")}</p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {item.status === "duplicate" ? (
                   <p className="text-[11px] text-amber-600">{t("upload.studio.duplicate")}</p>
                 ) : null}

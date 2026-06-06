@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Link2 } from "lucide-react";
+import { ImportUrlGuideBanner } from "@/features/tracks/components/import-url-guide-banner";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
 import { importTrackFromExternalUrl } from "@/lib/api/tracks";
@@ -9,7 +10,11 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 
-export function TrackImportExternalCard() {
+type TrackImportExternalCardProps = {
+  onImportComplete?: () => void;
+};
+
+export function TrackImportExternalCard({ onImportComplete }: TrackImportExternalCardProps) {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const [url, setUrl] = useState("");
@@ -22,6 +27,7 @@ export function TrackImportExternalCard() {
       await importTrackFromExternalUrl(url.trim());
       showToast(t("tracks.importSuccess"), "success");
       setUrl("");
+      onImportComplete?.();
     } catch (e) {
       const raw = e instanceof Error ? e.message : "import_failed";
       const { localizeMessage } = await import("@/lib/i18n/localize-message");
@@ -40,6 +46,7 @@ export function TrackImportExternalCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
+        <ImportUrlGuideBanner compact />
         <p className="text-xs text-muted-foreground">{t("tracks.importExternalHint")}</p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input

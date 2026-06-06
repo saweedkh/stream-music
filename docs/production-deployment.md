@@ -182,11 +182,70 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 | `media_data` | فایل‌های صوتی و مدیا |
 | (host) `/etc/letsencrypt` | گواهی TLS — mount به nginx |
 
-برای بکاپ منظم از Postgres می‌توانید دوره‌ای **`pg_dump`** از داخل کانتینر `postgres` بگیرید یا کل ولوم را snapshot کنید.
+برای بکاپ منظم از Postgres می‌توانید **`./scripts/backup.sh`** را اجرا کنید (خروجی در `backups/`). GitHub Actions workflow **`backup.yml`** هم روزانه بکاپ می‌گیرد.
+
+### بازیابی (restore)
+
+```bash
+chmod +x scripts/restore-backup.sh
+./scripts/restore-backup.sh backups/20260101-120000
+```
+
+اسکریپت Postgres و ولوم `media_data` را از همان پوشهٔ بکاپ بازمی‌گرداند. قبل از restore ترافیک را قطع کنید.
 
 ---
 
-## ۱۰. به‌روزرسانی نسخهٔ اپلیکیشن
+## ۱۰. import از لینک (YTDLP_PROXY)
+
+YouTube، SoundCloud و Spotify روی **سرور** با yt-dlp پردازش می‌شوند. اگر شبکهٔ سرور به این سایت‌ها دسترسی ندارد (مثلاً فیلتر)، در `.env.production` تنظیم کنید:
+
+```env
+YTDLP_PROXY=http://HOST:PORT
+```
+
+پروکسی باید از داخل کانتینرهای `backend` و `celery-worker` قابل دسترس باشد (مثلاً VPN روی host با `http://172.17.0.1:7890`).
+
+---
+
+## ۱۱. حالت VPS (بدون mount زندهٔ کد)
+
+برای سرور production واقعی (نه لپ‌تاپ LAN):
+
+```bash
+USE_VPS_COMPOSE=1 ./deploy/up.sh
+```
+
+این override (`docker-compose.prod.vps.yml`) mount `./apps/api` را حذف می‌کند — کد فقط داخل image است. بعد از تغییر Python: `./deploy/up.sh` (rebuild).
+
+---
+
+## ۱۲. مانیتورینگ و لاگ
+
+| ابزار | کار |
+|--------|-----|
+| `deploy/smoke.sh` | بعد از deploy — health + صفحهٔ اصلی |
+| `deploy/alert-health.sh` | برای cron — exit غیرصفر اگر API degraded |
+| `deploy/logrotate-stream-music.conf` | نمونه rotate لاگ Docker |
+
+مثال cron (هر ۵ دقیقه):
+
+```bash
+*/5 * * * * /root/stream-music/deploy/alert-health.sh || logger "stream-music health FAIL"
+```
+
+### Sentry (اختیاری)
+
+در `.env.production`:
+
+```env
+SENTRY_DSN=https://…
+SENTRY_ENVIRONMENT=production
+NEXT_PUBLIC_SENTRY_DSN=https://…
+```
+
+---
+
+## ۱۳. به‌روزرسانی نسخهٔ اپلیکیشن
 
 ```bash
 git pull
@@ -200,7 +259,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend pyt
 
 ---
 
-## ۱۱. عیب‌یابی
+## ۱۴. عیب‌یابی
 
 | مشکل | اقدام |
 |------|--------|
@@ -208,11 +267,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend pyt
 | خطای مربوط به `env.runtime.merged` | هرگز بدون اسکریپت Compose را با prod بالا نیاورید؛ اول `./deploy/up.sh`. |
 | `ERR_SSL` / گواهی نامعتبر | مسیر Certbot، `TLS_CERT_NAME`، و تطابق `SITE_DOMAIN` با SAN گواهی. |
 | CSRF / CORS | مطمئن شوید از همان آدرسی که در مرورگر باز کرده‌اید وارد می‌شوید؛ مقادیر `ALLOWED_HOSTS` و `CORS_EXTRA_ORIGINS` بعد از تغییر شبکه با اسکریپت بازتولید شوند. |
+| import از لینک `download_failed` | `YTDLP_PROXY` در `.env.production`؛ یا آپلود فایل از دستگاه |
 | وب‌سوکت قطع می‌شود | nginx مسیر `/ws/` را به backend پروکسی می‌کند؛ پشت CDN همهٔ ارائه‌دهندگان WS را پشتیبانی نمی‌کنند. |
 
 ---
 
-## ۱۲. چک‌لیست امنیت پروداکشن
+## ۱۵. چک‌لیست امنیت پروداکشن
 
 - `SECRET_KEY` و `POSTGRES_PASSWORD` منحصر به فرد و قوی.
 - `.env.production` و `deploy/.env.runtime.merged` هرگز commit نشوند.
@@ -221,7 +281,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend pyt
 
 ---
 
-## ۱۳. CDN و فایل‌های صوتی (اختیاری)
+## ۱۶. CDN و فایل‌های صوتی (اختیاری)
 
 برای ترافیک بالا:
 
@@ -233,7 +293,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend pyt
 
 ---
 
-## ۱۴. مرجع فایل‌ها
+## ۱۷. مرجع فایل‌ها
 
 - `docker-compose.prod.yml` — تعریف سرویس‌های پروداکشن.
 - `apps/api/Dockerfile.prod` — backend بدون mirror اجباری PyPI در Dockerfile توسعه.

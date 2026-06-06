@@ -10,7 +10,8 @@
 | `suggestions-badge.spec.ts` | Pending suggestions API |
 | `moderation.spec.ts` | Chat report + temp ban API |
 | `join-request.spec.ts` | Private channel join approve |
-| `resumable-upload.spec.ts` | Chunked upload init/status |
+| `resumable-upload.spec.ts` | Chunked upload init/chunk/finalize |
+| `track-import.spec.ts` | URL import 202 + poll + E2E mock import |
 | `playback-channel.spec.ts` | Admin/listener audio (project `chromium-playback`) |
 | `premium-redeem-ui.spec.ts` | Dashboard premium code redeem (needs `E2E_RATE_LIMIT_OFF`) |
 | `channel-statistics-ui.spec.ts` | Channel insights statistics panel |

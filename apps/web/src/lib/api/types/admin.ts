@@ -40,3 +40,55 @@ export type AdminChannelRow = {
   member_count: number;
   is_playing: boolean;
 };
+
+export type AdminTrackRow = {
+  id: number;
+  title: string;
+  artist: string;
+  owner_id: number;
+  owner_username: string | null;
+  visibility: string;
+  import_source: string;
+  source_url: string;
+  duration_seconds: number;
+  created_at: string | null;
+};
+
+export type AdminPlaylistRow = {
+  id: number;
+  name: string;
+  owner_id: number;
+  owner_username: string | null;
+  is_auto_generated: boolean;
+  channel_id: number | null;
+  track_count: number;
+  created_at: string | null;
+};
+
+export type AdminTrackImportRow = {
+  id: number;
+  title: string;
+  owner_id: number;
+  owner_username: string;
+  import_source: string;
+  source_url: string;
+  visibility: string;
+  created_at: string | null;
+};
+
+export type AdminPremiumCodeRow = {
+  id: number;
+  code: string;
+  max_uses: number;
+  use_count: number;
+  is_active: boolean;
+  expires_at: string | null;
+  note: string;
+};
+
+export type Paginated<T> = {
+  results: T[];
+  total: number;
+  offset: number;
+  limit: number;
+};

@@ -1,5 +1,12 @@
 /** Auto-generated from openapi.snapshot.json — do not edit by hand. */
 export const OPENAPI_PATHS = [
+  "/admin/playlists",
+  "/admin/playlists/{playlist_id}",
+  "/admin/premium-codes",
+  "/admin/premium-codes/{code_id}",
+  "/admin/track-imports",
+  "/admin/tracks",
+  "/admin/tracks/{track_id}",
   "/auth/login",
   "/auth/me",
   "/auth/register",
@@ -14,6 +21,9 @@ export const OPENAPI_PATHS = [
   "/health",
   "/metrics",
   "/time",
+  "/tracks/import-external",
+  "/tracks/import/{task_id}/status",
+  "/tracks/upload/from-url",
   "/tracks/upload/init",
   "/tracks/upload/{upload_id}/chunk",
   "/tracks/upload/{upload_id}/finalize",

@@ -37,6 +37,7 @@ urlpatterns = [
 ]
 
 if getattr(settings, "E2E_RATE_LIMIT_OFF", False):
-    from apps.core.e2e.e2e_helpers_api import E2EPremiumCodeView
+    from apps.core.e2e.e2e_helpers_api import E2EPremiumCodeView, E2ETrackImportMockView
 
     urlpatterns.append(path("e2e/premium-code", E2EPremiumCodeView.as_view()))
+    urlpatterns.append(path("e2e/track-import-mock", E2ETrackImportMockView.as_view()))

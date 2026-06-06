@@ -10,6 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { ImportUrlGuideBanner } from "@/features/tracks/components/import-url-guide-banner";
 import { TrackAccessPicker } from "@/features/tracks/components/track-access-picker";
 import { MobileUploadProgressDock } from "@/features/tracks/components/mobile-upload-progress-dock";
 import { UploadQueuePanel } from "@/features/tracks/components/upload-queue-panel";
@@ -172,6 +173,7 @@ function UploadStudioForm({
         </div>
       ) : (
         <div className="space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4">
+          <ImportUrlGuideBanner compact />
           <p className="text-xs text-muted-foreground">{t("upload.studio.urlHint")}</p>
           <div className="space-y-1.5">
             <Label htmlFor="upload-url">{t("upload.studio.urlLabel")}</Label>
@@ -298,8 +300,8 @@ export function TrackUploadStudio({ onUploadComplete }: TrackUploadStudioProps) 
         showToast(t("upload.studio.duplicate"), "info");
       } else if (item.kind === "url") {
         showToast(t("upload.studio.urlImportSuccess"), "success");
-        onUploadComplete?.();
       }
+      onUploadComplete?.();
     },
     onItemFailed: (_item, message) => {
       showToast(message, "error");

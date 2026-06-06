@@ -160,12 +160,14 @@ chmod +x "${ROOT}/deploy/nginx-prod-entrypoint.sh" "$RENDER_NGINX" 2>/dev/null |
 docker compose \
   --env-file "$ENV_MERGED" \
   -f "${ROOT}/docker-compose.prod.yml" \
+  ${USE_VPS_COMPOSE:+ -f "${ROOT}/docker-compose.prod.vps.yml"} \
   up -d --build --remove-orphans "$@"
 
 echo "[deploy] Waiting for backend health…"
 docker compose \
   --env-file "$ENV_MERGED" \
   -f "${ROOT}/docker-compose.prod.yml" \
+  ${USE_VPS_COMPOSE:+ -f "${ROOT}/docker-compose.prod.vps.yml"} \
   wait backend --timeout 180 2>/dev/null || true
 
 SMOKE="${ROOT}/deploy/smoke.sh"
@@ -180,6 +182,9 @@ fi
 
 echo ""
 echo "[deploy] API code: live-mounted from ${ROOT}/apps/api (restart backend/celery after edits)."
+if [[ "${USE_VPS_COMPOSE:-0}" == "1" ]]; then
+  echo "[deploy] VPS mode: API runs from image (no live mount). Rebuild after code changes."
+fi
 echo "[deploy] Running."
 if [[ -n "$SITE_DOMAIN" ]]; then
   echo "  HTTPS:  https://${SITE_DOMAIN}/  |  https://${SITE_DOMAIN}:8443/"

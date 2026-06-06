@@ -17,7 +17,6 @@ from apps.accounts.user_badges import (
     user_badge_flags,
 )
 from apps.channels.models import Channel, ChannelMembership
-from apps.core.health.health_api import HealthView
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import Playlist
 from apps.tracks.models import Track
@@ -325,3 +324,43 @@ class AdminHealthView(APIView):
         from apps.admin_panel.services.system_metrics import build_admin_system_payload
 
         return Response(build_admin_system_payload())
+
+
+class AdminTrackImportsView(APIView):
+    """Recent URL/streaming imports for admin audit."""
+
+    permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
+
+    def get(self, request):
+        search = (request.query_params.get("search") or "").strip()
+        qs = Track.objects.exclude(import_source="").select_related("owner").order_by("-created_at")
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(source_url__icontains=search)
+                | Q(owner__username__icontains=search)
+            )
+        try:
+            limit = max(1, min(int(request.query_params.get("limit", "50")), 200))
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = max(0, int(request.query_params.get("offset", "0")))
+        except (TypeError, ValueError):
+            offset = 0
+        total = qs.count()
+        results = []
+        for track in qs[offset : offset + limit]:
+            results.append(
+                {
+                    "id": track.id,
+                    "title": track.title,
+                    "owner_id": track.owner_id,
+                    "owner_username": track.owner.username,
+                    "import_source": track.import_source,
+                    "source_url": track.source_url,
+                    "visibility": track.visibility,
+                    "created_at": track.created_at.isoformat() if track.created_at else None,
+                }
+            )
+        return Response({"results": results, "total": total, "offset": offset, "limit": limit})
