@@ -13,6 +13,8 @@ __pycache__/
 venv/
 .venv/
 media/
+apps/api/celerybeat-schedule
+apps/api/celerybeat-schedule.db
 
 # Local database/media backups (do not commit)
 backups/

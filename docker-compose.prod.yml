@@ -20,6 +20,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   backend:
     build:
@@ -45,7 +50,17 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); exit(0 if r.status==200 else 1)\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
 
   celery-worker:
     build:
@@ -68,7 +83,15 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -t 5 2>&1 | grep -q OK"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
 
   celery-beat:
     build:
@@ -90,7 +113,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   frontend:
     build:
@@ -107,7 +130,8 @@ services:
       PORT: "3000"
       NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_WEBPUSH_VAPID_PUBLIC_KEY:-BD-yFmmlVLYRgW8U60CnOFCIHQ1YlBw2G7t-obUl4TnG5wttznz5jpmEZT9lx_aA4To7AcniJ7JSLtPZdBZyfD0}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
@@ -126,8 +150,10 @@ services:
       - ${TLS_CERT_HOST_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
       - media_data:/media:ro
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

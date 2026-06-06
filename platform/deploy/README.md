@@ -28,6 +28,15 @@ cp deploy/env.production.example .env.production
 ./deploy/up.sh
 ```
 
+بعد از `up.sh` اسکریپت **`deploy/smoke.sh`** به‌صورت خودکار `/api/health` و صفحهٔ اصلی را چک می‌کند. دستی:
+
+```bash
+chmod +x deploy/smoke.sh
+SMOKE_BASE_URL=http://127.0.0.1:8080 ./deploy/smoke.sh
+```
+
+**Healthcheck:** در `docker-compose.prod.yml` برای `postgres`، `redis`، `backend` و `celery-worker` تعریف شده — `docker compose ps` باید `healthy` نشان دهد.
+
 **کد بک‌اند:** `apps/api` روی `backend` و `celery-*` **mount** می‌شود (مثل `docker-compose.yml` dev). بعد از تغییر Python فقط ری‌استارت کنید:
 
 ```bash

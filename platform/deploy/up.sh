@@ -162,6 +162,22 @@ docker compose \
   -f "${ROOT}/docker-compose.prod.yml" \
   up -d --build --remove-orphans "$@"
 
+echo "[deploy] Waiting for backend health…"
+docker compose \
+  --env-file "$ENV_MERGED" \
+  -f "${ROOT}/docker-compose.prod.yml" \
+  wait backend --timeout 180 2>/dev/null || true
+
+SMOKE="${ROOT}/deploy/smoke.sh"
+if [[ -x "$SMOKE" ]]; then
+  echo "[deploy] Smoke checks…"
+  if SMOKE_BASE_URL="http://127.0.0.1:8080" "$SMOKE"; then
+    echo "[deploy] Smoke passed."
+  else
+    echo "[deploy] Smoke failed — stack may still be starting. Retry: SMOKE_BASE_URL=http://127.0.0.1:8080 ./deploy/smoke.sh" >&2
+  fi
+fi
+
 echo ""
 echo "[deploy] API code: live-mounted from ${ROOT}/apps/api (restart backend/celery after edits)."
 echo "[deploy] Running."
