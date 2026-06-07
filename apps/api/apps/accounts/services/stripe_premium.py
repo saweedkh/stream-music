@@ -25,8 +25,24 @@ def stripe_configured() -> bool:
     )
 
 
-def grant_premium_from_stripe(user_id: int, *, session_id: str | None = None) -> dict:
+def grant_premium_from_stripe(user_id: int, *, session_id: str | None = None, session: dict | None = None) -> dict:
     assign_badge_slug(user_id, SLUG_PREMIUM)
+    if session_id:
+        from apps.accounts.models import PremiumStripePurchase
+
+        amount = None
+        currency = ""
+        if session:
+            amount = session.get("amount_total")
+            currency = str(session.get("currency") or "")
+        PremiumStripePurchase.objects.get_or_create(
+            stripe_session_id=session_id,
+            defaults={
+                "user_id": user_id,
+                "amount_total": amount,
+                "currency": currency,
+            },
+        )
     return {"ok": True, "is_premium": True, "session_id": session_id}
 
 
@@ -75,6 +91,6 @@ def handle_stripe_webhook_payload(payload: bytes, sig_header: str | None) -> dic
         meta = session.get("metadata") or {}
         user_id = int(meta.get("user_id") or session.get("client_reference_id") or 0)
         if user_id:
-            grant_premium_from_stripe(user_id, session_id=session.get("id"))
+            grant_premium_from_stripe(user_id, session_id=session.get("id"), session=session)
             return {"handled": True, "user_id": user_id}
     return {"handled": False, "type": event.get("type")}

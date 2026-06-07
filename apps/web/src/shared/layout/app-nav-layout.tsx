@@ -14,7 +14,7 @@ import {
 import { getMe, type AuthUser } from "@/lib/api";
 import { registerWebPushOnDevice } from "@/lib/webpush-client";
 import { listenUserSessionRefresh } from "@/lib/user-session-events";
-import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";
+import { shellBody, shellContent, shellFrame, shellMain, navSidebarSheetWidth, navSidebarWidth } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 type AppNavLayoutProps = {
@@ -70,15 +70,15 @@ export function AppNavLayout({ activeTab, onSelectMainTab, children }: AppNavLay
 
   return (
     <div className={shellFrame}>
-      <div className="hidden h-full min-h-0 lg:flex lg:shrink-0">
-        <DashboardSidebar {...sidebarProps} className="h-full rounded-s-2xl" />
+      <div className={cn("hidden h-full min-h-0 shrink-0 lg:flex", navSidebarWidth)}>
+        <DashboardSidebar {...sidebarProps} className="h-full w-full rounded-s-2xl" />
       </div>
 
       <div className={shellMain}>
         <DashboardMobileHeader onMenuClick={() => setMobileNavOpen(true)} user={user} />
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent side={dir === "rtl" ? "right" : "left"} className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
+          <SheetContent side={dir === "rtl" ? "right" : "left"} className={cn(navSidebarSheetWidth, "gap-0 p-0")}>
             <SheetTitle className="sr-only">{t("dashboard.navTitle")}</SheetTitle>
             <DashboardSidebar {...sidebarProps} className="h-full w-full border-0 bg-transparent" />
           </SheetContent>

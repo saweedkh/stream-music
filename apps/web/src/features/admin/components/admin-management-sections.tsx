@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Activity, Loader2, Plus, Radio, Server, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, Eye, Loader2, Plus, Radio, Server, Trash2 } from "lucide-react";
+import { AdminDetailField, AdminDetailSheet, AdminDetailStatGrid } from "@/features/admin/components/admin-detail-sheet";
 import { AdminDataTable, AdminTableShell } from "@/features/admin/components/admin-table-shell";
 import { AdminStatCard } from "@/features/admin/components/admin-stat-card";
 import { useAdminPaginatedList } from "@/features/admin/hooks/use-admin-paginated-list";
 import {
   createAdminBadge,
   deleteAdminBadge,
+  getAdminChannel,
   getAdminHealth,
+  getAdminUser,
   listAdminBadges,
   listAdminChannels,
   listAdminUsers,
@@ -18,7 +21,7 @@ import {
   patchAdminUser,
   type AdminSystemHealth,
 } from "@/lib/api/admin";
-import type { AdminBadgeDefinition, AdminUserRow } from "@/lib/api/types/admin";
+import type { AdminBadgeDefinition, AdminChannelDetail, AdminUserDetail, AdminUserRow } from "@/lib/api/types/admin";
 import { manualBadgeSlugsForUser } from "@/lib/user-badges";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { Badge } from "@/shared/ui/badge";
@@ -41,6 +44,9 @@ export function AdminUsersSection() {
   const { showToast } = useToast();
   const [badgeDefs, setBadgeDefs] = useState<AdminBadgeDefinition[]>([]);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const [detailUser, setDetailUser] = useState<AdminUserDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetcher = useCallback(
     (opts: { search: string; limit: number; offset: number }) => listAdminUsers(opts),
@@ -56,6 +62,19 @@ export function AdminUsersSection() {
     () => badgeDefs.filter((b) => isManualBadgeSlug(b.slug) && b.is_active),
     [badgeDefs],
   );
+
+  async function openUserDetail(userId: number) {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    try {
+      setDetailUser(await getAdminUser(userId));
+    } catch {
+      showToast(t("admin.loadFailed"), "error");
+      setDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   async function toggleUserFlag(user: AdminUserRow, field: "is_active" | "is_staff" | "is_superuser") {
     setBusyUserId(user.id);
@@ -124,17 +143,23 @@ export function AdminUsersSection() {
             "—"
           ),
         meta: (
-          <span className="text-xs text-muted-foreground">
-            #{u.id}
-            {u.last_login ? ` · ${new Date(u.last_login).toLocaleDateString()}` : ""}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              #{u.id}
+              {u.last_login ? ` · ${new Date(u.last_login).toLocaleDateString()}` : ""}
+            </span>
+            <Button type="button" size="sm" variant="ghost" className="h-7 px-2" onClick={() => void openUserDetail(u.id)}>
+              <Eye className="h-4 w-4" />
+            </Button>
+          </div>
         ),
       })),
     [busyUserId, list.rows, manualBadgeDefs, t],
   );
 
   return (
-    <AdminTableShell
+    <>
+      <AdminTableShell
       title={t("admin.usersTitle")}
       description={t("admin.usersDescription", { total: String(list.total) })}
       searchPlaceholder={t("admin.searchUsers")}
@@ -161,6 +186,81 @@ export function AdminUsersSection() {
         rows={tableRows}
       />
     </AdminTableShell>
+
+      <AdminDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        title={detailUser ? `@${detailUser.username}` : t("admin.usersTitle")}
+        description={detailUser?.email || undefined}
+      >
+        {detailLoading || !detailUser ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <AdminDetailStatGrid
+              items={[
+                { label: t("admin.stat.channels"), value: detailUser.owned_channels },
+                { label: t("admin.stat.tracks"), value: detailUser.tracks_owned },
+                { label: t("admin.stat.playlists"), value: detailUser.playlists_owned },
+                { label: t("admin.stat.memberships"), value: detailUser.memberships },
+              ]}
+            />
+            <AdminDetailField label={t("admin.col.permissions")}>
+              <div className="flex flex-col gap-2">
+                {(["is_active", "is_staff", "is_superuser"] as const).map((field) => (
+                  <label key={field} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={detailUser[field]}
+                      disabled={busyUserId === detailUser.id}
+                      onCheckedChange={async () => {
+                        setBusyUserId(detailUser.id);
+                        try {
+                          const updated = await patchAdminUser(detailUser.id, { [field]: !detailUser[field] });
+                          setDetailUser((prev) => (prev ? { ...prev, ...updated } : prev));
+                          await list.reload();
+                          showToast(t("admin.userUpdated"), "success");
+                        } finally {
+                          setBusyUserId(null);
+                        }
+                      }}
+                    />
+                    {field === "is_active" ? t("admin.active") : field === "is_staff" ? t("admin.staff") : t("admin.superuser")}
+                  </label>
+                ))}
+              </div>
+            </AdminDetailField>
+            <AdminDetailField label={t("admin.premium")}>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={Boolean(detailUser.is_premium)}
+                  disabled={busyUserId === detailUser.id}
+                  onCheckedChange={async (checked) => {
+                    setBusyUserId(detailUser.id);
+                    try {
+                      await patchAdminUser(detailUser.id, { is_premium: checked });
+                      setDetailUser((prev) => (prev ? { ...prev, is_premium: checked } : prev));
+                      await list.reload();
+                      showToast(t("admin.userUpdated"), "success");
+                    } finally {
+                      setBusyUserId(null);
+                    }
+                  }}
+                />
+                {t("admin.premiumToggleHint")}
+              </label>
+            </AdminDetailField>
+            <AdminDetailField label={t("admin.lastLogin")}>
+              {detailUser.last_login ? new Date(detailUser.last_login).toLocaleString() : "—"}
+            </AdminDetailField>
+            <AdminDetailField label={t("admin.col.date")}>
+              {detailUser.date_joined ? new Date(detailUser.date_joined).toLocaleString() : "—"}
+            </AdminDetailField>
+          </>
+        )}
+      </AdminDetailSheet>
+    </>
   );
 }
 
@@ -168,11 +268,35 @@ export function AdminChannelsSection() {
   const { t } = useTranslations();
   const { showToast } = useToast();
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [detailChannel, setDetailChannel] = useState<AdminChannelDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editMemberLimit, setEditMemberLimit] = useState("50");
+
   const fetcher = useCallback(
     (opts: { search: string; limit: number; offset: number }) => listAdminChannels(opts),
     [],
   );
   const list = useAdminPaginatedList(fetcher);
+
+  async function openChannelDetail(channelId: number) {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    try {
+      const ch = await getAdminChannel(channelId);
+      setDetailChannel(ch);
+      setEditName(ch.name);
+      setEditDescription(ch.description);
+      setEditMemberLimit(String(ch.member_limit));
+    } catch {
+      showToast(t("admin.loadFailed"), "error");
+      setDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   const tableRows = useMemo(
     () =>
@@ -180,10 +304,34 @@ export function AdminChannelsSection() {
         name: (
           <div>
             <p className="font-medium">{ch.name}</p>
-            <p className="text-xs text-muted-foreground">#{ch.id} · {ch.privacy}</p>
+            <p className="text-xs text-muted-foreground">#{ch.id}</p>
           </div>
         ),
         owner: ch.owner_username ? `@${ch.owner_username}` : "—",
+        privacy: (
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            value={ch.privacy}
+            disabled={busyId === ch.id}
+            onChange={async (e) => {
+              setBusyId(ch.id);
+              try {
+                await patchAdminChannel(ch.id, { privacy: e.target.value });
+                await list.reload();
+                showToast(t("admin.channelUpdated"), "success");
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : t("admin.loadFailed"), "error");
+              } finally {
+                setBusyId(null);
+              }
+            }}
+            aria-label={t("admin.col.privacy")}
+          >
+            <option value="public">{t("channels.privacyPublic")}</option>
+            <option value="private">{t("channels.privacyPrivate")}</option>
+            <option value="unlisted">{t("channels.privacyUnlisted")}</option>
+          </select>
+        ),
         members: String(ch.member_count),
         status: (
           <div className="flex flex-wrap gap-1">
@@ -193,6 +341,9 @@ export function AdminChannelsSection() {
         ),
         actions: (
           <div className="flex gap-2">
+            <Button type="button" size="sm" variant="ghost" className="h-8 px-2" onClick={() => void openChannelDetail(ch.id)}>
+              <Eye className="h-4 w-4" />
+            </Button>
             <Switch checked={ch.is_active} disabled={busyId === ch.id} onCheckedChange={async () => {
               setBusyId(ch.id);
               try {
@@ -208,10 +359,11 @@ export function AdminChannelsSection() {
           </div>
         ),
       })),
-    [busyId, list.rows, t],
+    [busyId, list, list.rows, showToast, t],
   );
 
   return (
+    <>
     <AdminTableShell
       title={t("admin.channelsTitle")}
       description={t("admin.channelsDescription", { total: String(list.total) })}
@@ -232,6 +384,7 @@ export function AdminChannelsSection() {
         columns={[
           { key: "name", header: t("channels.name") },
           { key: "owner", header: t("admin.col.owner") },
+          { key: "privacy", header: t("admin.col.privacy") },
           { key: "members", header: t("admin.col.members") },
           { key: "status", header: t("admin.col.status") },
           { key: "actions", header: "" },
@@ -239,6 +392,107 @@ export function AdminChannelsSection() {
         rows={tableRows}
       />
     </AdminTableShell>
+
+      <AdminDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        title={detailChannel?.name ?? t("admin.channelsTitle")}
+        description={detailChannel ? `#${detailChannel.id} · @${detailChannel.owner_username ?? "—"}` : undefined}
+      >
+        {detailLoading || !detailChannel ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <AdminDetailStatGrid
+              items={[
+                { label: t("admin.col.members"), value: detailChannel.member_count },
+                { label: t("channels.memberLimit"), value: detailChannel.member_limit },
+              ]}
+            />
+            <AdminDetailField label={t("channels.name")}>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </AdminDetailField>
+            <AdminDetailField label={t("admin.channelDescription")}>
+              <textarea
+                className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+              />
+            </AdminDetailField>
+            <AdminDetailField label={t("channels.memberLimit")}>
+              <Input type="number" min={1} max={500} value={editMemberLimit} onChange={(e) => setEditMemberLimit(e.target.value)} />
+            </AdminDetailField>
+            <AdminDetailField label={t("admin.col.privacy")}>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={detailChannel.privacy}
+                disabled={busyId === detailChannel.id}
+                onChange={async (e) => {
+                  setBusyId(detailChannel.id);
+                  try {
+                    const updated = await patchAdminChannel(detailChannel.id, { privacy: e.target.value });
+                    setDetailChannel((prev) => (prev ? { ...prev, privacy: updated.privacy } : prev));
+                    await list.reload();
+                    showToast(t("admin.channelUpdated"), "success");
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+              >
+                <option value="public">{t("channels.privacyPublic")}</option>
+                <option value="private">{t("channels.privacyPrivate")}</option>
+                <option value="unlisted">{t("channels.privacyUnlisted")}</option>
+              </select>
+            </AdminDetailField>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={detailChannel.join_requires_approval}
+                disabled={busyId === detailChannel.id}
+                onCheckedChange={async (checked) => {
+                  setBusyId(detailChannel.id);
+                  try {
+                    await patchAdminChannel(detailChannel.id, { join_requires_approval: checked });
+                    setDetailChannel((prev) => (prev ? { ...prev, join_requires_approval: checked } : prev));
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+              />
+              {t("admin.joinRequiresApproval")}
+            </label>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                type="button"
+                disabled={busyId === detailChannel.id}
+                onClick={async () => {
+                  setBusyId(detailChannel.id);
+                  try {
+                    await patchAdminChannel(detailChannel.id, {
+                      name: editName.trim(),
+                      description: editDescription.trim(),
+                      member_limit: Number(editMemberLimit) || detailChannel.member_limit,
+                    });
+                    await list.reload();
+                    showToast(t("admin.channelUpdated"), "success");
+                  } catch (e) {
+                    showToast(e instanceof Error ? e.message : t("admin.loadFailed"), "error");
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+              >
+                {t("common.save")}
+              </Button>
+              <Button type="button" variant="secondary" asChild>
+                <Link href={`/channel/${detailChannel.id}`}>{t("channels.enterRoom")}</Link>
+              </Button>
+            </div>
+          </>
+        )}
+      </AdminDetailSheet>
+    </>
   );
 }
 

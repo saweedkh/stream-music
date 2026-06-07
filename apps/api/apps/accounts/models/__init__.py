@@ -12,6 +12,7 @@ from apps.accounts.models.user_badge_assignment import UserBadgeAssignment
 from apps.accounts.models.user_badge_definition import UserBadgeDefinition
 from apps.accounts.models.user_playlist_favorite import UserPlaylistFavorite
 from apps.accounts.models.premium_invite_code import PremiumCodeRedemption, PremiumInviteCode
+from apps.accounts.models.premium_stripe_purchase import PremiumStripePurchase
 from apps.accounts.models.user_track_favorite import UserTrackFavorite
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "UserBadgeDefinition",
     "PremiumCodeRedemption",
     "PremiumInviteCode",
+    "PremiumStripePurchase",
     "UserPlaylistFavorite",
     "UserTrackFavorite",
 ]

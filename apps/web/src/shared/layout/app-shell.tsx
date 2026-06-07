@@ -35,11 +35,19 @@ function isAuthPath(pathname: string | null) {
 }
 
 function isSelfShelledPath(pathname: string | null) {
-  return Boolean(pathname?.startsWith("/dashboard") || pathname?.startsWith("/channel/"));
+  return Boolean(
+    pathname?.startsWith("/dashboard") ||
+      pathname?.startsWith("/channel/") ||
+      pathname?.startsWith("/admin"),
+  );
 }
 
 function isDashboardPath(pathname: string | null) {
   return Boolean(pathname?.startsWith("/dashboard"));
+}
+
+function isAdminPath(pathname: string | null) {
+  return Boolean(pathname?.startsWith("/admin"));
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -48,6 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const inChannel = Boolean(pathname?.startsWith("/channel/"));
   const isDashboard = isDashboardPath(pathname);
+  const isAdmin = isAdminPath(pathname);
   const isAuthPage = isAuthPath(pathname);
   const isSelfShelled = isSelfShelledPath(pathname);
   const useGlobalNav = Boolean(me && !isAuthPage && !isSelfShelled);
@@ -103,6 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 (isSelfShelled || useGlobalNav) && desktopPageRoot,
                 inChannel && isSelfShelled && "px-2 py-2 sm:px-4 sm:py-4",
                 isDashboard && isSelfShelled && "px-2 py-2 sm:px-3 sm:py-3",
+                isAdmin && isSelfShelled && "px-2 py-2 sm:px-3 sm:py-3",
                 (isSelfShelled || useGlobalNav) && !inChannel && cn("max-w-[1500px] px-3 py-3 sm:px-4 sm:py-4", playerDockPad),
                 !isSelfShelled && !useGlobalNav && cn("min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-6", playerDockPad),
                 (isSelfShelled || useGlobalNav) && "max-w-[1500px]",

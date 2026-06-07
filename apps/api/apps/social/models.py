@@ -89,3 +89,18 @@ class ReferralCode(models.Model):
     code = models.CharField(max_length=24, unique=True)
     signup_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ReferralSignup(models.Model):
+    """Audit trail when a new user registers with a referral code."""
+
+    referral_code = models.ForeignKey(ReferralCode, on_delete=models.CASCADE, related_name="signups")
+    referred_user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="referral_signup",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["-created_at"])]

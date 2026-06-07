@@ -8,14 +8,18 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import COLOR_CHOICES, ICON_CHOICES, UserBadgeDefinition
+from apps.accounts.models import COLOR_CHOICES, ICON_CHOICES, UserBadgeAssignment, UserBadgeDefinition
 from apps.accounts.user_badges import (
+    MANUAL_EXCLUDED_SLUGS,
+    SLUG_PREMIUM,
     badges_for_users,
     is_platform_superuser,
     serialize_badge,
     set_user_manual_badges,
     user_badge_flags,
 )
+from apps.admin_panel.admin.admin_ops_api import ops_pending_counts
+from apps.admin_panel.admin.audit_helpers import log_admin_action
 from apps.channels.models import Channel, ChannelMembership
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import Playlist
@@ -41,6 +45,7 @@ class AdminOverviewView(APIView):
         tracks_total = Track.objects.count()
         playlists_total = Playlist.objects.count()
         memberships_active = ChannelMembership.objects.filter(is_active=True).count()
+        pending = ops_pending_counts()
         return Response(
             {
                 "users": {
@@ -57,6 +62,7 @@ class AdminOverviewView(APIView):
                 "tracks_total": tracks_total,
                 "playlists_total": playlists_total,
                 "memberships_active": memberships_active,
+                "pending": pending,
             }
         )
 
@@ -105,6 +111,35 @@ class AdminUsersView(APIView):
 class AdminUserDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
 
+    def get(self, request, user_id: int):
+        target = User.objects.filter(id=user_id).first()
+        if target is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        flags = user_badge_flags(target)
+        owned_channels = Channel.objects.filter(owner_id=target.id).count()
+        tracks_owned = Track.objects.filter(owner_id=target.id).count()
+        playlists_owned = Playlist.objects.filter(owner_id=target.id).count()
+        memberships = ChannelMembership.objects.filter(user_id=target.id, is_active=True).count()
+        return Response(
+            {
+                "id": target.id,
+                "username": target.username,
+                "email": target.email or "",
+                "first_name": target.first_name or "",
+                "last_name": target.last_name or "",
+                "is_active": target.is_active,
+                "is_staff": target.is_staff,
+                "is_superuser": target.is_superuser,
+                "date_joined": target.date_joined.isoformat() if target.date_joined else None,
+                "last_login": target.last_login.isoformat() if target.last_login else None,
+                "owned_channels": owned_channels,
+                "tracks_owned": tracks_owned,
+                "playlists_owned": playlists_owned,
+                "memberships": memberships,
+                **flags,
+            }
+        )
+
     def patch(self, request, user_id: int):
         target = User.objects.filter(id=user_id).first()
         if target is None:
@@ -140,6 +175,28 @@ class AdminUserDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             set_user_manual_badges(target.id, slugs, assigned_by_id=request.user.id)
+
+        if "is_premium" in request.data:
+            manual_slugs = list(
+                UserBadgeAssignment.objects.filter(user_id=target.id)
+                .exclude(badge__slug__in=MANUAL_EXCLUDED_SLUGS)
+                .values_list("badge__slug", flat=True)
+            )
+            want_premium = bool(request.data["is_premium"])
+            if want_premium and SLUG_PREMIUM not in manual_slugs:
+                manual_slugs.append(SLUG_PREMIUM)
+            elif not want_premium:
+                manual_slugs = [s for s in manual_slugs if s != SLUG_PREMIUM]
+            set_user_manual_badges(target.id, manual_slugs, assigned_by_id=request.user.id)
+
+        if update_fields or "badge_slugs" in request.data or "is_premium" in request.data:
+            log_admin_action(
+                request,
+                "user.update",
+                "user",
+                target.id,
+                {"fields": list(request.data.keys())},
+            )
 
         return Response(
             {
@@ -296,6 +353,33 @@ class AdminChannelsView(APIView):
 class AdminChannelDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
 
+    def get(self, request, channel_id: int):
+        channel = (
+            Channel.objects.select_related("owner")
+            .annotate(member_count=Count("memberships", filter=Q(memberships__is_active=True)))
+            .filter(id=channel_id)
+            .first()
+        )
+        if channel is None:
+            return Response({"detail": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        playing = PlaybackSession.objects.filter(channel_id=channel.id, is_playing=True).exists()
+        return Response(
+            {
+                "id": channel.id,
+                "name": channel.name,
+                "description": channel.description or "",
+                "privacy": channel.privacy,
+                "owner_id": channel.owner_id,
+                "owner_username": channel.owner.username if channel.owner_id else None,
+                "member_limit": channel.member_limit,
+                "join_requires_approval": channel.join_requires_approval,
+                "is_active": channel.is_active,
+                "member_count": channel.member_count,
+                "is_playing": playing,
+                "created_at": channel.created_at.isoformat() if channel.created_at else None,
+            }
+        )
+
     def patch(self, request, channel_id: int):
         channel = Channel.objects.filter(id=channel_id).first()
         if channel is None:
@@ -304,13 +388,40 @@ class AdminChannelDetailView(APIView):
         if "is_active" in request.data:
             channel.is_active = bool(request.data["is_active"])
             update_fields.append("is_active")
+        if "privacy" in request.data:
+            privacy = str(request.data["privacy"])
+            if privacy in Channel.Privacy.values:
+                channel.privacy = privacy
+                update_fields.append("privacy")
+        if "name" in request.data:
+            name = str(request.data["name"]).strip()
+            if name:
+                channel.name = name[:255]
+                update_fields.append("name")
+        if "description" in request.data:
+            channel.description = str(request.data["description"]).strip()
+            update_fields.append("description")
+        if "member_limit" in request.data:
+            try:
+                channel.member_limit = max(1, min(int(request.data["member_limit"]), 500))
+                update_fields.append("member_limit")
+            except (TypeError, ValueError):
+                pass
+        if "join_requires_approval" in request.data:
+            channel.join_requires_approval = bool(request.data["join_requires_approval"])
+            update_fields.append("join_requires_approval")
         if update_fields:
             channel.save(update_fields=update_fields)
+            log_admin_action(request, "channel.update", "channel", channel.id, {"fields": update_fields})
         playing = PlaybackSession.objects.filter(channel_id=channel.id, is_playing=True).exists()
         return Response(
             {
                 "id": channel.id,
                 "name": channel.name,
+                "description": channel.description or "",
+                "privacy": channel.privacy,
+                "member_limit": channel.member_limit,
+                "join_requires_approval": channel.join_requires_approval,
                 "is_active": channel.is_active,
                 "is_playing": playing,
             }

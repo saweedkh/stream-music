@@ -7,10 +7,17 @@ export async function loginUser(username: string, password: string) {
   return (await res.json()) as { user: AuthUser };
 }
 
-export async function registerUser(username: string, email: string, password: string) {
+export async function registerUser(
+  username: string,
+  email: string,
+  password: string,
+  referralCode?: string,
+) {
+  const body: Record<string, string> = { username, email, password };
+  if (referralCode?.trim()) body.referral_code = referralCode.trim();
   const res = await fetch(
     `${getApiBase()}/api/auth/register`,
-    await withAuthHeaders({ method: "POST", body: JSON.stringify({ username, email, password }) }),
+    await withAuthHeaders({ method: "POST", body: JSON.stringify(body) }),
   );
   if (!res.ok) throw new Error(await extractApiError(res, "Register failed"));
   return (await res.json()) as { user: AuthUser };

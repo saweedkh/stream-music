@@ -13,6 +13,8 @@ import {
   listAdminTrackImports,
   listAdminTracks,
   patchAdminPremiumCode,
+  patchAdminPlaylist,
+  patchAdminTrack,
 } from "@/lib/api/admin";
 import type { AdminPremiumCodeRow } from "@/lib/api/types/admin";
 import { useTranslations } from "@/shared/providers/locale-provider";
@@ -52,21 +54,82 @@ export function AdminTracksSection() {
     () =>
       list.rows.map((row) => ({
         title: (
-          <div className="min-w-0">
-            <p className="font-medium">{row.title}</p>
-            {row.artist ? <p className="text-xs text-muted-foreground">{row.artist}</p> : null}
+          <div className="min-w-0 space-y-1">
+            <input
+              className="h-8 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm font-medium"
+              defaultValue={row.title}
+              disabled={busyId === row.id}
+              onBlur={async (e) => {
+                const next = e.target.value.trim();
+                if (!next || next === row.title) return;
+                setBusyId(row.id);
+                try {
+                  await patchAdminTrack(row.id, { title: next });
+                  await list.reload();
+                  showToast(t("admin.trackUpdated"), "success");
+                } catch (err) {
+                  showToast(err instanceof Error ? err.message : t("admin.loadFailed"), "error");
+                } finally {
+                  setBusyId(null);
+                }
+              }}
+            />
+            <input
+              className="h-7 w-full min-w-[120px] rounded-md border border-input/70 bg-background px-2 text-xs text-muted-foreground"
+              defaultValue={row.artist}
+              placeholder={t("tracks.artist")}
+              disabled={busyId === row.id}
+              onBlur={async (e) => {
+                const next = e.target.value.trim();
+                if (next === row.artist) return;
+                setBusyId(row.id);
+                try {
+                  await patchAdminTrack(row.id, { artist: next });
+                  await list.reload();
+                  showToast(t("admin.trackUpdated"), "success");
+                } catch (err) {
+                  showToast(err instanceof Error ? err.message : t("admin.loadFailed"), "error");
+                } finally {
+                  setBusyId(null);
+                }
+              }}
+            />
           </div>
         ),
         owner: `@${row.owner_username ?? row.owner_id}`,
         source: row.import_source ? <Badge variant="secondary">{row.import_source}</Badge> : <span className="text-muted-foreground">—</span>,
-        visibility: <Badge variant="outline">{row.visibility}</Badge>,
+        visibility: (
+          <select
+            className="h-8 max-w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
+            value={row.visibility}
+            disabled={busyId === row.id}
+            onChange={async (e) => {
+              setBusyId(row.id);
+              try {
+                await patchAdminTrack(row.id, { visibility: e.target.value });
+                await list.reload();
+                showToast(t("admin.trackUpdated"), "success");
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : t("admin.loadFailed"), "error");
+              } finally {
+                setBusyId(null);
+              }
+            }}
+            aria-label={t("admin.col.visibility")}
+          >
+            <option value="private">{t("tracks.visPrivate")}</option>
+            <option value="shared_with_users">{t("tracks.visSharedUsers")}</option>
+            <option value="shared_with_channels">{t("tracks.visSharedChannels")}</option>
+            <option value="public_lan">{t("tracks.visPublicLan")}</option>
+          </select>
+        ),
         actions: (
           <Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={busyId === row.id} onClick={() => void removeTrack(row.id)}>
             {busyId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           </Button>
         ),
       })),
-    [busyId, list.rows, t],
+    [busyId, list.reload, list.rows, showToast, t],
   );
 
   return (
@@ -128,7 +191,27 @@ export function AdminPlaylistsSection() {
   const tableRows = useMemo(
     () =>
       list.rows.map((row) => ({
-        name: <span className="font-medium">{row.name}</span>,
+        name: (
+          <input
+            className="h-8 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm font-medium"
+            defaultValue={row.name}
+            disabled={busyId === row.id}
+            onBlur={async (e) => {
+              const next = e.target.value.trim();
+              if (!next || next === row.name) return;
+              setBusyId(row.id);
+              try {
+                await patchAdminPlaylist(row.id, { name: next });
+                await list.reload();
+                showToast(t("admin.playlistUpdated"), "success");
+              } catch (err) {
+                showToast(err instanceof Error ? err.message : t("admin.loadFailed"), "error");
+              } finally {
+                setBusyId(null);
+              }
+            }}
+          />
+        ),
         owner: `@${row.owner_username ?? row.owner_id}`,
         tracks: String(row.track_count),
         meta: row.is_auto_generated ? t("admin.playlistAuto") : row.channel_id ? `#${row.channel_id}` : "—",

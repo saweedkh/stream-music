@@ -2,16 +2,29 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+export type AdminListQuery = {
+  search: string;
+  limit: number;
+  offset: number;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
 type PaginatedResponse<T> = { results: T[]; total: number; offset: number; limit: number };
 
 export function useAdminPaginatedList<T>(
-  fetcher: (opts: { search: string; limit: number; offset: number }) => Promise<PaginatedResponse<T>>,
-  options?: { pageSize?: number; enabled?: boolean },
+  fetcher: (opts: AdminListQuery) => Promise<PaginatedResponse<T>>,
+  options?: { pageSize?: number; enabled?: boolean; withDateRange?: boolean },
 ) {
   const pageSize = options?.pageSize ?? 25;
   const enabled = options?.enabled ?? true;
+  const withDateRange = options?.withDateRange ?? false;
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [queryDateFrom, setQueryDateFrom] = useState("");
+  const [queryDateTo, setQueryDateTo] = useState("");
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
@@ -23,7 +36,13 @@ export function useAdminPaginatedList<T>(
     setLoading(true);
     setError(null);
     try {
-      const data = await fetcher({ search: query, limit: pageSize, offset });
+      const data = await fetcher({
+        search: query,
+        limit: pageSize,
+        offset,
+        dateFrom: withDateRange ? queryDateFrom || undefined : undefined,
+        dateTo: withDateRange ? queryDateTo || undefined : undefined,
+      });
       setRows(data.results);
       setTotal(data.total);
     } catch (e) {
@@ -31,7 +50,7 @@ export function useAdminPaginatedList<T>(
     } finally {
       setLoading(false);
     }
-  }, [enabled, fetcher, offset, pageSize, query]);
+  }, [enabled, fetcher, offset, pageSize, query, queryDateFrom, queryDateTo, withDateRange]);
 
   useEffect(() => {
     void reload();
@@ -40,6 +59,18 @@ export function useAdminPaginatedList<T>(
   function submitSearch() {
     setOffset(0);
     setQuery(search.trim());
+    if (withDateRange) {
+      setQueryDateFrom(dateFrom);
+      setQueryDateTo(dateTo);
+    }
+  }
+
+  function clearDateRange() {
+    setDateFrom("");
+    setDateTo("");
+    setQueryDateFrom("");
+    setQueryDateTo("");
+    setOffset(0);
   }
 
   const page = Math.floor(offset / pageSize) + 1;
@@ -48,7 +79,15 @@ export function useAdminPaginatedList<T>(
   return {
     search,
     setSearch,
+    appliedSearch: query,
     submitSearch,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    queryDateFrom,
+    queryDateTo,
+    clearDateRange,
     rows,
     total,
     loading,

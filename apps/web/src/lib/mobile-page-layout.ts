@@ -31,6 +31,10 @@ export const shellBody =
 export const shellContent =
   "relative mx-auto flex w-full flex-col max-lg:flex-none max-lg:overflow-visible lg:mx-0 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden";
 
+/** Dashboard + admin portal sidebars (desktop rail + mobile sheet cap). */
+export const navSidebarWidth = "w-[17rem]";
+export const navSidebarSheetWidth = "w-[min(100vw-1.5rem,17rem)]";
+
 /** Dashboard / hub panels: grow on desktop only — mobile uses page scroll. */
 export const hubPanelRoot = "flex w-full flex-col max-lg:flex-none lg:min-h-0 lg:flex-1";
 

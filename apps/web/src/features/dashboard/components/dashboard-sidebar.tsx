@@ -102,7 +102,7 @@ export function DashboardSidebar({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 w-[min(100%,19rem)] flex-col border-e border-border/60 bg-card/95 backdrop-blur-sm",
+        "flex h-full min-h-0 w-full shrink-0 flex-col border-e border-border/60 bg-card/95 backdrop-blur-sm",
         className,
       )}
     >

@@ -8,7 +8,7 @@ import { useTranslations } from "@/shared/providers/locale-provider";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { Button } from "@/shared/ui/button";
 import { getMe, type AuthUser } from "@/lib/api";
-import { shellBody, shellContent, shellFrame, shellMain } from "@/lib/mobile-page-layout";
+import { shellBody, shellContent, shellFrame, shellMain, navSidebarSheetWidth, navSidebarWidth } from "@/lib/mobile-page-layout";
 import { cn } from "@/lib/utils";
 
 type AdminLayoutProps = {
@@ -27,18 +27,17 @@ export function AdminLayout({ activeSection, children }: AdminLayoutProps) {
       .catch(() => setUser(null));
   }, []);
 
-  const sidebar = (
-    <AdminSidebar
-      activeSection={activeSection}
-      user={user}
-      onNavigate={() => setMobileNavOpen(false)}
-      className="h-full w-full border-0 bg-transparent"
-    />
-  );
+  const sidebarProps = {
+    activeSection,
+    user,
+    onNavigate: () => setMobileNavOpen(false),
+  };
 
   return (
-    <div className={cn(shellFrame, "min-h-dvh bg-background")}>
-      <div className="hidden h-full min-h-0 lg:flex lg:shrink-0">{sidebar}</div>
+    <div className={cn(shellFrame, "min-h-dvh bg-background lg:min-h-0")}>
+      <div className={cn("hidden h-full min-h-0 shrink-0 lg:flex", navSidebarWidth)}>
+        <AdminSidebar {...sidebarProps} className="h-full w-full rounded-s-2xl" />
+      </div>
 
       <div className={shellMain}>
         <header className="flex items-center gap-3 border-b border-border/60 px-4 py-3 lg:hidden">
@@ -52,9 +51,9 @@ export function AdminLayout({ activeSection, children }: AdminLayoutProps) {
         </header>
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent side={dir === "rtl" ? "right" : "left"} className="w-[min(100vw-1.5rem,19rem)] gap-0 p-0">
+          <SheetContent side={dir === "rtl" ? "right" : "left"} className={cn(navSidebarSheetWidth, "gap-0 p-0")}>
             <SheetTitle className="sr-only">{t("admin.panelTitle")}</SheetTitle>
-            {sidebar}
+            <AdminSidebar {...sidebarProps} className="h-full w-full border-0 bg-transparent" />
           </SheetContent>
         </Sheet>
 

@@ -5,6 +5,7 @@ export { AdminLayout } from "@/features/admin/components/admin-layout";
 export { AdminSidebar } from "@/features/admin/components/admin-sidebar";
 export {
   ADMIN_NAV,
+  ADMIN_NAV_SECTIONS,
   ADMIN_SECTIONS,
   adminSectionFromPath,
   adminSectionFromSearch,

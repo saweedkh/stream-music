@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { Eye, EyeOff, Gift, Loader2, Lock, Mail, User } from "lucide-react";
 import { useTranslations } from "@/shared/providers/locale-provider";
 import { useToast } from "@/shared/ui/toast-provider";
 import { AuthSocialButtons } from "@/features/auth/components/auth-social-buttons";
@@ -62,13 +62,20 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
-  const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | "confirmPassword" | null>(null);
+  const [focusedField, setFocusedField] = useState<"username" | "email" | "password" | "confirmPassword" | "referralCode" | null>(null);
+
+  useEffect(() => {
+    if (mode !== "register" || typeof window === "undefined") return;
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref?.trim()) setReferralCode(ref.trim().toUpperCase());
+  }, [mode]);
 
   async function onSubmit(e?: FormEvent) {
     e?.preventDefault();
@@ -96,7 +103,7 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
     }
     try {
       if (mode === "register") {
-        await registerUser(username, email, password);
+        await registerUser(username, email, password, referralCode || undefined);
       } else {
         await loginUser(username, password);
       }
@@ -168,6 +175,28 @@ export function AuthForm({ mode, onSwitchMode }: { mode: Mode; onSwitchMode?: (m
                 onBlur={() => setFocusedField(null)}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+              />
+            </AuthField>
+          </motion.div>
+        )}
+
+        {mode === "register" && (
+          <motion.div {...staggerItem}>
+            <AuthField
+              id="auth-referral"
+              label={t("auth.referralOptional")}
+              icon={<Gift className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />}
+              focused={focusedField === "referralCode"}
+            >
+              <input
+                id="auth-referral"
+                className="h-11 flex-1 border-0 bg-transparent pe-3 ps-0 text-sm uppercase text-slate-900 outline-none placeholder:normal-case placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                placeholder={t("auth.referralPlaceholder")}
+                value={referralCode}
+                onFocus={() => setFocusedField("referralCode")}
+                onBlur={() => setFocusedField(null)}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                autoComplete="off"
               />
             </AuthField>
           </motion.div>
