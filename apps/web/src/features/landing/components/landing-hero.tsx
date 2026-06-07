@@ -45,7 +45,7 @@ export function LandingHero() {
             className="mb-5 max-w-2xl font-display text-[clamp(2.5rem,6vw,4.25rem)] font-bold leading-[1.06] tracking-tighter text-foreground"
           >
             {t("landing.headline1")}{" "}
-            <span className="text-gradient-brand">
+            <span className="text-gradient-brand py-2">
               {t("landing.headline2")}
             </span>
           </motion.h1>
@@ -122,23 +122,6 @@ export function LandingHero() {
         className="mt-16"
       >
         <AuthStageVisual />
-      </motion.div>
-
-      {/* Scroll hint */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.4, duration: 0.8 }}
-        className="mt-10 flex flex-col items-center gap-1.5"
-      >
-        <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50">
-          {t("landing.scrollHint")}
-        </span>
-        <motion.div
-          animate={{ y: [0, 5, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          className="h-5 w-px rounded-full bg-gradient-to-b from-muted-foreground/40 to-transparent"
-        />
       </motion.div>
     </section>
   );

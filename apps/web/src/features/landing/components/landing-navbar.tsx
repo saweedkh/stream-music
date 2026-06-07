@@ -33,7 +33,7 @@ export function LandingNavbar() {
           : "border-b border-transparent bg-transparent",
       )}
     >
-      <div className="relative mx-auto flex min-h-[64px] max-w-6xl items-center justify-between overflow-visible px-5 py-2 sm:min-h-[68px]">
+      <div className="relative mx-auto flex min-h-[64px] max-w-6xl items-center justify-between overflow-visible px-5 py-4 sm:min-h-[68px]">
         {/* Start: theme & language */}
         <div className="z-10 flex items-center gap-0.5">
           <LanguageToggle
