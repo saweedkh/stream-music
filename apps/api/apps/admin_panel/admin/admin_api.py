@@ -18,17 +18,13 @@ from apps.accounts.user_badges import (
     set_user_manual_badges,
     user_badge_flags,
 )
-from apps.admin_panel.admin.admin_ops_api import ops_pending_counts
+from apps.admin_panel.admin.permissions import SuperuserRequired
+from apps.admin_panel.selectors.platform_ops import ops_pending_counts
 from apps.admin_panel.admin.audit_helpers import log_admin_action
 from apps.channels.models import Channel, ChannelMembership
 from apps.playback.models import PlaybackSession
 from apps.playlists.models import Playlist
 from apps.tracks.models import Track
-
-
-class SuperuserRequired(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return is_platform_superuser(request.user)
 
 
 class AdminOverviewView(APIView):

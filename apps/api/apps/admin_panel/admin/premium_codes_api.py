@@ -10,14 +10,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models.premium_invite_code import PremiumInviteCode
-from apps.admin_panel.admin.admin_api import SuperuserRequired
+from apps.admin_panel.admin.admin_content_api import pagination_params
+from apps.admin_panel.admin.permissions import SuperuserRequired
 
 
 class AdminPremiumCodesView(APIView):
     permission_classes = [permissions.IsAuthenticated, SuperuserRequired]
 
     def get(self, request):
-        rows = PremiumInviteCode.objects.order_by("-created_at")[:100]
+        search = (request.query_params.get("search") or "").strip()
+        offset, limit = pagination_params(request)
+        qs = PremiumInviteCode.objects.order_by("-created_at")
+        if search:
+            qs = qs.filter(code__icontains=search)
+        total = qs.count()
+        rows = qs[offset : offset + limit]
         return Response(
             {
                 "results": [
@@ -31,7 +38,10 @@ class AdminPremiumCodesView(APIView):
                         "note": r.note,
                     }
                     for r in rows
-                ]
+                ],
+                "total": total,
+                "offset": offset,
+                "limit": limit,
             }
         )
 

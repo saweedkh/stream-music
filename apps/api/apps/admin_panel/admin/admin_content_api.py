@@ -7,7 +7,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.admin_panel.admin.admin_api import SuperuserRequired
+from apps.admin_panel.admin.permissions import SuperuserRequired
 from apps.admin_panel.admin.audit_helpers import log_admin_action
 from apps.playlists.models import Playlist
 from apps.tracks.models import Track

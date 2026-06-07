@@ -8,12 +8,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import PremiumCodeRedemption
-from apps.admin_panel.admin.admin_api import SuperuserRequired
+from apps.admin_panel.admin.permissions import SuperuserRequired
 from apps.admin_panel.admin.audit_helpers import log_admin_action
 from apps.admin_panel.admin.admin_content_api import _paginate
 from apps.channels.models import Channel, ChannelChatReport, ChannelJoinRequest, ChannelPlaylistSuggestion
 from apps.playback.models import PlaybackSession
-from apps.support.models import SupportTicket
 
 
 class AdminModerationReportsView(APIView):
@@ -201,34 +200,3 @@ class AdminSuggestionsView(APIView):
                 }
             )
         return Response({"results": results, "total": total, "offset": offset, "limit": limit})
-
-
-def support_ticket_stats() -> dict:
-    open_statuses = [
-        SupportTicket.Status.OPEN,
-        SupportTicket.Status.IN_PROGRESS,
-        SupportTicket.Status.WAITING_STAFF,
-        SupportTicket.Status.WAITING_USER,
-    ]
-    return {
-        "open": SupportTicket.objects.filter(status__in=open_statuses).count(),
-        "waiting_staff": SupportTicket.objects.filter(status=SupportTicket.Status.WAITING_STAFF).count(),
-        "urgent": SupportTicket.objects.filter(
-            priority=SupportTicket.Priority.URGENT,
-            status__in=open_statuses,
-        ).count(),
-    }
-
-
-def ops_pending_counts() -> dict:
-    return {
-        "chat_reports_open": ChannelChatReport.objects.filter(status=ChannelChatReport.Status.OPEN).count(),
-        "join_requests_pending": ChannelJoinRequest.objects.filter(
-            status=ChannelJoinRequest.Status.PENDING
-        ).count(),
-        "suggestions_pending": ChannelPlaylistSuggestion.objects.filter(
-            status=ChannelPlaylistSuggestion.Status.PENDING
-        ).count(),
-        "channels_playing": PlaybackSession.objects.filter(is_playing=True).count(),
-        "support": support_ticket_stats(),
-    }

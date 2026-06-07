@@ -11,7 +11,7 @@ from django.utils import timezone
 from apps.accounts.models import PremiumCodeRedemption, PremiumInviteCode, PremiumStripePurchase, SLUG_PREMIUM
 from apps.accounts.models.user_badge_assignment import UserBadgeAssignment
 from apps.accounts.services.stripe_premium import stripe_configured
-from apps.admin_panel.selectors.date_range import filter_created_at
+from apps.admin_panel.selectors.date_range import date_range_bounds, filter_created_at
 from apps.social.models import ReferralSignup
 
 
@@ -23,13 +23,22 @@ def _referral_signup_qs(*, date_from: str = "", date_to: str = ""):
     return filter_created_at(ReferralSignup.objects.all(), date_from=date_from, date_to=date_to)
 
 
+def _redemption_qs(*, date_from: str = "", date_to: str = ""):
+    start, end = date_range_bounds(date_from, date_to)
+    qs = PremiumCodeRedemption.objects.all()
+    if start is not None:
+        qs = qs.filter(redeemed_at__gte=start)
+    if end is not None:
+        qs = qs.filter(redeemed_at__lte=end)
+    return qs
+
+
 def build_billing_overview(*, date_from: str = "", date_to: str = "") -> dict:
     premium_users = UserBadgeAssignment.objects.filter(badge__slug=SLUG_PREMIUM, badge__is_active=True).count()
     stripe_qs = _stripe_qs(date_from=date_from, date_to=date_to)
     stripe_purchases = stripe_qs.count()
     stripe_revenue = stripe_qs.aggregate(total=Sum("amount_total"))["total"] or 0
-    code_qs = filter_created_at(PremiumCodeRedemption.objects.all(), date_from=date_from, date_to=date_to)
-    code_redemptions = code_qs.count()
+    code_redemptions = _redemption_qs(date_from=date_from, date_to=date_to).count()
     active_codes = PremiumInviteCode.objects.filter(is_active=True).count()
     referral_signups = _referral_signup_qs(date_from=date_from, date_to=date_to).count()
     return {
