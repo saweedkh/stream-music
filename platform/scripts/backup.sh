@@ -31,13 +31,19 @@ else
   echo "[backup] Postgres container not running — skip DB dump"
 fi
 
-MEDIA_VOL="stream-music_media_data"
-if docker volume inspect "$MEDIA_VOL" >/dev/null 2>&1; then
-  docker run --rm -v "${MEDIA_VOL}:/media:ro" -v "${DEST}:/backup" alpine \
-    tar czf /backup/media.tar.gz -C /media .
-  echo "[backup] Media archive done"
+MEDIA_DIR="${MEDIA_HOST_DIR:-${ROOT}/media}"
+if [[ -d "$MEDIA_DIR" ]]; then
+  tar czf "${DEST}/media.tar.gz" -C "$(dirname "$MEDIA_DIR")" "$(basename "$MEDIA_DIR")"
+  echo "[backup] Media archive done (${MEDIA_DIR})"
 else
-  [[ -d "${ROOT}/media" ]] && tar czf "${DEST}/media.tar.gz" -C "${ROOT}" media || true
+  MEDIA_VOL="stream-music_media_data"
+  if docker volume inspect "$MEDIA_VOL" >/dev/null 2>&1; then
+    docker run --rm -v "${MEDIA_VOL}:/media:ro" -v "${DEST}:/backup" alpine \
+      tar czf /backup/media.tar.gz -C /media .
+    echo "[backup] Media archive done (legacy volume ${MEDIA_VOL})"
+  else
+    echo "[backup] No media dir or volume — skip media"
+  fi
 fi
 
 echo "[backup] Complete: $DEST"

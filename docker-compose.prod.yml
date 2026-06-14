@@ -44,7 +44,7 @@ services:
     volumes:
       # Live API source (same as dev compose) — pip/ffmpeg stay in the image; Python code from host.
       - ./apps/api:/app
-      - media_data:/media
+      - ${MEDIA_HOST_DIR:-./media}:/media
     command: >
       sh -c "python manage.py migrate --noinput &&
              daphne -b 0.0.0.0 -p 8000 config.asgi:application"
@@ -81,7 +81,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings
     volumes:
       - ./apps/api:/app
-      - media_data:/media
+      - ${MEDIA_HOST_DIR:-./media}:/media
     command: celery -A config worker -l info --concurrency=2
     depends_on:
       postgres:
@@ -155,7 +155,7 @@ services:
       - ./deploy/nginx-prod-entrypoint.sh:/nginx-prod-entrypoint.sh:ro
       - ./deploy/nginx.generated.conf:/etc/nginx/conf.d/00-stream-music.conf:ro
       - ${TLS_CERT_HOST_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
-      - media_data:/media:ro
+      - ${MEDIA_HOST_DIR:-./media}:/media:ro
     depends_on:
       frontend:
         condition: service_started
@@ -164,4 +164,3 @@ services:
 
 volumes:
   postgres_data:
-  media_data:

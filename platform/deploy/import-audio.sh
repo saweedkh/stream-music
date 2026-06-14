@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Import tracks from a host folder into the prod stack's MEDIA_ROOT (/media volume)
+# Import tracks from a host folder into the prod stack's MEDIA_ROOT (./media on host → /media in container)
 # and Postgres used by docker-compose.prod.yml.
 #
 # Usage:

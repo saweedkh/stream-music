@@ -2,7 +2,7 @@
 # Restore Postgres + media from a backup folder created by backup.sh.
 # Usage: ./scripts/restore-backup.sh /path/to/backups/20260101-120000
 #
-# WARNING: overwrites current DB and media volume. Stop traffic first.
+# WARNING: overwrites current DB and media on host. Stop traffic first.
 
 set -euo pipefail
 
@@ -47,14 +47,21 @@ else
   echo "[restore] No postgres.sql.gz — skip DB" >&2
 fi
 
-MEDIA_VOL="stream-music_media_data"
-if [[ -f "${SRC}/media.tar.gz" ]] && docker volume inspect "$MEDIA_VOL" >/dev/null 2>&1; then
-  echo "[restore] Restoring media volume…"
-  docker run --rm -v "${MEDIA_VOL}:/media" -v "${SRC}:/backup:ro" alpine \
-    sh -c "rm -rf /media/* /media/.[!.]* 2>/dev/null || true; tar xzf /backup/media.tar.gz -C /media"
+MEDIA_DIR="${MEDIA_HOST_DIR:-${ROOT}/media}"
+if [[ -f "${SRC}/media.tar.gz" ]]; then
+  echo "[restore] Restoring media to ${MEDIA_DIR}…"
+  mkdir -p "$(dirname "$MEDIA_DIR")"
+  if tar tzf "${SRC}/media.tar.gz" 2>/dev/null | head -1 | grep -q '^media/'; then
+    rm -rf "${MEDIA_DIR:?}" 2>/dev/null || true
+    tar xzf "${SRC}/media.tar.gz" -C "$(dirname "$MEDIA_DIR")"
+  else
+    mkdir -p "$MEDIA_DIR"
+    rm -rf "${MEDIA_DIR:?}"/* "${MEDIA_DIR}"/.[!.]* 2>/dev/null || true
+    tar xzf "${SRC}/media.tar.gz" -C "$MEDIA_DIR"
+  fi
   echo "[restore] Media restored."
 else
-  echo "[restore] No media.tar.gz or volume — skip media" >&2
+  echo "[restore] No media.tar.gz — skip media" >&2
 fi
 
 echo "[restore] Done. Restart stack: ./deploy/up.sh"

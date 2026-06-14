@@ -12,7 +12,7 @@
 |--------|-----|
 | **postgres** | پایگاه داده — فقط روی شبکه داخلی Docker |
 | **redis** | Channels layer و کش |
-| **backend** | API، WebSocket، فایل مدیا روی ولوم `media_data` |
+| **backend** | API، WebSocket؛ فایل مدیا روی پوشهٔ host (پیش‌فرض `./media` → `/media` در کانتینر) |
 | **frontend** | Next.js با خروجی `standalone` — پورت ۳۰۰۰ فقط داخلی |
 | **nginx** | پورت‌های **۸۰**، **۴۴۳**، **۸۴۴۳**، **۸۰۸۰**؛ TLS از `/etc/letsencrypt`؛ مسیر `/api`، `/ws`، `/audio`، و بقیه |
 
@@ -101,7 +101,8 @@ TLS_CERT_NAME=saweedkh.ir
 | `SECRET_KEY` | کلید Django؛ هرگز در Git قرار ندهید. |
 | `POSTGRES_*` | اتصال به سرویس `postgres` در Compose؛ `POSTGRES_HOST=postgres` در compose برای backend ست شده است. |
 | `REDIS_URL` | پیش‌فرض `redis://redis:6379/0`. |
-| `MEDIA_ROOT` | درون کانتینر معمولاً `/media` و با ولوم `media_data` یکسان است. |
+| `MEDIA_ROOT` | درون کانتینر همیشه `/media` است. |
+| `MEDIA_HOST_DIR` | مسیر روی host که به `/media` mount می‌شود (پیش‌فرض `./media`). |
 | `CORS_EXTRA_ORIGINS` | در صورت نیاز به originهای اضافی؛ اسکریپت خودش بر اساس IP و دامنه مقدار می‌دهد. |
 | `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | با HTTPS روی `1` بمانند مگر TLS را جای دیگری خاتمه دهید. |
 | `SITE_DOMAIN` | hostname مرورگر (باید با SAN گواهی هم‌خوان باشد). |
@@ -168,7 +169,7 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 
 ### ورود موزیک از دیسک سرور
 
-مثل محیط توسعه، داخل کانتینر backend؛ مسیر مدیا روی ولوم **`media_data`** persist می‌شود. راهنمای CLI: [`docs/architecture.md`](architecture.md#import-ترک-از-دیسک).
+مثل محیط توسعه، فایل‌ها روی **دیسک سرور** در `MEDIA_HOST_DIR` (پیش‌فرض `./media`) ذخیره می‌شوند و داخل کانتینر در `/media` دیده می‌شوند. راهنمای CLI: [`docs/architecture.md`](architecture.md#import-ترک-از-دیسک).
 
 ---
 
@@ -179,7 +180,7 @@ docker compose --env-file deploy/.env.runtime.merged -f docker-compose.prod.yml 
 | ولوم | محتوا |
 |------|--------|
 | `postgres_data` | دیتابیس |
-| `media_data` | فایل‌های صوتی و مدیا |
+| `./media` (یا `MEDIA_HOST_DIR`) | فایل‌های صوتی و مدیا روی host |
 | (host) `/etc/letsencrypt` | گواهی TLS — mount به nginx |
 
 برای بکاپ منظم از Postgres می‌توانید **`./scripts/backup.sh`** را اجرا کنید (خروجی در `backups/`). GitHub Actions workflow **`backup.yml`** هم روزانه بکاپ می‌گیرد.
@@ -191,7 +192,20 @@ chmod +x scripts/restore-backup.sh
 ./scripts/restore-backup.sh backups/20260101-120000
 ```
 
-اسکریپت Postgres و ولوم `media_data` را از همان پوشهٔ بکاپ بازمی‌گرداند. قبل از restore ترافیک را قطع کنید.
+اسکریپت Postgres و پوشهٔ مدia را از همان پوشهٔ بکاپ بازمی‌گرداند. قبل از restore ترافیک را قطع کنید.
+
+### مهاجرت از ولوم Docker قدیمی (`media_data`)
+
+اگر قبلاً از named volume استفاده می‌کردید، یک‌بار داده را به `./media` منتقل کنید:
+
+```bash
+mkdir -p media
+docker run --rm \
+  -v stream-music_media_data:/from:ro \
+  -v "$(pwd)/media:/to" \
+  alpine sh -c "cp -a /from/. /to/"
+./deploy/up.sh
+```
 
 ---
 

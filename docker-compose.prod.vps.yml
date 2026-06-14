@@ -1,16 +1,17 @@
 # VPS override: run API from the built image (no live host mount).
 # Usage: USE_VPS_COMPOSE=1 ./deploy/up.sh
 #
-# Keeps media volume; Python code updates require rebuild + up --build.
+# Media stays on the host bind mount (see MEDIA_HOST_DIR in .env.production);
+# Python code updates require rebuild + up --build.
 
 services:
   backend:
     volumes:
-      - media_data:/media
+      - ${MEDIA_HOST_DIR:-./media}:/media
 
   celery-worker:
     volumes:
-      - media_data:/media
+      - ${MEDIA_HOST_DIR:-./media}:/media
 
   celery-beat:
     volumes: []
