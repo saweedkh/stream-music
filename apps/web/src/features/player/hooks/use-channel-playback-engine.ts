@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChannelPlaybackEventPayload } from "@/features/player/model/playback-payload";
 import type { ChannelExperience } from "@/features/experience";
 import { mergePlaybackPayload, shouldApplyEventSeq } from "@/features/player/model/playback-payload";
+import {
+  CHANNEL_PLAYBACK_PRIME_EVENT,
+  PLAYBACK_PRIME_ACTIONS,
+} from "@/features/player/model/playback-prime";
 import { resumeSharedAudioContext } from "@/features/player/components/audio-wave-visualizer";
 import {
   createChannelAudio,
@@ -237,6 +241,74 @@ export function useChannelPlaybackEngine({
     void resumeSharedAudioContext();
   }, []);
 
+  const primeLocalPlaybackOnControl = useCallback(
+    (action: string, payload?: Record<string, unknown>) => {
+      const normalized = action.toLowerCase();
+      if (!PLAYBACK_PRIME_ACTIONS.has(normalized)) return;
+
+      void resumeSharedAudioContext();
+      const audio = audioRef.current;
+
+      if (normalized === "next" || normalized === "prev" || normalized === "play_playlist" || normalized === "shuffle_play") {
+        if (normalized === "play_playlist" || normalized === "shuffle_play") {
+          isPlayingRef.current = true;
+          syncRef.current = { ...syncRef.current, isPlaying: true };
+          setIsPlaying(true);
+          setIsBuffering(true);
+        }
+        if (audio?.src) void playChannelAudio(audio);
+        return;
+      }
+
+      if (normalized === "play") {
+        isPlayingRef.current = true;
+        syncRef.current = { ...syncRef.current, isPlaying: true };
+        setIsPlaying(true);
+        if (typeof payload?.position === "number") {
+          const pos = Math.max(0, payload.position);
+          setSyncPausedAt(pos);
+          syncRef.current = { ...syncRef.current, pausedAt: pos };
+        }
+        void applyTransportRef.current({ forceSeek: true });
+        return;
+      }
+
+      if (normalized === "pause") {
+        isPlayingRef.current = false;
+        syncRef.current = { ...syncRef.current, isPlaying: false };
+        setIsPlaying(false);
+        const pos =
+          typeof payload?.position === "number"
+            ? Math.max(0, payload.position)
+            : audio?.src
+              ? readPosition(audio)
+              : typeof syncRef.current.pausedAt === "number"
+                ? syncRef.current.pausedAt
+                : undefined;
+        if (typeof pos === "number") {
+          setSyncPausedAt(pos);
+          syncRef.current = { ...syncRef.current, pausedAt: pos };
+        }
+        if (audio?.src) pauseAudioAtSync(audio);
+        return;
+      }
+
+      if (normalized === "seek" && typeof payload?.position === "number") {
+        const clamped = Math.max(0, payload.position);
+        setPosition(clamped);
+        if (audio?.src) {
+          seekChannelAudio(audio, clamped);
+          suppressDriftUntilRef.current = Date.now() + 2800;
+          void playChannelAudio(audio);
+        }
+      }
+    },
+    [pauseAudioAtSync],
+  );
+
+  const primeLocalPlaybackOnControlRef = useRef(primeLocalPlaybackOnControl);
+  primeLocalPlaybackOnControlRef.current = primeLocalPlaybackOnControl;
+
   const unlockChannelAudio = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio?.src) return;
@@ -341,6 +413,7 @@ export function useChannelPlaybackEngine({
       if (controlRequestInFlightRef.current) return;
       controlRequestInFlightRef.current = true;
       try {
+        primeLocalPlaybackOnControl(action, payload);
         if (action === "next" || action === "prev") {
           haltPlaybackNow();
           setIsBuffering(true);
@@ -360,7 +433,7 @@ export function useChannelPlaybackEngine({
         controlRequestInFlightRef.current = false;
       }
     },
-    [canControl, haltPlaybackNow, onToast, sendSocketMessage],
+    [canControl, haltPlaybackNow, onToast, primeLocalPlaybackOnControl, sendSocketMessage],
   );
 
   const commitSeek = useCallback(
@@ -508,6 +581,20 @@ export function useChannelPlaybackEngine({
     if (socketState !== "closed") return;
     void refreshChannelPlaybackState({ silent: true });
   }, [channelId, refreshChannelPlaybackState, socketState]);
+
+  useEffect(() => {
+    const onPrime = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        channelId?: string;
+        action?: string;
+        payload?: Record<string, unknown>;
+      }>;
+      if (String(customEvent.detail?.channelId ?? "") !== String(channelId)) return;
+      primeLocalPlaybackOnControlRef.current(customEvent.detail?.action ?? "", customEvent.detail?.payload);
+    };
+    window.addEventListener(CHANNEL_PLAYBACK_PRIME_EVENT, onPrime as EventListener);
+    return () => window.removeEventListener(CHANNEL_PLAYBACK_PRIME_EVENT, onPrime as EventListener);
+  }, [channelId]);
 
   useEffect(() => {
     const handler = (event: Event) => {

@@ -40,6 +40,7 @@ import { RoomOnboarding } from "@/shared/room/room-onboarding";
 import { useRoomHotkeys } from "@/shared/hooks/use-room-hotkeys";
 import type { ChannelExperience } from "@/features/experience";
 import { useGlobalChannelPlayer } from "@/features/player";
+import { dispatchPlaybackPrime } from "@/features/player/model/playback-prime";
 import { useChannelPresence } from "@/shared/hooks/use-channel-presence";
 import { usePendingSuggestionsCount } from "@/shared/hooks/use-pending-suggestions-count";
 import { useReconnectingChannelSocket } from "@/shared/hooks/use-reconnecting-channel-socket";
@@ -190,9 +191,18 @@ export function ChannelDashboardTabs(props: Props) {
     setExperience((initialExperience as ChannelExperience) ?? {});
   }, [initialExperience]);
 
+  const sendPlaybackMessage = useCallback(
+    (payload: Record<string, unknown>) => {
+      const action = String(payload.action ?? "");
+      dispatchPlaybackPrime(channelId, action, payload);
+      return latestSendMessageRef.current?.(payload) ?? false;
+    },
+    [channelId],
+  );
+
   const stableSendSocketMessage = useCallback((payload: Record<string, unknown>) => {
-    return latestSendMessageRef.current?.(payload) ?? false;
-  }, []);
+    return sendPlaybackMessage(payload);
+  }, [sendPlaybackMessage]);
 
   const handleSocketMessage = useCallback(
     (payload: unknown) => {
@@ -381,7 +391,7 @@ export function ChannelDashboardTabs(props: Props) {
   useRoomHotkeys({
     enabled: membershipLoaded && !inListenerLayout,
     canControl: canManageChannel,
-    onTogglePlay: () => sendMessage({ action: isChannelOnline ? "pause" : "play" }),
+    onTogglePlay: () => sendPlaybackMessage({ action: isChannelOnline ? "pause" : "play" }),
   });
 
   useEffect(() => {
@@ -846,7 +856,7 @@ export function ChannelDashboardTabs(props: Props) {
             channelId={channelId}
             canManage={canManageChannel}
             channelIsActive={channelIsActive}
-            sendSocketMessage={sendMessage}
+            sendSocketMessage={sendPlaybackMessage}
           />
         );
       case "queue":
@@ -874,7 +884,7 @@ export function ChannelDashboardTabs(props: Props) {
             publicSlug={publicSlug}
             publicJoinSlug={publicJoinSlug}
             initialJoinRequiresApproval={initialJoinRequiresApproval ?? false}
-            sendSocketMessage={sendMessage}
+            sendSocketMessage={sendPlaybackMessage}
             channelIsActive={channelIsActive}
             canDeleteChannel={isChannelOwner}
             initialExperience={initialExperience ?? null}
